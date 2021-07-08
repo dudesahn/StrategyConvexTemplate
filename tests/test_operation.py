@@ -1,135 +1,89 @@
 import brownie
 from brownie import Contract
-import pytest
+from brownie import config
 
-
+# test passes as of 21-05-20
 def test_operation(
-    chain, accounts, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX
+    gov, token, vault, dudesahn, strategist, whale, strategy, chain, strategist_ms
 ):
-    # Deposit to the vault
-    user_balance_before = token.balanceOf(user)
-    token.approve(vault.address, amount, {"from": user})
-    vault.deposit(amount, {"from": user})
-    assert token.balanceOf(vault.address) == amount
+    ## deposit to the vault after approving
+    startingWhale = token.balanceOf(whale)
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    vault.deposit(100000e18, {"from": whale})
+    newWhale = token.balanceOf(whale)
+    starting_assets = vault.totalAssets()
 
-    # harvest
-    chain.sleep(1)
-    strategy.harvest()
-    assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
+    # harvest, store asset amount
+    strategy.harvest({"from": dudesahn})
+    # tx.call_trace(True)
+    old_assets_dai = vault.totalAssets()
+    assert old_assets_dai >= starting_assets
 
-    # tend()
-    strategy.tend()
+    # simulate a day of earnings
+    chain.sleep(86400)
+    chain.mine(1)
 
-    # withdrawal
-    vault.withdraw({"from": user})
-    assert (
-        pytest.approx(token.balanceOf(user), rel=RELATIVE_APPROX) == user_balance_before
+    # harvest after a day, store new asset amount
+    tx = strategy.harvest({"from": dudesahn})
+    # tx.call_trace(True)
+    new_assets_dai = vault.totalAssets()
+    assert new_assets_dai > old_assets_dai
+
+    # Display estimated APR based on the past month
+    print(
+        "\nEstimated DAI APR: ",
+        "{:.2%}".format(
+            ((new_assets_dai - old_assets_dai) * 365)
+            / (strategy.estimatedTotalAssets())
+        ),
     )
 
+    # set optimal to USDC. new_assets_dai is now our new baseline
+    strategy.setOptimal(1, {"from": gov})
 
-def test_emergency_exit(
-    chain, accounts, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX
-):
-    # Deposit to the vault
-    token.approve(vault.address, amount, {"from": user})
-    vault.deposit(amount, {"from": user})
-    chain.sleep(1)
-    strategy.harvest()
-    assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
-
-    # set emergency and exit
-    strategy.setEmergencyExit()
-    chain.sleep(1)
-    strategy.harvest()
-    assert strategy.estimatedTotalAssets() < amount
-
-
-def test_profitable_harvest(
-    chain, accounts, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX
-):
-    # Deposit to the vault
-    token.approve(vault.address, amount, {"from": user})
-    vault.deposit(amount, {"from": user})
-    assert token.balanceOf(vault.address) == amount
-
-    # Harvest 1: Send funds through the strategy
-    chain.sleep(1)
-    strategy.harvest()
-    assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
-
-    # TODO: Add some code before harvest #2 to simulate earning yield
-
-    # Harvest 2: Realize profit
-    chain.sleep(1)
-    strategy.harvest()
-    chain.sleep(3600 * 6)  # 6 hrs needed for profits to unlock
+    # simulate a day of earnings
+    chain.sleep(86400)
     chain.mine(1)
-    profit = token.balanceOf(vault.address)  # Profits go to vault
-    # TODO: Uncomment the lines below
-    # assert token.balanceOf(strategy) + profit > amount
-    # assert vault.pricePerShare() > before_pps
 
+    # harvest after a month, store new asset amount after switch to USDC
+    strategy.harvest({"from": dudesahn})
+    new_assets_usdc = vault.totalAssets()
+    assert new_assets_usdc > new_assets_dai
 
-def test_change_debt(
-    chain, gov, token, vault, strategy, user, strategist, amount, RELATIVE_APPROX
-):
-    # Deposit to the vault and harvest
-    token.approve(vault.address, amount, {"from": user})
-    vault.deposit(amount, {"from": user})
-    vault.updateStrategyDebtRatio(strategy.address, 5_000, {"from": gov})
-    chain.sleep(1)
-    strategy.harvest()
-    half = int(amount / 2)
+    # Display estimated APR based on the past month
+    print(
+        "\nEstimated USDC APR: ",
+        "{:.2%}".format(
+            ((new_assets_usdc - new_assets_dai) * 365)
+            / (strategy.estimatedTotalAssets())
+        ),
+    )
 
-    assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == half
+    # set optimal to USDT, new_assets_usdc is now our new baseline
+    strategy.setOptimal(2, {"from": gov})
 
-    vault.updateStrategyDebtRatio(strategy.address, 10_000, {"from": gov})
-    chain.sleep(1)
-    strategy.harvest()
-    assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == amount
+    # simulate a day of earnings
+    chain.sleep(86400)
+    chain.mine(1)
 
-    # In order to pass this tests, you will need to implement prepareReturn.
-    # TODO: uncomment the following lines.
-    # vault.updateStrategyDebtRatio(strategy.address, 5_000, {"from": gov})
-    # chain.sleep(1)
-    # strategy.harvest()
-    # assert pytest.approx(strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX) == half
+    # harvest after a month, store new asset amount
+    strategy.harvest({"from": dudesahn})
+    new_assets_usdt = vault.totalAssets()
+    assert new_assets_usdt > new_assets_usdc
 
+    # Display estimated APR based on the past month
+    print(
+        "\nEstimated USDT APR: ",
+        "{:.2%}".format(
+            ((new_assets_usdt - new_assets_usdc) * 365)
+            / (strategy.estimatedTotalAssets())
+        ),
+    )
 
-def test_sweep(gov, vault, strategy, token, user, amount, weth, weth_amout):
-    # Strategy want token doesn't work
-    token.transfer(strategy, amount, {"from": user})
-    assert token.address == strategy.want()
-    assert token.balanceOf(strategy) > 0
-    with brownie.reverts("!want"):
-        strategy.sweep(token, {"from": gov})
+    # simulate a day of waiting for share price to bump back up
+    chain.sleep(86400)
+    chain.mine(1)
 
-    # Vault share token doesn't work
-    with brownie.reverts("!shares"):
-        strategy.sweep(vault.address, {"from": gov})
-
-    # TODO: If you add protected tokens to the strategy.
-    # Protected token doesn't work
-    # with brownie.reverts("!protected"):
-    #     strategy.sweep(strategy.protectedToken(), {"from": gov})
-
-    before_balance = weth.balanceOf(gov)
-    weth.transfer(strategy, weth_amout, {"from": user})
-    assert weth.address != strategy.want()
-    assert weth.balanceOf(user) == 0
-    strategy.sweep(weth, {"from": gov})
-    assert weth.balanceOf(gov) == weth_amout + before_balance
-
-
-def test_triggers(
-    chain, gov, vault, strategy, token, amount, user, weth, weth_amout, strategist
-):
-    # Deposit to the vault and harvest
-    token.approve(vault.address, amount, {"from": user})
-    vault.deposit(amount, {"from": user})
-    vault.updateStrategyDebtRatio(strategy.address, 5_000, {"from": gov})
-    chain.sleep(1)
-    strategy.harvest()
-
-    strategy.harvestTrigger(0)
-    strategy.tendTrigger(0)
+    # withdraw and confirm we made money
+    vault.withdraw({"from": whale})
+    assert token.balanceOf(whale) > startingWhale
