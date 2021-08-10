@@ -19,7 +19,7 @@ import {
 
 /* ========== CONTRACT ========== */
 
-contract StrategyCurveIBVoterProxy is BaseStrategy {
+contract StrategyCurveEURtVoterProxy is BaseStrategy {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
@@ -81,7 +81,7 @@ contract StrategyCurveIBVoterProxy is BaseStrategy {
     }
 
     function name() external view override returns (string memory) {
-        return "StrategyCurveIBVoterProxy";
+        return "StrategyCurveEURtVoterProxy";
     }
 
     // total assets held by strategy
