@@ -8,53 +8,58 @@ def isolation(fn_isolation):
 
 
 # Define relevant tokens and contracts in this section
-
-
 @pytest.fixture(scope="module")
 def token():
-    # this should be the address of the ERC-20 used by the strategy/vault. In this case, Curve's Iron Bank Pool token
-    token_address = "0x5282a4eF67D9C33135340fB3289cc1711c13638C"
+    # this should be the address of the ERC-20 used by the strategy/vault. In this case, EURt
+    token_address = "0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890"
     yield Contract(token_address)
 
 
 @pytest.fixture(scope="module")
-def crv():
+def healthCheck():
+    yield Contract("0xDDCea799fF1699e98EDF118e0629A974Df7DF012")
+
+
+@pytest.fixture(scope="module")
+def farmed():
+    # this is the token that we are farming and selling for more of our want. 
     yield Contract("0xD533a949740bb3306d119CC777fa900bA034cd52")
 
 
-@pytest.fixture(scope="module")
-def dai():
-    yield Contract("0x6B175474E89094C44Da98b954EedeAC495271d0F")
+# Add any extra contracts we need here, such as staking contracts
 
-
-@pytest.fixture(scope="module")
-def strategyProxy():
-    # This is Yearn's StrategyProxy contract, overlord of the Curve world
-    yield Contract("0xA420A63BbEFfbda3B147d0585F1852C358e2C152")
-
-
-@pytest.fixture(scope="module")
+# yearn's curve voter
+@pytest.fixture(scope="function")
 def voter():
-    # this is yearn's veCRV voter, where all gauge tokens are held (for v2 curve gauges that are tokenized)
     yield Contract("0xF147b8125d2ef93FB6965Db97D6746952a133934")
 
 
 @pytest.fixture(scope="module")
-def gaugeIB():
-    # this is the gauge contract for the Iron Bank Curve Pool, in Curve v2 these are tokenized.
-    yield Contract("0xF5194c3325202F456c95c1Cf0cA36f8475C1949F")
+def other_vault_strategy():
+    yield Contract("0x8423590CD0343c4E18d35aA780DF50a5751bebae")
+
+
+@pytest.fixture(scope="module")
+def gauge():
+    yield Contract("0xe8060Ad8971450E624d5289A10017dD30F5dA85F")
+
+
+@pytest.fixture(scope="function")
+def proxy():
+    yield Contract("0xA420A63BbEFfbda3B147d0585F1852C358e2C152")
+    
+    
+@pytest.fixture(scope="module")
+def pool():
+    yield Contract("0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890")
 
 
 # Define any accounts in this section
+# for live testing, governance is the strategist MS; we will update this before we endorse
+# normal gov is ychad, 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52
 @pytest.fixture(scope="module")
 def gov(accounts):
-    # yearn multis... I mean YFI governance. I swear!
     yield accounts.at("0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52", force=True)
-
-
-@pytest.fixture(scope="module")
-def dudesahn(accounts):
-    yield accounts.at("0xBedf3Cf16ba1FcE6c3B751903Cf77E51d51E05b8", force=True)
 
 
 @pytest.fixture(scope="module")
@@ -64,19 +69,13 @@ def strategist_ms(accounts):
 
 
 @pytest.fixture(scope="module")
-def new_address(accounts):
-    # new account for voter and proxy tests
-    yield accounts.at("0xb5DC07e23308ec663E743B1196F5a5569E4E0555", force=True)
-
-
-@pytest.fixture(scope="module")
 def keeper(accounts):
-    yield accounts[0]
+    yield accounts.at("0xBedf3Cf16ba1FcE6c3B751903Cf77E51d51E05b8", force=True)
 
 
 @pytest.fixture(scope="module")
 def rewards(accounts):
-    yield accounts[1]
+    yield accounts.at("0x8Ef63b525fceF7f8662D98F77f5C9A86ae7dFE09", force=True)
 
 
 @pytest.fixture(scope="module")
@@ -95,36 +94,71 @@ def strategist(accounts):
 
 
 @pytest.fixture(scope="module")
-def strategist_ms(accounts):
-    # like governance, but better
-    yield accounts.at("0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7", force=True)
-
-
-@pytest.fixture(scope="module")
 def whale(accounts):
     # Totally in it for the tech
-    whale = accounts.at("0x9817569Dc3015C84846159dAbcb80425186f506f", force=True)
+    # Update this with a large holder of your want token (the only EOA holder of EURt LP)
+    whale = accounts.at("0x1eb8271d94292d5bb9e043eb94ba0904115eb5f4", force=True)
     yield whale
 
 
+# # list any existing strategies here
+# @pytest.fixture(scope="module")
+# def LiveStrategy_1():
+#     yield Contract("0xC1810aa7F733269C39D640f240555d0A4ebF4264")
+
+
+# use this if you need to deploy the vault
 @pytest.fixture(scope="function")
-def vault(pm):
+def vault(pm, gov, rewards, guardian, management, token, chain):
     Vault = pm(config["dependencies"][0]).Vault
-    vault = Vault.at("0x27b7b1ad7288079A66d12350c828D3C00A6F07d7")
+    vault = guardian.deploy(Vault)
+    vault.initialize(token, gov, rewards, "", "", guardian)
+    vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
+    vault.setManagement(management, {"from": gov})
+    chain.sleep(1)
     yield vault
 
 
+# use this if your vault is already deployed
+# @pytest.fixture(scope="function")
+# def vault(pm, gov, rewards, guardian, management, token, chain):
+#     vault = Contract("0x497590d2d57f05cf8B42A36062fA53eBAe283498")
+#     yield vault
+
+
+# replace the first value with the name of your strategy
 @pytest.fixture(scope="function")
 def strategy(
-    strategist, keeper, vault, gov, StrategyCurveIBVoterProxy, guardian, strategyProxy
+    StrategyCurveEURtVoterProxy,
+    strategist,
+    keeper,
+    vault,
+    gov,
+    guardian,
+    token,
+    healthCheck,
+    chain,
+    proxy
 ):
     # parameters for this are: strategy, vault, max deposit, minTimePerInvest, slippage protection (10000 = 100% slippage allowed),
-    strategy = strategist.deploy(StrategyCurveIBVoterProxy, vault)
+    strategy = strategist.deploy(StrategyCurveEURtVoterProxy, vault)
     strategy.setKeeper(keeper, {"from": gov})
-    strategyProxy.approveStrategy(strategy.gauge(), strategy, {"from": gov})
+    # set our management fee to zero so it doesn't mess with our profit checking
     vault.setManagementFee(0, {"from": gov})
-    vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1000, {"from": gov})
-    strategy.setStrategist(strategist, {"from": gov})
-    # we harvest to deploy all funds to this strategy
+    # add our new strategy
+    vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
+    proxy.approveStrategy(strategy.gauge(), strategy, {"from": gov})
+    strategy.setHealthCheck(healthCheck, {"from": gov})
+    strategy.setDoHealthCheck(True, {"from": gov})
+    chain.sleep(1)
     strategy.harvest({"from": gov})
+    chain.sleep(1)
     yield strategy
+
+
+# use this if your strategy is already deployed
+# @pytest.fixture(scope="function")
+# def strategy():
+#     # parameters for this are: strategy, vault, max deposit, minTimePerInvest, slippage protection (10000 = 100% slippage allowed),
+#     strategy = Contract("0xC1810aa7F733269C39D640f240555d0A4ebF4264")
+#     yield strategy

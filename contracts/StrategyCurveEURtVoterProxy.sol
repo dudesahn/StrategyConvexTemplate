@@ -17,26 +17,41 @@ import {
     StrategyParams
 } from "@yearnvaults/contracts/BaseStrategy.sol";
 
+interface IUniswapv3 {
+
+    struct ExactInputParams {
+        bytes path;
+        address recipient;
+        uint256 deadline;
+        uint256 amountIn;
+        uint256 amountOutMinimum;
+    }
+
+    function exactInput(
+        ExactInputParams calldata params
+    ) external payable returns (uint256 amountOut);
+}
+
 contract StrategyCurveEURtVoterProxy is BaseStrategy {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
 
     address public constant gauge =
-        address(0xF5194c3325202F456c95c1Cf0cA36f8475C1949F); // Curve Iron Bank Gauge contract, v2 is tokenized, held by Yearn's voter
+        address(0xe8060Ad8971450E624d5289A10017dD30F5dA85F); // Curve EURt Gauge contract, tokenized, held by Yearn's voter
     ICurveStrategyProxy public proxy =
-        ICurveStrategyProxy(
-            address(0xA420A63BbEFfbda3B147d0585F1852C358e2C152)
-        ); // Yearn's Updated v4 StrategyProxy
+        ICurveStrategyProxy(0xA420A63BbEFfbda3B147d0585F1852C358e2C152); // Yearn's Updated v4 StrategyProxy
 
     uint256 public optimal;
 
     ICurveFi public constant curve =
-        ICurveFi(address(0x2dded6Da1BF5DBdF597C45fcFaa3194e53EcfeAF)); // Curve Iron Bank Pool
+        ICurveFi(address(0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890)); // Curve EURt Pool
     address public constant voter =
         address(0xF147b8125d2ef93FB6965Db97D6746952a133934); // Yearn's veCRV voter
-    address public constant crvRouter =
+    address public constant sushiswap =
         address(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F); // default to sushiswap, more CRV liquidity there
+    address public constant uniV3 = address(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+
     address[] public crvPath;
 
     // Swap stuff
@@ -52,43 +67,49 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
     IERC20 public constant eurt =
         IERC20(0xC581b735A1688071A1746c968e0798D642EDE491);
 
+    /* ========== CONSTRUCTOR ========== */
+
     constructor(address _vault) public BaseStrategy(_vault) {
         // You can set these parameters on deployment to whatever you want
+        minReportDelay = 0;
         maxReportDelay = 504000; // 140 hours in seconds
-        debtThreshold = 400 * 1e18; // we shouldn't ever have debt, but set a bit of a buffer
+        debtThreshold = 5 * 1e18; // we shouldn't ever have debt, but set a bit of a buffer
         profitFactor = 4000; // in this strategy, profitFactor is only used for telling keep3rs when to move funds from vault to strategy
+        healthCheck = address(0xDDCea799fF1699e98EDF118e0629A974Df7DF012); // health.ychad.eth
 
         // want = crvIB, Curve's Iron Bank pool (ycDai+ycUsdc+ycUsdt)
         want.safeApprove(address(proxy), type(uint256).max);
 
         // add approvals for crv on sushiswap and uniswap due to weird crv approval issues for setCrvRouter
         // add approvals on all tokens
-        crv.approve(crvRouter, type(uint256).max);
-        dai.safeApprove(address(curve), type(uint256).max);
-        usdc.safeApprove(address(curve), type(uint256).max);
-        usdt.safeApprove(address(curve), type(uint256).max);
+        crv.approve(sushiswap, type(uint256).max);
+        eurt.safeApprove(address(curve), type(uint256).max);
+        weth.safeApprove(uniV3, type(uint256).max);
 
-        crvPath = new address[](3);
+        crvPath = new address[](2);
         crvPath[0] = address(crv);
         crvPath[1] = address(weth);
-        crvPath[2] = address(usdt);
     }
+
+    /* ========== VIEWS ========== */
 
     function name() external view override returns (string memory) {
         return "StrategyCurveEURtVoterProxy";
     }
 	
-    function _stakedBalance() public view returns (uint256) {
+    function _stakedBalance() internal view returns (uint256) {
         return proxy.balanceOf(gauge);
     }
 
-    function _balanceOfWant() public view returns (uint256) {
+    function _balanceOfWant() internal view returns (uint256) {
         return want.balanceOf(address(this));
     }
 
     function estimatedTotalAssets() public view override returns (uint256) {
         return _balanceOfWant().add(_stakedBalance());
     }
+
+    /* ========== MUTATIVE FUNCTIONS ========== */
 
     function prepareReturn(uint256 _debtOutstanding)
         internal
@@ -102,25 +123,25 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
         // if we have anything in the gauge, then harvest CRV from the gauge
         if (_stakedBalance() > 0) {
             proxy.harvest(gauge);
-            uint256 crvBalance = crv.balanceOf(address(this));
+            uint256 _crvBalance = crv.balanceOf(address(this));
             // if we claimed any CRV, then sell it
-            if (crvBalance > 0) {
+            if (_crvBalance > 0) {
             	
             	// keep some of our CRV to increase our boost
-                uint256 _keepCRV = crvBalance.mul(keepCRV).div(FEE_DENOMINATOR);
+                uint256 _keepCRV = _crvBalance.mul(keepCRV).div(FEE_DENOMINATOR);
                 IERC20(address(crv)).safeTransfer(voter, _keepCRV);
-                uint256 crvRemainder = crvBalance.sub(_keepCRV);
+                uint256 _crvRemainder = _crvBalance.sub(_keepCRV);
                 
                 // sell the rest of our CRV
-                _sell(crvRemainder);
+                _sell(_crvRemainder);
                 
-                // convert our USDT to EURt
-                uint256 usdtBalance = IERC20(usdt).balanceOf(address(this));
-                _sell_v3(usdtBalance);
+                // convert our WETH to EURt, but don't want to swap dust
+                uint256 _wethBalance = IERC20(weth).balanceOf(address(this));
+                if (_wethBalance > 0) _sell_v3(_wethBalance);
                 
                 // deposit our EURt to Curve
-                uint256 eurtBalance = eurt.balanceOf(address(this));
-                curve.add_liquidity([eurtBalance, 0], 0);
+                uint256 _eurtBalance = eurt.balanceOf(address(this));
+                curve.add_liquidity([_eurtBalance, 0], 0);
 
             }
         }
@@ -131,7 +152,7 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
 
         // if assets are greater than debt, things are working great!
         if (assets > debt) {
-            _profit = want.balanceOf(address(this));
+            _profit = assets.sub(debt);
         }
         // if assets are less than debt, we are in trouble
         else {
@@ -140,20 +161,24 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
 
         // debtOustanding will only be > 0 in the event of revoking or lowering debtRatio of a strategy
         if (_debtOutstanding > 0) {
-            proxy.withdraw(
-                gauge,
-                address(want),
-                Math.min(_stakedBalance(), _debtOutstanding)
-            );
-
-            _debtPayment = Math.min(
-                _debtOutstanding,
-                want.balanceOf(address(this))
-            );
-            // want to make sure we report losses properly here
+            if (_stakedBalance() > 0) { // don't bother withdrawing if we don't have staked funds
+            	proxy.withdraw(
+                	gauge,
+                	address(want),
+               	 Math.min(_stakedBalance(), _debtOutstanding)
+                );
+            }
+            uint256 withdrawnBal = _balanceOfWant();
+            _debtPayment = Math.min(_debtOutstanding, withdrawnBal);
             if (_debtPayment < _debtOutstanding) {
                 _loss = _debtOutstanding.sub(_debtPayment);
-                _profit = 0;
+                if(_profit > _loss){
+                    _profit = _profit.sub(_loss);
+                    _loss = 0;
+                }else{
+                    _loss = _loss.sub(_profit);
+                    _profit = 0;
+                }
             }
         }
     }
@@ -162,8 +187,8 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
         if (emergencyExit) {
             return;
         }
-        // Send all of our Iron Bank pool tokens to the proxy and deposit to the gauge if we have any
-        uint256 _toInvest = want.balanceOf(address(this));
+        // Send all of our LP tokens to the proxy and deposit to the gauge if we have any
+        uint256 _toInvest = _balanceOfWant();
         if (_toInvest > 0) {
             want.safeTransfer(address(proxy), _toInvest);
             proxy.deposit(gauge, address(want));
@@ -175,26 +200,34 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
         override
         returns (uint256 _liquidatedAmount, uint256 _loss)
     {
-        uint256 wantBal = want.balanceOf(address(this));
-        if (_amountNeeded > wantBal) {
-            proxy.withdraw(
-                gauge,
-                address(want),
-                Math.min(_stakedBalance(), _amountNeeded - wantBal)
-            );
-            uint256 withdrawnBal = want.balanceOf(address(this));
-            _liquidatedAmount = Math.min(_amountNeeded, withdrawnBal);
-
+        if (_amountNeeded > _balanceOfWant()) { // check if we have enough free funds to cover the withdrawal
+            if (_stakedBalance() > 0) {
+            	proxy.withdraw(
+                	gauge,
+                	address(want),
+                	Math.min(_stakedBalance(), _amountNeeded - _balanceOfWant())
+            	);
+            }
+            uint256 _withdrawnBal = _balanceOfWant();
+            _liquidatedAmount = Math.min(_amountNeeded, _withdrawnBal);
             _loss = _amountNeeded.sub(_liquidatedAmount);
         } else {
             // we have enough balance to cover the liquidation available
             return (_amountNeeded, 0);
         }
     }
+	
+	// fire sale, get rid of it all!
+    function liquidateAllPositions() internal override returns (uint256) {
+        if (_stakedBalance() > 0) { // don't bother withdrawing zero
+            proxy.withdraw(gauge, address(want), _stakedBalance());
+        }
+        return _balanceOfWant();
+    }
 
-    // Sells our harvested CRV into the selected output (DAI, USDC, or USDT).
+    // Sells our harvested CRV into the selected output (USDT).
     function _sell(uint256 _amount) internal {
-        IUniswapV2Router02(crvRouter).swapExactTokensForTokens(
+        IUniswapV2Router02(sushiswap).swapExactTokensForTokens(
             _amount,
             uint256(0),
             crvPath,
@@ -203,13 +236,15 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
         );
     }
 
-    // Sells our harvested CRV into the selected output (DAI, USDC, or USDT).
+    // Sells our USDT for EURt
     function _sell_v3(uint256 _amount) internal {
-        UniV3(uniswapv3).exactInput(UniV3.ExactInputParams(
+        IUniswapv3(uniV3).exactInput(IUniswapv3.ExactInputParams(
             abi.encodePacked(
-                usdt, 
-                uint24(500), 
-                eurt
+                address(weth),
+                uint24(500),
+                address(usdt),
+                uint24(500),
+                address(eurt)
             ),
             address(this),
             now,
@@ -236,6 +271,7 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
         return protected;
     }
 
+    // our main trigger is regarding our DCA since there is low liquidity for $XYZ
     function harvestTrigger(uint256 callCostinEth)
         public
         view
@@ -268,34 +304,20 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
         // Trigger if we have a loss to report
         if (total.add(debtThreshold) < params.totalDebt) return true;
 
-        // Trigger if it makes sense for the vault to send funds idle funds from the vault to the strategy
-        uint256 profit = 0;
-        if (total > params.totalDebt) profit = total.sub(params.totalDebt); // We've earned a profit!
-
-        // calculate how much the call costs in dollars (converted from ETH)
-        uint256 callCost = ethToDai(callCostinEth);
-
-        // check if it makes sense to send funds from vault to strategy
-        uint256 credit = vault.creditAvailable();
-        if (profitFactor.mul(callCost) < credit.add(profit)) return true;
+        // Trigger if we haven't harvested in the last week
+        uint256 week = 86400 * 7;
+        if (block.timestamp.sub(params.lastReport) > week) {
+            return true;
+        }
     }
 
-    // convert our keeper's eth cost into dai
-    function ethToDai(uint256 _ethAmount) internal view returns (uint256) {
-        if (_ethAmount > 0) {
-            address[] memory ethPath = new address[](2);
-            ethPath[0] = address(weth);
-            ethPath[1] = address(dai);
-            uint256[] memory callCostInDai =
-                IUniswapV2Router02(crvRouter).getAmountsOut(
-                    _ethAmount,
-                    ethPath
-                );
-
-            return callCostInDai[callCostInDai.length - 1];
-        } else {
-            return 0;
-        }
+    function ethToWant(uint256 _amtInWei)
+        public
+        view
+        override
+        returns (uint256)
+    {
+        return _amtInWei;
     }
 
     /* ========== SETTERS ========== */

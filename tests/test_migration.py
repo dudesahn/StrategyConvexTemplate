@@ -1,52 +1,75 @@
 import brownie
 from brownie import Contract
 from brownie import config
+import math
 
-# TODO: Add tests that show proper migration of the strategy to a newer one
-#       Use another copy of the strategy to simulate the migration
-#       Show that nothing is lost!
 
-# test passes as of 21-05-20
 def test_migration(
+    StrategyCurveEURtVoterProxy,
     gov,
     token,
     vault,
-    dudesahn,
+    guardian,
     strategist,
     whale,
     strategy,
     chain,
+    proxy,
     strategist_ms,
-    strategyProxy,
-    gaugeIB,
-    StrategyCurveIBVoterProxy,
+    healthCheck
 ):
+
+    ## deposit to the vault after approving
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    vault.deposit(20e18, {"from": whale})
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+
     # deploy our new strategy
-    new_strategy = dudesahn.deploy(StrategyCurveIBVoterProxy, vault)
+    new_strategy = strategist.deploy(StrategyCurveEURtVoterProxy, vault)
     total_old = strategy.estimatedTotalAssets()
+
+    # can we harvest an unactivated strategy? should be no
+    tx = new_strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be False.", tx)
+    assert tx == False
+
+    # sleep for a week to build up some rewards
+    chain.sleep(86400 * 7)
 
     # migrate our old strategy
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})
+    proxy.approveStrategy(new_strategy.gauge(), new_strategy, {"from": gov})
+    new_strategy.setHealthCheck(healthCheck, {"from": gov})
+    new_strategy.setDoHealthCheck(True, {"from": gov})
 
     # assert that our old strategy is empty
     updated_total_old = strategy.estimatedTotalAssets()
     assert updated_total_old == 0
 
     # harvest to get funds back in strategy
-    strategyProxy.approveStrategy(new_strategy.gauge(), new_strategy, {"from": gov})
-    new_strategy.harvest({"from": dudesahn})
+    chain.sleep(1)
+    new_strategy.harvest({"from": gov})
     new_strat_balance = new_strategy.estimatedTotalAssets()
-    assert new_strat_balance >= total_old
+
+    # confirm we made money, or at least that we have about the same
+    assert new_strat_balance >= total_old or math.isclose(
+        new_strat_balance, total_old, abs_tol=5
+    )
 
     startingVault = vault.totalAssets()
     print("\nVault starting assets with new strategy: ", startingVault)
 
-    # simulate a day of waiting for share price to bump back up
+    # simulate one day of earnings
     chain.sleep(86400)
     chain.mine(1)
 
     # Test out our migrated strategy, confirm we're making a profit
-    new_strategy.harvest({"from": dudesahn})
+    new_strategy.harvest({"from": gov})
     vaultAssets_2 = vault.totalAssets()
-    assert vaultAssets_2 > startingVault
+    # confirm we made money, or at least that we have about the same
+    assert vaultAssets_2 >= startingVault or math.isclose(
+        vaultAssets_2, startingVault, abs_tol=5
+    )
     print("\nAssets after 1 day harvest: ", vaultAssets_2)

@@ -1,60 +1,52 @@
 import brownie
 from brownie import Contract
 from brownie import config
+import math
 
-# test passes as of 21-05-20
+
 def test_simple_harvest(
-    gov,
-    token,
-    vault,
-    dudesahn,
-    strategist,
-    whale,
-    strategy,
-    chain,
-    strategist_ms,
-    strategyProxy,
-    gaugeIB,
+    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, gauge, voter
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(100000e18, {"from": whale})
+    vault.deposit(20e18, {"from": whale})
     newWhale = token.balanceOf(whale)
 
-    # harvest, store asset amount
-    strategy.harvest({"from": gov})
-    old_assets_dai = vault.totalAssets()
-    assert old_assets_dai > 0
-    assert token.balanceOf(strategy) == 0
-    assert strategyProxy.balanceOf(gaugeIB) > 0
-    print("\nStaked Assets: ", strategyProxy.balanceOf(gaugeIB) / 1e18)
-    print("\nStarting Assets: ", old_assets_dai / 1e18)
+    # this is part of our check into the staking contract balance
+    stakingBeforeHarvest = gauge.balanceOf(voter)
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # harvest, store asset amount
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+    old_assets = vault.totalAssets()
+    assert old_assets > 0
+    assert token.balanceOf(strategy) == 0
+    assert strategy.estimatedTotalAssets() > 0
+    print("\nStarting Assets: ", old_assets / 1e18)
+
+    # try and include custom logic here to check that funds are in the staking contract (if needed)
+    assert gauge.balanceOf(voter) > stakingBeforeHarvest
+
+    # simulate 7 days of earnings
+    chain.sleep(86400 * 7)
     chain.mine(1)
 
-    # harvest after a day, store new asset amount
-    print("\nClaimable CRV after 1 day: ", strategyProxy.balanceOf(gaugeIB) / 1e18)
+    # harvest, store new asset amount
+    chain.sleep(1)
     strategy.harvest({"from": gov})
-    print(
-        "\nClaimable CRV after 1 day and harvest: ",
-        strategyProxy.balanceOf(gaugeIB) / 1e18,
-    )
-    # tx.call_trace(True)
-    new_assets_dai = vault.totalAssets()
-    # we can't use strategyEstimated Assets because the profits are sent to the vault
-    assert new_assets_dai > old_assets_dai
-    print("\nAssets after 1 day: ", new_assets_dai / 1e18)
-    print("\nStaked Assets after 1 day: ", strategyProxy.balanceOf(gaugeIB) / 1e18)
+    chain.sleep(1)
+    new_assets = vault.totalAssets()
+    # confirm we made money, or at least that we have about the same
+    assert new_assets >= old_assets or math.isclose(new_assets, old_assets, abs_tol=5)
+    print("\nAssets after 7 days: ", new_assets / 1e18)
 
-    # Display estimated APR based on the past day
+    # Display estimated APR
     print(
-        "\nEstimated DAI APR: ",
+        "\nEstimated EURt APR: ",
         "{:.2%}".format(
-            ((new_assets_dai - old_assets_dai) * 365)
-            / (strategy.estimatedTotalAssets())
+            ((new_assets - old_assets) * (365 / 7)) / (strategy.estimatedTotalAssets())
         ),
     )
 
@@ -62,6 +54,8 @@ def test_simple_harvest(
     chain.sleep(86400)
     chain.mine(1)
 
-    # withdraw and confirm we made money
+    # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) > startingWhale
+    assert token.balanceOf(whale) >= startingWhale or math.isclose(
+        token.balanceOf(whale), startingWhale, abs_tol=5
+    )

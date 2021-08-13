@@ -26,9 +26,8 @@ interface ICurveFi {
 
     function add_liquidity(
         // Iron bank pool
-        uint256[3] calldata amounts,
-        uint256 min_mint_amount,
-        bool use_underlying
+        uint256[2] calldata amounts,
+        uint256 min_mint_amount
     ) external payable;
 
     function remove_liquidity_imbalance(
