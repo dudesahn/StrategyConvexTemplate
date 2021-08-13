@@ -1,31 +1,42 @@
 import brownie
 from brownie import Contract
 from brownie import config
+import math
 
-# test passes as of 21-06-26
+
 def test_remove_from_withdrawal_queue(
-    gov, token, vault, whale, strategy, chain, dudesahn
+    gov, token, vault, whale, strategy, chain,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(10000e18, {"from": whale})
-    strategy.harvest({"from": dudesahn})
+    vault.deposit(20e18, {"from": whale})
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
 
-    # simulate a day of earnings
-    chain.sleep(86400)
+    # simulate nine days of earnings to make sure we hit at least one epoch of rewards
+    chain.sleep(86400 * 9)
     chain.mine(1)
-    strategy.harvest({"from": dudesahn})
-
-    # simulate a day of earnings
-    chain.sleep(86400)
-    chain.mine(1)
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
     before = strategy.estimatedTotalAssets()
 
-    # remove strategy from queue, then confirm that our funds haven't gone anywhere
+    # set emergency and exit, then confirm that the strategy has no funds
     vault.removeStrategyFromQueue(strategy, {"from": gov})
     after = strategy.estimatedTotalAssets()
     assert before == after
 
-    zero = "0x0000000000000000000000000000000000000000"
-    assert vault.withdrawalQueue(2) == zero
+    # check that our strategy is no longer in the withdrawal queue's 20 addresses
+    addresses = []
+    for x in range(19):
+        address = vault.withdrawalQueue(x)
+        addresses.append(address)
+    print(
+        "Strategy Address: ",
+        strategy.address,
+        "\nWithdrawal Queue Addresses: ",
+        addresses,
+    )
+    assert not strategy.address in addresses

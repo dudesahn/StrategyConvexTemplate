@@ -1,47 +1,53 @@
 import brownie
 from brownie import Contract
 from brownie import config
+import math
 
-# test passes as of 21-05-20
+# test passes as of 21-06-26
 def test_change_debt(
-    gov,
-    token,
-    vault,
-    dudesahn,
-    strategist,
-    whale,
-    strategy,
-    chain,
-    strategist_ms,
-    strategyProxy,
-    gaugeIB,
+    gov, token, vault, strategist, whale, strategy, chain,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(100000e18, {"from": whale})
-    newWhale = token.balanceOf(whale)
-    starting_assets = vault.totalAssets()
+    vault.deposit(20e18, {"from": whale})
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
 
     # evaluate our current total assets
-    startingLive = strategyProxy.balanceOf(gaugeIB)
+    old_assets = vault.totalAssets()
+    startingStrategy = strategy.estimatedTotalAssets()
 
     # debtRatio is in BPS (aka, max is 10,000, which represents 100%), and is a fraction of the funds that can be in the strategy
-    currentDebt = vault.strategies(strategy)[2]
+    currentDebt = 10000
     vault.updateStrategyDebtRatio(strategy, currentDebt / 2, {"from": gov})
-    strategy.harvest({"from": dudesahn})
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
 
-    assert strategyProxy.balanceOf(gaugeIB) < (startingLive)
+    assert strategy.estimatedTotalAssets() <= startingStrategy
+
+    # simulate nine days of earnings
+    chain.sleep(86400 * 9)
+    chain.mine(1)
 
     # set DebtRatio back to 100%
     vault.updateStrategyDebtRatio(strategy, currentDebt, {"from": gov})
-    strategy.harvest({"from": dudesahn})
-    assert strategyProxy.balanceOf(gaugeIB) >= startingLive
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+
+    # evaluate our current total assets
+    new_assets = vault.totalAssets()
+
+    # confirm we made money, or at least that we have about the same
+    assert new_assets >= old_assets or math.isclose(new_assets, old_assets, abs_tol=5)
 
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
     chain.mine(1)
 
-    # withdraw and confirm we made money
+    # withdraw and confirm our whale made money
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) > startingWhale
+    assert token.balanceOf(whale) >= startingWhale
