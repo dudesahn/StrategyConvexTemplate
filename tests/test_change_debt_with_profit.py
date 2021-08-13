@@ -50,7 +50,7 @@ def test_change_debt_with_profit(
     strategy.harvest({"from": gov})
     chain.sleep(1)
     new_params = vault.strategies(strategy).dict()
-    
+
     profit = new_params["totalGain"] - prev_params["totalGain"]
 
     # check that we've recorded a gain

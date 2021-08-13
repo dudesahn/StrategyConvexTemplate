@@ -17,7 +17,7 @@ def test_emergency_shutdown_from_vault(
 
     # simulate one day of earnings
     chain.sleep(86400)
-    
+
     chain.mine(1)
     strategy.harvest({"from": gov})
 

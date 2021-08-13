@@ -16,7 +16,7 @@ def test_migration(
     chain,
     proxy,
     strategist_ms,
-    healthCheck
+    healthCheck,
 ):
 
     ## deposit to the vault after approving

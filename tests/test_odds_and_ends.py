@@ -143,7 +143,7 @@ def test_odds_and_ends_migration(
     strategy,
     chain,
     strategist_ms,
-    proxy
+    proxy,
 ):
 
     ## deposit to the vault after approving

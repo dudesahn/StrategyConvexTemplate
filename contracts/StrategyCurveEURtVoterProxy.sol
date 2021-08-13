@@ -18,7 +18,6 @@ import {
 } from "@yearnvaults/contracts/BaseStrategy.sol";
 
 interface IUniswapv3 {
-
     struct ExactInputParams {
         bytes path;
         address recipient;
@@ -27,9 +26,10 @@ interface IUniswapv3 {
         uint256 amountOutMinimum;
     }
 
-    function exactInput(
-        ExactInputParams calldata params
-    ) external payable returns (uint256 amountOut);
+    function exactInput(ExactInputParams calldata params)
+        external
+        payable
+        returns (uint256 amountOut);
 }
 
 contract StrategyCurveEURtVoterProxy is BaseStrategy {
@@ -50,7 +50,8 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
         address(0xF147b8125d2ef93FB6965Db97D6746952a133934); // Yearn's veCRV voter
     address public constant sushiswap =
         address(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F); // default to sushiswap, more CRV liquidity there
-    address public constant uniV3 = address(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+    address public constant uniV3 =
+        address(0xE592427A0AEce92De3Edee1F18E0157C05861564);
 
     address[] public crvPath;
 
@@ -96,7 +97,7 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
     function name() external view override returns (string memory) {
         return "StrategyCurveEURtVoterProxy";
     }
-	
+
     function _stakedBalance() internal view returns (uint256) {
         return proxy.balanceOf(gauge);
     }
@@ -126,23 +127,22 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
             uint256 _crvBalance = crv.balanceOf(address(this));
             // if we claimed any CRV, then sell it
             if (_crvBalance > 0) {
-            	
-            	// keep some of our CRV to increase our boost
-                uint256 _keepCRV = _crvBalance.mul(keepCRV).div(FEE_DENOMINATOR);
+                // keep some of our CRV to increase our boost
+                uint256 _keepCRV =
+                    _crvBalance.mul(keepCRV).div(FEE_DENOMINATOR);
                 IERC20(address(crv)).safeTransfer(voter, _keepCRV);
                 uint256 _crvRemainder = _crvBalance.sub(_keepCRV);
-                
+
                 // sell the rest of our CRV
                 _sell(_crvRemainder);
-                
+
                 // convert our WETH to EURt, but don't want to swap dust
                 uint256 _wethBalance = IERC20(weth).balanceOf(address(this));
                 if (_wethBalance > 0) _sell_v3(_wethBalance);
-                
+
                 // deposit our EURt to Curve
                 uint256 _eurtBalance = eurt.balanceOf(address(this));
                 curve.add_liquidity([_eurtBalance, 0], 0);
-
             }
         }
 
@@ -161,21 +161,22 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
 
         // debtOustanding will only be > 0 in the event of revoking or lowering debtRatio of a strategy
         if (_debtOutstanding > 0) {
-            if (_stakedBalance() > 0) { // don't bother withdrawing if we don't have staked funds
-            	proxy.withdraw(
-                	gauge,
-                	address(want),
-               	 Math.min(_stakedBalance(), _debtOutstanding)
+            if (_stakedBalance() > 0) {
+                // don't bother withdrawing if we don't have staked funds
+                proxy.withdraw(
+                    gauge,
+                    address(want),
+                    Math.min(_stakedBalance(), _debtOutstanding)
                 );
             }
             uint256 withdrawnBal = _balanceOfWant();
             _debtPayment = Math.min(_debtOutstanding, withdrawnBal);
             if (_debtPayment < _debtOutstanding) {
                 _loss = _debtOutstanding.sub(_debtPayment);
-                if(_profit > _loss){
+                if (_profit > _loss) {
                     _profit = _profit.sub(_loss);
                     _loss = 0;
-                }else{
+                } else {
                     _loss = _loss.sub(_profit);
                     _profit = 0;
                 }
@@ -200,13 +201,14 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
         override
         returns (uint256 _liquidatedAmount, uint256 _loss)
     {
-        if (_amountNeeded > _balanceOfWant()) { // check if we have enough free funds to cover the withdrawal
+        if (_amountNeeded > _balanceOfWant()) {
+            // check if we have enough free funds to cover the withdrawal
             if (_stakedBalance() > 0) {
-            	proxy.withdraw(
-                	gauge,
-                	address(want),
-                	Math.min(_stakedBalance(), _amountNeeded - _balanceOfWant())
-            	);
+                proxy.withdraw(
+                    gauge,
+                    address(want),
+                    Math.min(_stakedBalance(), _amountNeeded - _balanceOfWant())
+                );
             }
             uint256 _withdrawnBal = _balanceOfWant();
             _liquidatedAmount = Math.min(_amountNeeded, _withdrawnBal);
@@ -216,10 +218,11 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
             return (_amountNeeded, 0);
         }
     }
-	
-	// fire sale, get rid of it all!
+
+    // fire sale, get rid of it all!
     function liquidateAllPositions() internal override returns (uint256) {
-        if (_stakedBalance() > 0) { // don't bother withdrawing zero
+        if (_stakedBalance() > 0) {
+            // don't bother withdrawing zero
             proxy.withdraw(gauge, address(want), _stakedBalance());
         }
         return _balanceOfWant();
@@ -238,19 +241,21 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
 
     // Sells our USDT for EURt
     function _sell_v3(uint256 _amount) internal {
-        IUniswapv3(uniV3).exactInput(IUniswapv3.ExactInputParams(
-            abi.encodePacked(
-                address(weth),
-                uint24(500),
-                address(usdt),
-                uint24(500),
-                address(eurt)
-            ),
-            address(this),
-            now,
-            _amount,
-            uint256(0)
-        ));
+        IUniswapv3(uniV3).exactInput(
+            IUniswapv3.ExactInputParams(
+                abi.encodePacked(
+                    address(weth),
+                    uint24(500),
+                    address(usdt),
+                    uint24(500),
+                    address(eurt)
+                ),
+                address(this),
+                now,
+                _amount,
+                uint256(0)
+            )
+        );
     }
 
     function prepareMigration(address _newStrategy) internal override {
@@ -333,5 +338,4 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
     function setKeepCRV(uint256 _keepCRV) external onlyAuthorized {
         keepCRV = _keepCRV;
     }
-
 }

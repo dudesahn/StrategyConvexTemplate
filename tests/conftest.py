@@ -22,7 +22,7 @@ def healthCheck():
 
 @pytest.fixture(scope="module")
 def farmed():
-    # this is the token that we are farming and selling for more of our want. 
+    # this is the token that we are farming and selling for more of our want.
     yield Contract("0xD533a949740bb3306d119CC777fa900bA034cd52")
 
 
@@ -47,8 +47,8 @@ def gauge():
 @pytest.fixture(scope="function")
 def proxy():
     yield Contract("0xA420A63BbEFfbda3B147d0585F1852C358e2C152")
-    
-    
+
+
 @pytest.fixture(scope="module")
 def pool():
     yield Contract("0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890")
@@ -138,7 +138,7 @@ def strategy(
     token,
     healthCheck,
     chain,
-    proxy
+    proxy,
 ):
     # parameters for this are: strategy, vault, max deposit, minTimePerInvest, slippage protection (10000 = 100% slippage allowed),
     strategy = strategist.deploy(StrategyCurveEURtVoterProxy, vault)

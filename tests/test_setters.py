@@ -23,7 +23,6 @@ def test_setters(gov, strategy, strategist, chain, whale, token, vault, proxy):
     strategy.setProxy(proxy, {"from": gov})
     strategy.setKeepCRV(10, {"from": gov})
 
-
     strategy.setStrategist(strategist, {"from": gov})
     name = strategy.name()
     print("Strategy Name:", name)
@@ -53,7 +52,6 @@ def test_setters(gov, strategy, strategist, chain, whale, token, vault, proxy):
         strategy.setMaxReportDelay(1000, {"from": whale})
     with brownie.reverts():
         strategy.setRewards(strategist, {"from": whale})
-
 
     # try a health check with zero address as health check
     strategy.setHealthCheck(zero, {"from": gov})
