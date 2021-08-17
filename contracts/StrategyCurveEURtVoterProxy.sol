@@ -36,33 +36,38 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
+    
+    /* ========== STATE VARIABLES ========== */
 
-    address public constant gauge =
-        address(0xe8060Ad8971450E624d5289A10017dD30F5dA85F); // Curve EURt Gauge contract, tokenized, held by Yearn's voter
+    // these stay constant for each strategy
+    // curve infrastructure contracts
     ICurveStrategyProxy public proxy =
         ICurveStrategyProxy(0xA420A63BbEFfbda3B147d0585F1852C358e2C152); // Yearn's Updated v4 StrategyProxy
-
-    uint256 public optimal;
-
-    ICurveFi public constant curve =
-        ICurveFi(address(0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890)); // Curve EURt Pool
     address public constant voter =
         address(0xF147b8125d2ef93FB6965Db97D6746952a133934); // Yearn's veCRV voter
+        
+    // state variables used for swapping
     address public constant sushiswap =
         address(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F); // default to sushiswap, more CRV liquidity there
     address public constant uniV3 =
         address(0xE592427A0AEce92De3Edee1F18E0157C05861564);
-
     address[] public crvPath;
-
-    // Swap stuff
     uint256 public keepCRV = 1000; // the percentage of CRV we re-lock for boost (in basis points)
     uint256 public constant FEE_DENOMINATOR = 10000; // with this and the above, sending 10% of our CRV yield to our voter
-
     ICrvV3 public constant crv =
         ICrvV3(0xD533a949740bb3306d119CC777fa900bA034cd52);
     IERC20 public constant weth =
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+        
+    // these variables will change from strategy to strategy
+    address public constant gauge =
+        address(0xe8060Ad8971450E624d5289A10017dD30F5dA85F); // Curve EURt Gauge contract, tokenized, held by Yearn's voter
+    ICurveFi public constant curve =
+        ICurveFi(address(0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890)); // Curve EURt Pool
+
+    uint256 public optimal; // this is our target deposit token
+    
+    // here are any additional tokens used in the swap path
     IERC20 public constant usdt =
         IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
     IERC20 public constant eurt =
@@ -78,12 +83,11 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
         profitFactor = 4000; // in this strategy, profitFactor is only used for telling keep3rs when to move funds from vault to strategy
         healthCheck = address(0xDDCea799fF1699e98EDF118e0629A974Df7DF012); // health.ychad.eth
 
-        // want = crvIB, Curve's Iron Bank pool (ycDai+ycUsdc+ycUsdt)
+        // these are our standard approvals. want = Curve LP token
         want.safeApprove(address(proxy), type(uint256).max);
-
-        // add approvals for crv on sushiswap and uniswap due to weird crv approval issues for setCrvRouter
-        // add approvals on all tokens
         crv.approve(sushiswap, type(uint256).max);
+
+        // these are our approvals and path specific to this contract
         eurt.safeApprove(address(curve), type(uint256).max);
         weth.safeApprove(uniV3, type(uint256).max);
 
@@ -228,7 +232,7 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
         return _balanceOfWant();
     }
 
-    // Sells our harvested CRV into the selected output (USDT).
+    // Sells our harvested CRV into the selected output.
     function _sell(uint256 _amount) internal {
         IUniswapV2Router02(sushiswap).swapExactTokensForTokens(
             _amount,
@@ -236,25 +240,6 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
             crvPath,
             address(this),
             now
-        );
-    }
-
-    // Sells our USDT for EURt
-    function _sell_v3(uint256 _amount) internal {
-        IUniswapv3(uniV3).exactInput(
-            IUniswapv3.ExactInputParams(
-                abi.encodePacked(
-                    address(weth),
-                    uint24(500),
-                    address(usdt),
-                    uint24(500),
-                    address(eurt)
-                ),
-                address(this),
-                now,
-                _amount,
-                uint256(0)
-            )
         );
     }
 
@@ -314,6 +299,25 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
         if (block.timestamp.sub(params.lastReport) > week) {
             return true;
         }
+    }
+
+    // Sells our USDT for EURt
+    function _sell_v3(uint256 _amount) internal {
+        IUniswapv3(uniV3).exactInput(
+            IUniswapv3.ExactInputParams(
+                abi.encodePacked(
+                    address(weth),
+                    uint24(500),
+                    address(usdt),
+                    uint24(500),
+                    address(eurt)
+                ),
+                address(this),
+                now,
+                _amount,
+                uint256(0)
+            )
+        );
     }
 
     function ethToWant(uint256 _amtInWei)
