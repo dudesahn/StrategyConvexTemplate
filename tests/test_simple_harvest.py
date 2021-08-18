@@ -5,7 +5,7 @@ import math
 
 
 def test_simple_harvest(
-    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, gauge, voter
+    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, gauge, voter, rewardsContract
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -14,7 +14,7 @@ def test_simple_harvest(
     newWhale = token.balanceOf(whale)
 
     # this is part of our check into the staking contract balance
-    stakingBeforeHarvest = gauge.balanceOf(voter)
+    stakingBeforeHarvest = rewardsContract.balanceOf(strategy)
 
     # harvest, store asset amount
     chain.sleep(1)
@@ -27,7 +27,7 @@ def test_simple_harvest(
     print("\nStarting Assets: ", old_assets / 1e18)
 
     # try and include custom logic here to check that funds are in the staking contract (if needed)
-    assert gauge.balanceOf(voter) > stakingBeforeHarvest
+    assert rewardsContract.balanceOf(strategy) > stakingBeforeHarvest
 
     # simulate 7 days of earnings
     chain.sleep(86400 * 7)

@@ -5,7 +5,7 @@ import math
 
 
 def test_migration(
-    StrategyCurveEURtVoterProxy,
+    StrategyConvexEURt,
     gov,
     token,
     vault,
@@ -17,6 +17,7 @@ def test_migration(
     proxy,
     strategist_ms,
     healthCheck,
+    pid
 ):
 
     ## deposit to the vault after approving
@@ -27,7 +28,7 @@ def test_migration(
     chain.sleep(1)
 
     # deploy our new strategy
-    new_strategy = strategist.deploy(StrategyCurveEURtVoterProxy, vault)
+    new_strategy = strategist.deploy(StrategyConvexEURt, vault, pid)
     total_old = strategy.estimatedTotalAssets()
 
     # can we harvest an unactivated strategy? should be no
@@ -40,7 +41,6 @@ def test_migration(
 
     # migrate our old strategy
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})
-    proxy.approveStrategy(new_strategy.gauge(), new_strategy, {"from": gov})
     new_strategy.setHealthCheck(healthCheck, {"from": gov})
     new_strategy.setDoHealthCheck(True, {"from": gov})
 

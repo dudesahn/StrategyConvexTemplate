@@ -77,7 +77,7 @@ def test_emergency_exit_with_profit(
 
 
 def test_emergency_exit_with_no_gain_or_loss(
-    gov, token, vault, whale, strategy, chain, gauge, voter
+    gov, token, vault, whale, strategy, chain, gauge, voter, cvxDeposit
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -89,9 +89,10 @@ def test_emergency_exit_with_no_gain_or_loss(
     chain.sleep(1)
 
     # send away all funds, will need to alter this based on strategy
-    to_send = gauge.balanceOf(voter)
-    print("Gauge Balance of Vault", to_send)
-    gauge.transfer(gov, to_send, {"from": voter})
+    strategy.withdrawToConvexDepositTokens()
+    to_send = cvxDeposit.balanceOf(strategy)
+    print("cvxToken Balance of Strategy", to_send)
+    cvxDeposit.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
 
     # have our whale send in exactly our debtOutstanding
@@ -113,3 +114,71 @@ def test_emergency_exit_with_no_gain_or_loss(
     # withdraw and confirm we made money, accounting for all of the funds we lost lol
     vault.withdraw({"from": whale})
     assert token.balanceOf(whale) + 20e18 + whale_to_give >= startingWhale
+
+
+def test_emergency_withdraw_method_0(
+    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, rewardsContract, cvxDeposit
+):
+    ## deposit to the vault after approving
+    startingWhale = token.balanceOf(whale)
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    vault.deposit(20e18, {"from": whale})
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+    # simulate a day of earnings
+    chain.sleep(86400)
+    chain.mine(1)
+
+    # set emergency exit so no funds will go back to strategy, and we assume that deposit contract is borked so we go through staking contract
+    # here we assume that the swap out to curve pool tokens is borked, so we stay in cvx vault tokens and send to gov
+    # we also assume extra rewards are fine, so we will collect them on harvest and withdrawal
+    strategy.setClaimRewards(True, {"from": gov})
+    strategy.setEmergencyExit({"from": gov})
+
+    strategy.withdrawToConvexDepositTokens({"from": gov})
+    # turn off health check since we're doing weird shit
+    strategy.setDoHealthCheck(False, {"from": gov})
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+    assert strategy.estimatedTotalAssets() == 0
+    assert rewardsContract.balanceOf(strategy) == 0
+    assert cvxDeposit.balanceOf(strategy) > 0
+
+    # sweep this from the strategy with gov and wait until we can figure out how to unwrap them
+    strategy.sweep(cvxDeposit, {"from": gov})
+    assert cvxDeposit.balanceOf(gov) > 0
+
+
+def test_emergency_withdraw_method_1(
+    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, rewardsContract, cvxDeposit
+):
+    ## deposit to the vault after approving
+    startingWhale = token.balanceOf(whale)
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    vault.deposit(20e18, {"from": whale})
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+
+    # simulate a day of earnings
+    chain.sleep(86400)
+    chain.mine(1)
+
+    # set emergency exit so no funds will go back to strategy, and we assume that deposit contract is borked so we go through staking contract
+    # here we assume that the swap out to curve pool tokens is borked, so we stay in cvx vault tokens and send to gov
+    # we also assume extra rewards are borked so we don't want them when harvesting or withdrawing
+    strategy.setClaimRewards(False, {"from": gov})
+    strategy.setEmergencyExit({"from": gov})
+
+    strategy.withdrawToConvexDepositTokens({"from": gov})
+    # turn off health check since we're doing weird shit
+    strategy.setDoHealthCheck(False, {"from": gov})
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+    assert strategy.estimatedTotalAssets() == 0
+    assert rewardsContract.balanceOf(strategy) == 0
+    assert cvxDeposit.balanceOf(strategy) > 0
+
+    strategy.sweep(cvxDeposit, {"from": gov})
+    assert cvxDeposit.balanceOf(gov) > 0

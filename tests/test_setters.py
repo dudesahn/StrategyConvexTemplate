@@ -20,8 +20,11 @@ def test_setters(gov, strategy, strategist, chain, whale, token, vault, proxy):
     strategy.setMinReportDelay(100, {"from": gov})
     strategy.setProfitFactor(1000, {"from": gov})
     strategy.setRewards(gov, {"from": strategist})
-    strategy.setProxy(proxy, {"from": gov})
     strategy.setKeepCRV(10, {"from": gov})
+    strategy.setClaimRewards(True, {"from": gov})
+    strategy.setHarvestProfitNeeded(1e18, {"from": gov})
+
+
 
     strategy.setStrategist(strategist, {"from": gov})
     name = strategy.name()
