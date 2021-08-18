@@ -15,7 +15,12 @@ def test_odds_and_ends(
     strategist_ms,
     voter,
     gauge,
-    StrategyCurveEURtVoterProxy,
+    StrategyConvexEURt,
+    cvxDeposit,
+    rewardsContract, 
+    pid, 
+    crv,
+    convexToken
 ):
 
     ## deposit to the vault after approving. turn off health check before each harvest since we're doing weird shit
@@ -28,18 +33,25 @@ def test_odds_and_ends(
     chain.sleep(1)
 
     # send away all funds, will need to alter this based on strategy
-    to_send = gauge.balanceOf(voter)
-    print("Gauge Balance of Vault", to_send)
-    gauge.transfer(gov, to_send, {"from": voter})
+    # set claim rewards to true and send away CRV and CVX so we don't have dust leftover, this is a problem with uni v3
+    strategy.setClaimRewards(True, {"from": gov})
+    strategy.withdrawToConvexDepositTokens()
+    to_send = cvxDeposit.balanceOf(strategy)
+    print("cvxToken Balance of Strategy", to_send)
+    cvxDeposit.transfer(gov, to_send, {"from": strategy})
+    to_send = crv.balanceOf(strategy)
+    crv.transfer(gov, to_send, {"from": strategy})
+    to_send = convexToken.balanceOf(strategy)
+    convexToken.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
-    vault.approve(strategist_ms, 1e25, {"from": whale})
 
     # we want to check when we have a loss
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be true.", tx)
     assert tx == True
 
-    chain.sleep(1)
+    chain.sleep(86400*2)
+    chain.mine(1)
     strategy.setDoHealthCheck(False, {"from": gov})
     strategy.harvest({"from": gov})
     chain.sleep(1)
@@ -49,7 +61,7 @@ def test_odds_and_ends(
 
     # we can try to migrate too, lol
     # deploy our new strategy
-    new_strategy = strategist.deploy(StrategyCurveEURtVoterProxy, vault)
+    new_strategy = strategist.deploy(StrategyConvexEURt, vault, pid)
     total_old = strategy.estimatedTotalAssets()
 
     # migrate our old strategy
@@ -78,7 +90,7 @@ def test_odds_and_ends(
     print("\nAssets after 1 day harvest: ", vaultAssets_2)
 
     # check our oracle
-    one_eth_in_want = strategy.ethToWant(1e18)
+    one_eth_in_want = strategy.ethToWant(1000000000000000000)
     print("This is how much want one ETH buys:", one_eth_in_want)
     zero_eth_in_want = strategy.ethToWant(0)
 
@@ -104,7 +116,7 @@ def test_odds_and_ends_2(
     strategist_ms,
     voter,
     gauge,
-    StrategyCurveEURtVoterProxy,
+    cvxDeposit
 ):
 
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
@@ -117,10 +129,12 @@ def test_odds_and_ends_2(
     chain.sleep(1)
 
     # send away all funds, will need to alter this based on strategy
-    to_send = gauge.balanceOf(voter)
-    print("Gauge Balance of Vault", to_send)
-    gauge.transfer(gov, to_send, {"from": voter})
+    strategy.withdrawToConvexDepositTokens()
+    to_send = cvxDeposit.balanceOf(strategy)
+    print("cvxToken Balance of Strategy", to_send)
+    cvxDeposit.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
+    
     strategy.setEmergencyExit({"from": gov})
 
     chain.sleep(1)
@@ -133,7 +147,7 @@ def test_odds_and_ends_2(
 
 
 def test_odds_and_ends_migration(
-    StrategyCurveEURtVoterProxy,
+    StrategyConvexEURt,
     gov,
     token,
     vault,
@@ -144,6 +158,7 @@ def test_odds_and_ends_migration(
     chain,
     strategist_ms,
     proxy,
+    pid
 ):
 
     ## deposit to the vault after approving
@@ -154,7 +169,7 @@ def test_odds_and_ends_migration(
     chain.sleep(1)
 
     # deploy our new strategy
-    new_strategy = strategist.deploy(StrategyCurveEURtVoterProxy, vault)
+    new_strategy = strategist.deploy(StrategyConvexEURt, vault, pid)
     total_old = strategy.estimatedTotalAssets()
 
     # can we harvest an unactivated strategy? should be no
@@ -167,7 +182,6 @@ def test_odds_and_ends_migration(
 
     # migrate our old strategy
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})
-    proxy.approveStrategy(new_strategy.gauge(), new_strategy, {"from": gov})
 
     # assert that our old strategy is empty
     updated_total_old = strategy.estimatedTotalAssets()
@@ -205,7 +219,7 @@ def test_odds_and_ends_migration(
 
 
 def test_odds_and_ends_liquidatePosition(
-    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, gauge, voter
+    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, gauge, voter, rewardsContract
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -214,7 +228,7 @@ def test_odds_and_ends_liquidatePosition(
     newWhale = token.balanceOf(whale)
 
     # this is part of our check into the staking contract balance
-    stakingBeforeHarvest = gauge.balanceOf(voter)
+    stakingBeforeHarvest = rewardsContract.balanceOf(strategy)
 
     # harvest, store asset amount
     chain.sleep(1)
@@ -227,7 +241,7 @@ def test_odds_and_ends_liquidatePosition(
     print("\nStarting Assets: ", old_assets / 1e18)
 
     # try and include custom logic here to check that funds are in the staking contract (if needed)
-    assert gauge.balanceOf(voter) > stakingBeforeHarvest
+    assert rewardsContract.balanceOf(strategy) > stakingBeforeHarvest
 
     # simulate one day of earnings
     chain.sleep(86400)
@@ -244,9 +258,9 @@ def test_odds_and_ends_liquidatePosition(
 
     # Display estimated APR
     print(
-        "\nEstimated CVX APR: ",
+        "\nEstimated EURt APR: ",
         "{:.2%}".format(
-            ((new_assets - old_assets) * (365 / 7)) / (strategy.estimatedTotalAssets())
+            ((new_assets - old_assets) * (365)) / (strategy.estimatedTotalAssets())
         ),
     )
 
@@ -265,7 +279,7 @@ def test_odds_and_ends_liquidatePosition(
 
 
 def test_odds_and_ends_rekt(
-    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, voter, gauge
+    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, voter, cvxDeposit, rewardsContract, crv, convexToken
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -277,16 +291,24 @@ def test_odds_and_ends_rekt(
     chain.sleep(1)
 
     # send away all funds, will need to alter this based on strategy
-    to_send = gauge.balanceOf(voter)
-    print("Gauge Balance of Vault", to_send)
-    gauge.transfer(gov, to_send, {"from": voter})
+    # set claim rewards to true and send away CRV and CVX so we don't have dust leftover
+    strategy.setClaimRewards(True, {"from": gov})
+    strategy.withdrawToConvexDepositTokens()
+    to_send = cvxDeposit.balanceOf(strategy)
+    print("cvxToken Balance of Strategy", to_send)
+    cvxDeposit.transfer(gov, to_send, {"from": strategy})
+    to_send = crv.balanceOf(strategy)
+    crv.transfer(gov, to_send, {"from": strategy})
+    to_send = convexToken.balanceOf(strategy)
+    convexToken.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
-    assert vault.strategies(strategy)[2] == 10000
-    print("Strategy Total Debt, this should be >0:", vault.strategies(strategy)[6])
+    
+    
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
 
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
+    chain.mine(1)
     tx = strategy.harvest({"from": gov})
     chain.sleep(1)
 
@@ -296,7 +318,7 @@ def test_odds_and_ends_rekt(
 
 # goal of this one is to hit a withdraw when we don't have any staked assets
 def test_odds_and_ends_liquidate_rekt(
-    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, voter, gauge
+    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, voter, cvxDeposit
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -308,9 +330,10 @@ def test_odds_and_ends_liquidate_rekt(
     chain.sleep(1)
 
     # send away all funds, will need to alter this based on strategy
-    to_send = gauge.balanceOf(voter)
-    print("Gauge Balance of Vault", to_send)
-    gauge.transfer(gov, to_send, {"from": voter})
+    strategy.withdrawToConvexDepositTokens()
+    to_send = cvxDeposit.balanceOf(strategy)
+    print("cvxToken Balance of Strategy", to_send)
+    cvxDeposit.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
 
     # we can also withdraw from an empty vault as well, but make sure we're okay with losing 100%
@@ -326,7 +349,6 @@ def test_weird_reverts(
     strategy,
     chain,
     strategist_ms,
-    StrategyCurveEURtVoterProxy,
     other_vault_strategy,
 ):
 

@@ -7,12 +7,55 @@ def isolation(fn_isolation):
     pass
 
 
-# Define relevant tokens and contracts in this section
+# put our pool's convex pid here; this is the only thing that should need to change up here **************
 @pytest.fixture(scope="module")
-def token():
-    # this should be the address of the ERC-20 used by the strategy/vault. In this case, EURt
-    token_address = "0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890"
-    yield Contract(token_address)
+def pid():
+    pid = 39
+    yield pid
+
+
+@pytest.fixture(scope="module")
+def whale(accounts):
+    # Totally in it for the tech
+    # Update this with a large holder of your want token (the only EOA holder of EURt LP)
+    whale = accounts.at("0x1eb8271d94292d5bb9e043eb94ba0904115eb5f4", force=True)
+    yield whale
+
+
+# all contracts below should be able to stay static based on the pid
+@pytest.fixture(scope="module")
+def booster():  # this is the deposit contract
+    yield Contract("0xF403C135812408BFbE8713b5A23a04b3D48AAE31")
+
+
+@pytest.fixture(scope="function")
+def voter():
+    yield Contract("0xF147b8125d2ef93FB6965Db97D6746952a133934")
+
+
+@pytest.fixture(scope="function")
+def convexToken():
+    yield Contract("0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B")
+
+
+@pytest.fixture(scope="function")
+def crv():
+    yield Contract("0xD533a949740bb3306d119CC777fa900bA034cd52")
+
+
+@pytest.fixture(scope="module")
+def other_vault_strategy():
+    yield Contract("0x8423590CD0343c4E18d35aA780DF50a5751bebae")
+
+
+@pytest.fixture(scope="function")
+def proxy():
+    yield Contract("0xA420A63BbEFfbda3B147d0585F1852C358e2C152")
+
+
+@pytest.fixture(scope="module")
+def curve_registry():
+    yield Contract("0x90E00ACe148ca3b23Ac1bC8C240C2a7Dd9c2d7f5")
 
 
 @pytest.fixture(scope="module")
@@ -26,32 +69,44 @@ def farmed():
     yield Contract("0xD533a949740bb3306d119CC777fa900bA034cd52")
 
 
-# Add any extra contracts we need here, such as staking contracts
+# Define relevant tokens and contracts in this section
+@pytest.fixture(scope="module")
+def token(pid, booster):
+    # this should be the address of the ERC-20 used by the strategy/vault
+    token_address = booster.poolInfo(pid)[0]
+    yield Contract(token_address)
 
-# yearn's curve voter
-@pytest.fixture(scope="function")
-def voter():
-    yield Contract("0xF147b8125d2ef93FB6965Db97D6746952a133934")
+
+# gauge for the curve pool
+@pytest.fixture(scope="module")
+def gauge(pid, booster):
+    # this should be the address of the convex deposit token
+    gauge = booster.poolInfo(pid)[2]
+    yield Contract(gauge)
+
+
+# curve deposit pool
+@pytest.fixture(scope="module")
+def pool(token, curve_registry):
+    zero_address = "0x0000000000000000000000000000000000000000"
+    if curve_registry.get_pool_from_lp_token(token) == zero_address:
+        _poolAddress = token
+    else:
+        _poolAddress = registry.get_pool_from_lp_token(token)
+    yield Contract(_poolAddress)
 
 
 @pytest.fixture(scope="module")
-def other_vault_strategy():
-    yield Contract("0x8423590CD0343c4E18d35aA780DF50a5751bebae")
+def cvxDeposit(booster, pid):
+    # this should be the address of the convex deposit token
+    cvx_address = booster.poolInfo(pid)[1]
+    yield Contract(cvx_address)
 
 
 @pytest.fixture(scope="module")
-def gauge():
-    yield Contract("0xe8060Ad8971450E624d5289A10017dD30F5dA85F")
-
-
-@pytest.fixture(scope="function")
-def proxy():
-    yield Contract("0xA420A63BbEFfbda3B147d0585F1852C358e2C152")
-
-
-@pytest.fixture(scope="module")
-def pool():
-    yield Contract("0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890")
+def rewardsContract(pid, booster):
+    rewardsContract = booster.poolInfo(pid)[3]
+    yield Contract(rewardsContract)
 
 
 # Define any accounts in this section
@@ -93,14 +148,6 @@ def strategist(accounts):
     yield accounts.at("0xBedf3Cf16ba1FcE6c3B751903Cf77E51d51E05b8", force=True)
 
 
-@pytest.fixture(scope="module")
-def whale(accounts):
-    # Totally in it for the tech
-    # Update this with a large holder of your want token (the only EOA holder of EURt LP)
-    whale = accounts.at("0x1eb8271d94292d5bb9e043eb94ba0904115eb5f4", force=True)
-    yield whale
-
-
 # # list any existing strategies here
 # @pytest.fixture(scope="module")
 # def LiveStrategy_1():
@@ -129,7 +176,7 @@ def vault(pm, gov, rewards, guardian, management, token, chain):
 # replace the first value with the name of your strategy
 @pytest.fixture(scope="function")
 def strategy(
-    StrategyCurveEURtVoterProxy,
+    StrategyConvexEURt,
     strategist,
     keeper,
     vault,
@@ -139,15 +186,16 @@ def strategy(
     healthCheck,
     chain,
     proxy,
+    pid,
 ):
     # parameters for this are: strategy, vault, max deposit, minTimePerInvest, slippage protection (10000 = 100% slippage allowed),
-    strategy = strategist.deploy(StrategyCurveEURtVoterProxy, vault)
+    strategy = strategist.deploy(StrategyConvexEURt, vault, pid)
     strategy.setKeeper(keeper, {"from": gov})
     # set our management fee to zero so it doesn't mess with our profit checking
     vault.setManagementFee(0, {"from": gov})
     # add our new strategy
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
-    proxy.approveStrategy(strategy.gauge(), strategy, {"from": gov})
+    # proxy.approveStrategy(strategy.gauge(), strategy, {"from": gov}), only need this step for curve voter strats
     strategy.setHealthCheck(healthCheck, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
     chain.sleep(1)

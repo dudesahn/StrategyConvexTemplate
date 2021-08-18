@@ -5,7 +5,7 @@ import math
 
 
 def test_triggers(
-    gov, token, vault, strategist, whale, strategy, chain, strategist_ms,
+    gov, token, vault, strategist, whale, strategy, chain,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -52,7 +52,7 @@ def test_triggers(
 
 
 def test_less_useful_triggers(
-    gov, token, vault, strategist, whale, strategy, chain, strategist_ms,
+    gov, token, vault, strategist, whale, strategy, chain,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)

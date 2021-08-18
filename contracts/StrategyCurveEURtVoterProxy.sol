@@ -36,7 +36,7 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
-    
+
     /* ========== STATE VARIABLES ========== */
 
     // these stay constant for each strategy
@@ -45,7 +45,7 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
         ICurveStrategyProxy(0xA420A63BbEFfbda3B147d0585F1852C358e2C152); // Yearn's Updated v4 StrategyProxy
     address public constant voter =
         address(0xF147b8125d2ef93FB6965Db97D6746952a133934); // Yearn's veCRV voter
-        
+
     // state variables used for swapping
     address public constant sushiswap =
         address(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F); // default to sushiswap, more CRV liquidity there
@@ -58,7 +58,7 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
         ICrvV3(0xD533a949740bb3306d119CC777fa900bA034cd52);
     IERC20 public constant weth =
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-        
+
     // these variables will change from strategy to strategy
     address public constant gauge =
         address(0xe8060Ad8971450E624d5289A10017dD30F5dA85F); // Curve EURt Gauge contract, tokenized, held by Yearn's voter
@@ -66,7 +66,7 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
         ICurveFi(address(0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890)); // Curve EURt Pool
 
     uint256 public optimal; // this is our target deposit token
-    
+
     // here are any additional tokens used in the swap path
     IERC20 public constant usdt =
         IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
@@ -138,7 +138,7 @@ contract StrategyCurveEURtVoterProxy is BaseStrategy {
                 uint256 _crvRemainder = _crvBalance.sub(_keepCRV);
 
                 // sell the rest of our CRV
-                _sell(_crvRemainder);
+                if (_crvRemainder > 0) _sell(_crvRemainder);
 
                 // convert our WETH to EURt, but don't want to swap dust
                 uint256 _wethBalance = IERC20(weth).balanceOf(address(this));
