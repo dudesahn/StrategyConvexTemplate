@@ -143,7 +143,7 @@ contract StrategyConvexEURt is BaseStrategy {
         // You can set these parameters on deployment to whatever you want
         maxReportDelay = 60 * 60 * 24 * 7; // 7 days in seconds, if we hit this then harvestTrigger = True
         debtThreshold = 5 * 1e18; // set a bit of a buffer
-        profitFactor = 500_000e18; // in this strategy, profitFactor is only used for telling keep3rs when to move funds from vault to strategy (what previously was an earn call)
+        profitFactor = 10000; // in this strategy, profitFactor is only used for telling keep3rs when to move funds from vault to strategy (what previously was an earn call)
         harvestProfitNeeded = 20_000e18;
         healthCheck = address(0xDDCea799fF1699e98EDF118e0629A974Df7DF012); // health.ychad.eth
 
@@ -219,7 +219,7 @@ contract StrategyConvexEURt is BaseStrategy {
             uint256 convexBalance = convexToken.balanceOf(address(this));
 
             uint256 _keepCRV = crvBalance.mul(keepCRV).div(FEE_DENOMINATOR);
-            IERC20(address(crv)).safeTransfer(voter, _keepCRV);
+            crv.safeTransfer(voter, _keepCRV);
             uint256 crvRemainder = crvBalance.sub(_keepCRV);
 
             if (crvRemainder > 0) _sellCrv(crvRemainder);
