@@ -88,12 +88,13 @@ interface IConvexDeposit {
         );
 }
 
-/* ========== CONTRACT ========== */
-
 contract StrategyConvexEURt is BaseStrategy {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
+
+    /* ========== STATE CONSTANTS ========== */
+    // these should stay the same across different wants.
 
     address public constant depositContract =
         0xF403C135812408BFbE8713b5A23a04b3D48AAE31; // this is the deposit contract that all pools use, aka booster
@@ -112,8 +113,8 @@ contract StrategyConvexEURt is BaseStrategy {
     // Swap stuff
     uint256 public keepCRV = 1000; // the percentage of CRV we re-lock for boost (in basis points)
     uint256 public constant FEE_DENOMINATOR = 10000; // with this and the above, sending 10% of our CRV yield to our voter
-    ICrvV3 public constant crv =
-        ICrvV3(0xD533a949740bb3306d119CC777fa900bA034cd52);
+    IERC20 public constant crv =
+        IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
     IERC20 public constant convexToken =
         IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
     IERC20 public constant weth =
@@ -121,7 +122,10 @@ contract StrategyConvexEURt is BaseStrategy {
     uint256 public harvestProfitNeeded;
 
     // convex-specific variables
-    bool public claimRewards = false; // boolean if we should always claim rewards when withdrawing, usually withdrawAndUnwrap (generally this should be false)
+    bool public claimRewards; // boolean if we should always claim rewards when withdrawing, usually withdrawAndUnwrap (generally this should be false)
+
+    /* ========== STATE VARIABLES ========== */
+    // these will likely change across different wants.
 
     // specific variables for this contract
     ICurveFi public constant curve =
@@ -133,15 +137,19 @@ contract StrategyConvexEURt is BaseStrategy {
     IOracle public oracle = IOracle(0x0F1f5A87f99f0918e6C81F16E59F3518698221Ff);
 
     constructor(address _vault, uint256 _pid) public BaseStrategy(_vault) {
+        /* ========== CONSTRUCTOR CONSTANTS ========== */
+        // these should stay the same across different wants.
+
         // You can set these parameters on deployment to whatever you want
         maxReportDelay = 60 * 60 * 24 * 7; // 7 days in seconds, if we hit this then harvestTrigger = True
         debtThreshold = 5 * 1e18; // set a bit of a buffer
-        profitFactor = 10_000; // in this strategy, profitFactor is only used for telling keep3rs when to move funds from vault to strategy (what previously was an earn call)
-        harvestProfitNeeded = 10_0000e18;
+        profitFactor = 500_000e18; // in this strategy, profitFactor is only used for telling keep3rs when to move funds from vault to strategy (what previously was an earn call)
+        harvestProfitNeeded = 20_000e18;
+        healthCheck = address(0xDDCea799fF1699e98EDF118e0629A974Df7DF012); // health.ychad.eth
 
         // want = Curve LP
         want.safeApprove(address(depositContract), type(uint256).max);
-        IERC20(address(crv)).safeApprove(sushiswapRouter, type(uint256).max);
+        crv.safeApprove(sushiswapRouter, type(uint256).max);
         convexToken.safeApprove(sushiswapRouter, type(uint256).max);
 
         // setup our rewards contract
@@ -150,9 +158,12 @@ contract StrategyConvexEURt is BaseStrategy {
             pid
         );
 
+        /* ========== CONSTRUCTOR VARIABLES ========== */
+        // these will likely change across different wants.
+
         // strategy-specific approvals and paths
-        IERC20(address(eurt)).safeApprove(address(curve), type(uint256).max);
-        IERC20(address(weth)).safeApprove(uniswapv3, type(uint256).max);
+        eurt.safeApprove(address(curve), type(uint256).max);
+        weth.safeApprove(uniswapv3, type(uint256).max);
 
         // crv token path
         crvPath = new address[](2);
@@ -164,6 +175,8 @@ contract StrategyConvexEURt is BaseStrategy {
         convexTokenPath[0] = address(convexToken);
         convexTokenPath[1] = address(weth);
     }
+
+    /* ========== VIEWS ========== */
 
     function name() external view override returns (string memory) {
         return "StrategyConvexEURt";
@@ -184,6 +197,9 @@ contract StrategyConvexEURt is BaseStrategy {
     function estimatedTotalAssets() public view override returns (uint256) {
         return _balanceOfWant().add(_stakedBalance());
     }
+
+    /* ========== VARIABLE FUNCTIONS ========== */
+    // these will likely change across different wants.
 
     function prepareReturn(uint256 _debtOutstanding)
         internal
@@ -256,6 +272,117 @@ contract StrategyConvexEURt is BaseStrategy {
         }
     }
 
+    // migrate our want token to a new strategy if needed, make sure to check claimRewards first
+    // also send over any CRV or CVX that is claimed; for migrations we definitely want to claim
+    function prepareMigration(address _newStrategy) internal override {
+        if (_stakedBalance() > 0) {
+            IConvexRewards(rewardsContract).withdrawAndUnwrap(
+                _stakedBalance(),
+                claimRewards
+            );
+        }
+        crv.safeTransfer(_newStrategy, crv.balanceOf(address(this)));
+        convexToken.safeTransfer(
+            _newStrategy,
+            convexToken.balanceOf(address(this))
+        );
+    }
+
+    function _sellWethForEurt(uint256 _amount) internal {
+        IUniV3(uniswapv3).exactInput(
+            IUniV3.ExactInputParams(
+                abi.encodePacked(
+                    address(weth),
+                    uint24(500),
+                    address(usdt),
+                    uint24(500),
+                    address(eurt)
+                ),
+                address(this),
+                now,
+                _amount,
+                uint256(1)
+            )
+        );
+    }
+
+    /* ========== KEEP3RS ========== */
+
+    // we will need to add rewards token here if we have them
+    function claimableProfitInUsd() internal view returns (uint256) {
+        // calculations pulled directly from CVX's contract for minting CVX per CRV claimed
+        uint256 totalCliffs = 1000;
+        uint256 maxSupply = 100 * 1000000 * 1e18; // 100mil
+        uint256 reductionPerCliff = 100000000000000000000000; // 100,000
+        uint256 supply = convexToken.totalSupply();
+        uint256 mintableCvx;
+
+        uint256 cliff = supply.div(reductionPerCliff);
+        //mint if below total cliffs
+        if (cliff < totalCliffs) {
+            //for reduction% take inverse of current cliff
+            uint256 reduction = totalCliffs.sub(cliff);
+            //reduce
+            mintableCvx = claimableBalance().mul(reduction).div(totalCliffs);
+
+            //supply cap check
+            uint256 amtTillMax = maxSupply.sub(supply);
+            if (mintableCvx > amtTillMax) {
+                mintableCvx = amtTillMax;
+            }
+        }
+
+        address[] memory crv_usd_path = new address[](3);
+        crv_usd_path[0] = address(crv);
+        crv_usd_path[1] = address(weth);
+        crv_usd_path[2] = address(usdt);
+
+        address[] memory cvx_usd_path = new address[](3);
+        cvx_usd_path[0] = address(convexToken);
+        cvx_usd_path[1] = address(weth);
+        cvx_usd_path[2] = address(usdt);
+
+        uint256 crvValue;
+        if (claimableBalance() > 0) {
+            uint256[] memory crvSwap =
+                IUniswapV2Router02(sushiswapRouter).getAmountsOut(
+                    claimableBalance(),
+                    crv_usd_path
+                );
+            crvValue = crvSwap[1];
+        }
+
+        uint256 cvxValue;
+        if (mintableCvx > 0) {
+            uint256[] memory cvxSwap =
+                IUniswapV2Router02(sushiswapRouter).getAmountsOut(
+                    mintableCvx,
+                    cvx_usd_path
+                );
+            cvxValue = cvxSwap[1];
+        }
+        return crvValue.add(cvxValue);
+    }
+
+    // convert our keeper's eth cost into want
+    function ethToWant(uint256 _ethAmount)
+        public
+        view
+        override
+        returns (uint256)
+    {
+        uint256 callCostInWant;
+        if (_ethAmount > 0) {
+            uint256 callCostInEur =
+                oracle.ethToAsset(_ethAmount, address(eurt), 1800);
+            callCostInWant = curve.calc_token_amount([callCostInEur, 0], true);
+        }
+        return callCostInWant;
+    }
+
+    /* ========== CONSTANT FUNCTIONS ========== */
+    // these should stay the same across different wants.
+
     function adjustPosition(uint256 _debtOutstanding) internal override {
         if (emergencyExit) {
             return;
@@ -326,24 +453,6 @@ contract StrategyConvexEURt is BaseStrategy {
         );
     }
 
-    function _sellWethForEurt(uint256 _amount) internal {
-        IUniV3(uniswapv3).exactInput(
-            IUniV3.ExactInputParams(
-                abi.encodePacked(
-                    address(weth),
-                    uint24(500),
-                    address(usdt),
-                    uint24(500),
-                    address(eurt)
-                ),
-                address(this),
-                now,
-                _amount,
-                uint256(1)
-            )
-        );
-    }
-
     // in case we need to exit into the convex deposit token, this will allow us to do that
     // make sure to check claimRewards before this step if needed
     // plan to have gov sweep convex deposit tokens from strategy after this
@@ -356,25 +465,6 @@ contract StrategyConvexEURt is BaseStrategy {
         }
     }
 
-    // migrate our want token to a new strategy if needed, make sure to check claimRewards first
-    // also send over any CRV or CVX that is claimed; for migrations we definitely want to claim
-    function prepareMigration(address _newStrategy) internal override {
-        if (_stakedBalance() > 0) {
-            IConvexRewards(rewardsContract).withdrawAndUnwrap(
-                _stakedBalance(),
-                claimRewards
-            );
-        }
-        IERC20(address(crv)).safeTransfer(
-            _newStrategy,
-            crv.balanceOf(address(this))
-        );
-        IERC20(address(convexToken)).safeTransfer(
-            _newStrategy,
-            convexToken.balanceOf(address(this))
-        );
-    }
-
     // we don't want for these tokens to be swept out. We allow gov to sweep out cvx vault tokens; we would only be holding these if things were really, really rekt.
     function protectedTokens()
         internal
@@ -383,7 +473,6 @@ contract StrategyConvexEURt is BaseStrategy {
         returns (address[] memory)
     {
         address[] memory protected = new address[](0);
-
         return protected;
     }
 
@@ -398,77 +487,6 @@ contract StrategyConvexEURt is BaseStrategy {
         return
             super.harvestTrigger(callCostinEth) ||
             claimableProfitInUsd() > harvestProfitNeeded;
-    }
-
-    function claimableProfitInUsd() internal view returns (uint256) {
-        // calculations pulled directly from CVX's contract for minting CVX per CRV claimed
-        uint256 totalCliffs = 1000;
-        uint256 maxSupply = 100 * 1000000 * 1e18; // 100mil
-        uint256 reductionPerCliff = 100000000000000000000000; // 100,000
-        uint256 supply = convexToken.totalSupply();
-        uint256 mintableCvx;
-
-        uint256 cliff = supply.div(reductionPerCliff);
-        //mint if below total cliffs
-        if (cliff < totalCliffs) {
-            //for reduction% take inverse of current cliff
-            uint256 reduction = totalCliffs.sub(cliff);
-            //reduce
-            mintableCvx = claimableBalance().mul(reduction).div(totalCliffs);
-
-            //supply cap check
-            uint256 amtTillMax = maxSupply.sub(supply);
-            if (mintableCvx > amtTillMax) {
-                mintableCvx = amtTillMax;
-            }
-        }
-
-        address[] memory crv_usd_path = new address[](3);
-        crv_usd_path[0] = address(crv);
-        crv_usd_path[1] = address(weth);
-        crv_usd_path[2] = address(usdt);
-
-        address[] memory cvx_usd_path = new address[](3);
-        cvx_usd_path[0] = address(convexToken);
-        cvx_usd_path[1] = address(weth);
-        cvx_usd_path[2] = address(usdt);
-
-        uint256 crvValue;
-        if (claimableBalance() > 0) {
-            uint256[] memory crvSwap =
-                IUniswapV2Router02(sushiswapRouter).getAmountsOut(
-                    claimableBalance(),
-                    crv_usd_path
-                );
-            crvValue = crvSwap[1];
-        }
-
-        uint256 cvxValue;
-        if (mintableCvx > 0) {
-            uint256[] memory cvxSwap =
-                IUniswapV2Router02(sushiswapRouter).getAmountsOut(
-                    mintableCvx,
-                    cvx_usd_path
-                );
-            cvxValue = cvxSwap[1];
-        }
-        return crvValue.add(cvxValue);
-    }
-
-    // convert our keeper's eth cost into want
-    function ethToWant(uint256 _ethAmount)
-        public
-        view
-        override
-        returns (uint256)
-    {
-        uint256 callCostInWant;
-        if (_ethAmount > 0) {
-            uint256 callCostInEur =
-                oracle.ethToAsset(_ethAmount, address(eurt), 1800);
-            callCostInWant = curve.calc_token_amount([callCostInEur, 0], true);
-        }
-        return callCostInWant;
     }
 
     /* ========== SETTERS ========== */
