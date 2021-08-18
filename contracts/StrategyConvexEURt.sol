@@ -31,10 +31,12 @@ interface IUniV3 {
         returns (uint256 amountOut);
 }
 
-interface IChainlink {
-    function latestAnswer() external view returns (int256);
-
-    function decimals() external view returns (uint8);
+interface IOracle {
+    function ethToAsset(
+        uint256 _ethAmountIn,
+        address _tokenOut,
+        uint32 _twapPeriod
+    ) external view returns (uint256 amountOut);
 }
 
 interface IConvexRewards {
@@ -128,10 +130,7 @@ contract StrategyConvexEURt is BaseStrategy {
         IERC20(0xC581b735A1688071A1746c968e0798D642EDE491);
     IERC20 public constant usdt =
         IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
-    IChainlink internal eurOracle =
-        IChainlink(0xb49f677943BC038e9857d61E7d053CaA2C1734C1);
-    IChainlink internal ethOracle =
-        IChainlink(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
+    IOracle public oracle = IOracle(0x0F1f5A87f99f0918e6C81F16E59F3518698221Ff);
 
     constructor(address _vault, uint256 _pid) public BaseStrategy(_vault) {
         // You can set these parameters on deployment to whatever you want
@@ -458,6 +457,11 @@ contract StrategyConvexEURt is BaseStrategy {
         returns (uint256)
     {
         uint256 callCostInWant;
+        if (_ethAmount > 0) {
+            uint256 callCostInEur =
+                oracle.ethToAsset(_ethAmount, address(eurt), 1800);
+            callCostInWant = curve.calc_token_amount([callCostInEur, 0], true);
+        }
         return callCostInWant;
     }
 
