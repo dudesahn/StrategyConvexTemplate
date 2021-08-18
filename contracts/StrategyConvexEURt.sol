@@ -101,11 +101,9 @@ contract StrategyConvexEURt is BaseStrategy {
     address public rewardsContract; // This is unique to each curve pool
     uint256 public pid; // this is unique to each pool
     address public constant sushiswapRouter =
-        0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // default to sushiswap, more CRV liquidity there
+        0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // default to sushiswap, more CRV and CVX liquidity there
     address public constant uniswapv3 =
         0xE592427A0AEce92De3Edee1F18E0157C05861564;
-    address public constant uniswapQuoter =
-        0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6;
 
     address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     address[] public crvPath; // path to sell CRV
@@ -126,15 +124,16 @@ contract StrategyConvexEURt is BaseStrategy {
 
     /* ========== STATE VARIABLES ========== */
     // these will likely change across different wants.
+    // note that some strategies will require the "optimal" state variable here as well if we choose which token to sell into before depositing
 
     // specific variables for this contract
     ICurveFi public constant curve =
-        ICurveFi(0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890); // Curve EURT Pool, need this for buying more pool tokens
+        ICurveFi(0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890); // Curve Pool, need this for buying more pool tokens
     IERC20 public constant eurt =
         IERC20(0xC581b735A1688071A1746c968e0798D642EDE491);
     IERC20 public constant usdt =
         IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
-    IOracle public oracle = IOracle(0x0F1f5A87f99f0918e6C81F16E59F3518698221Ff);
+    IOracle public oracle = IOracle(0x0F1f5A87f99f0918e6C81F16E59F3518698221Ff); // this is only needed for strats that use uniV3 for swaps
 
     constructor(address _vault, uint256 _pid) public BaseStrategy(_vault) {
         /* ========== CONSTRUCTOR CONSTANTS ========== */
