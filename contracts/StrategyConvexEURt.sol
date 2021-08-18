@@ -245,7 +245,13 @@ contract StrategyConvexEURt is BaseStrategy {
             // want to make sure we report losses properly here
             if (_debtPayment < _debtOutstanding) {
                 _loss = _debtOutstanding.sub(_debtPayment);
-                _profit = 0;
+                if (_profit > _loss) {
+                    _profit = _profit.sub(_loss);
+                    _loss = 0;
+                } else {
+                    _loss = _loss.sub(_profit);
+                    _profit = 0;
+                }
             }
         }
     }
