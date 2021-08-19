@@ -181,20 +181,20 @@ contract StrategyConvexEURt is BaseStrategy {
         return "StrategyConvexEURt";
     }
 
-    function _stakedBalance() internal view returns (uint256) {
+    function stakedBalance() public view returns (uint256) {
         return IConvexRewards(rewardsContract).balanceOf(address(this));
     }
 
-    function _balanceOfWant() internal view returns (uint256) {
+    function balanceOfWant() public view returns (uint256) {
         return want.balanceOf(address(this));
     }
 
-    function claimableBalance() internal view returns (uint256) {
+    function claimableBalance() public view returns (uint256) {
         return IConvexRewards(rewardsContract).earned(address(this)); // how much CRV we can claim from the staking contract
     }
 
     function estimatedTotalAssets() public view override returns (uint256) {
-        return _balanceOfWant().add(_stakedBalance());
+        return balanceOfWant().add(stakedBalance());
     }
 
     /* ========== VARIABLE FUNCTIONS ========== */
@@ -247,9 +247,9 @@ contract StrategyConvexEURt is BaseStrategy {
 
         // debtOustanding will only be > 0 in the event of revoking or lowering debtRatio of a strategy
         if (_debtOutstanding > 0) {
-            if (_stakedBalance() > 0) {
+            if (stakedBalance() > 0) {
                 IConvexRewards(rewardsContract).withdrawAndUnwrap(
-                    Math.min(_stakedBalance(), _debtOutstanding),
+                    Math.min(stakedBalance(), _debtOutstanding),
                     claimRewards
                 );
             }
@@ -274,9 +274,9 @@ contract StrategyConvexEURt is BaseStrategy {
     // migrate our want token to a new strategy if needed, make sure to check claimRewards first
     // also send over any CRV or CVX that is claimed; for migrations we definitely want to claim
     function prepareMigration(address _newStrategy) internal override {
-        if (_stakedBalance() > 0) {
+        if (stakedBalance() > 0) {
             IConvexRewards(rewardsContract).withdrawAndUnwrap(
-                _stakedBalance(),
+                stakedBalance(),
                 claimRewards
             );
         }
@@ -387,7 +387,7 @@ contract StrategyConvexEURt is BaseStrategy {
             return;
         }
         // Send all of our Curve pool tokens to be deposited
-        uint256 _toInvest = _balanceOfWant();
+        uint256 _toInvest = balanceOfWant();
         // deposit into convex and stake immediately but only if we have something to invest
         if (_toInvest > 0) {
             IConvexDeposit(depositContract).deposit(pid, _toInvest, true);
@@ -399,18 +399,15 @@ contract StrategyConvexEURt is BaseStrategy {
         override
         returns (uint256 _liquidatedAmount, uint256 _loss)
     {
-        if (_amountNeeded > _balanceOfWant()) {
-            if (_stakedBalance() > 0) {
+        if (_amountNeeded > balanceOfWant()) {
+            if (stakedBalance() > 0) {
                 IConvexRewards(rewardsContract).withdrawAndUnwrap(
-                    Math.min(
-                        _stakedBalance(),
-                        _amountNeeded - _balanceOfWant()
-                    ),
+                    Math.min(stakedBalance(), _amountNeeded - balanceOfWant()),
                     claimRewards
                 );
             }
 
-            _liquidatedAmount = Math.min(_amountNeeded, _balanceOfWant());
+            _liquidatedAmount = Math.min(_amountNeeded, balanceOfWant());
             _loss = _amountNeeded.sub(_liquidatedAmount);
         } else {
             // we have enough balance to cover the liquidation available
@@ -420,14 +417,14 @@ contract StrategyConvexEURt is BaseStrategy {
 
     // fire sale, get rid of it all!
     function liquidateAllPositions() internal override returns (uint256) {
-        if (_stakedBalance() > 0) {
+        if (stakedBalance() > 0) {
             // don't bother withdrawing zero
             IConvexRewards(rewardsContract).withdrawAndUnwrap(
-                _stakedBalance(),
+                stakedBalance(),
                 claimRewards
             );
         }
-        return _balanceOfWant();
+        return balanceOfWant();
     }
 
     // Sells our harvested CRV into the selected output (ETH).
@@ -456,9 +453,9 @@ contract StrategyConvexEURt is BaseStrategy {
     // make sure to check claimRewards before this step if needed
     // plan to have gov sweep convex deposit tokens from strategy after this
     function withdrawToConvexDepositTokens() external onlyAuthorized {
-        if (_stakedBalance() > 0) {
+        if (stakedBalance() > 0) {
             IConvexRewards(rewardsContract).withdraw(
-                _stakedBalance(),
+                stakedBalance(),
                 claimRewards
             );
         }
