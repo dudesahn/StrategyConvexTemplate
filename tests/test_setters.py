@@ -3,12 +3,14 @@ from brownie import Contract
 from brownie import config
 
 
-def test_setters(gov, strategy, strategist, chain, whale, token, vault, proxy):
+def test_setters(
+    gov, strategy, strategist, chain, whale, token, vault, proxy, amount,
+):
 
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(20e18, {"from": whale})
+    vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
 
@@ -23,8 +25,6 @@ def test_setters(gov, strategy, strategist, chain, whale, token, vault, proxy):
     strategy.setKeepCRV(10, {"from": gov})
     strategy.setClaimRewards(True, {"from": gov})
     strategy.setHarvestProfitNeeded(1e18, {"from": gov})
-
-
 
     strategy.setStrategist(strategist, {"from": gov})
     name = strategy.name()
@@ -60,6 +60,7 @@ def test_setters(gov, strategy, strategist, chain, whale, token, vault, proxy):
     strategy.setHealthCheck(zero, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
     strategy.harvest({"from": gov})
+    chain.sleep(86400)
 
     # try a health check with random contract as health check
     strategy.setHealthCheck(gov, {"from": gov})

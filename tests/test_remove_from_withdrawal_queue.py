@@ -5,12 +5,12 @@ import math
 
 
 def test_remove_from_withdrawal_queue(
-    gov, token, vault, whale, strategy, chain,
+    gov, token, vault, whale, strategy, chain, amount,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(20e18, {"from": whale})
+    vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)

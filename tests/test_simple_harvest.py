@@ -5,12 +5,23 @@ import math
 
 
 def test_simple_harvest(
-    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, gauge, voter, rewardsContract
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    gauge,
+    voter,
+    rewardsContract,
+    amount,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(20e18, {"from": whale})
+    vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
 
     # this is part of our check into the staking contract balance

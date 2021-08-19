@@ -17,17 +17,18 @@ def test_odds_and_ends(
     gauge,
     StrategyConvexEURt,
     cvxDeposit,
-    rewardsContract, 
-    pid, 
+    rewardsContract,
+    pid,
     crv,
-    convexToken
+    convexToken,
+    amount,
 ):
 
     ## deposit to the vault after approving. turn off health check before each harvest since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(20e18, {"from": whale})
+    vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
@@ -35,7 +36,7 @@ def test_odds_and_ends(
     # send away all funds, will need to alter this based on strategy
     # set claim rewards to true and send away CRV and CVX so we don't have dust leftover, this is a problem with uni v3
     strategy.setClaimRewards(True, {"from": gov})
-    strategy.withdrawToConvexDepositTokens()
+    strategy.withdrawToConvexDepositTokens({"from": gov})
     to_send = cvxDeposit.balanceOf(strategy)
     print("cvxToken Balance of Strategy", to_send)
     cvxDeposit.transfer(gov, to_send, {"from": strategy})
@@ -50,7 +51,7 @@ def test_odds_and_ends(
     print("\nShould we harvest? Should be true.", tx)
     assert tx == True
 
-    chain.sleep(86400*2)
+    chain.sleep(86400 * 2)
     chain.mine(1)
     strategy.setDoHealthCheck(False, {"from": gov})
     strategy.harvest({"from": gov})
@@ -116,25 +117,26 @@ def test_odds_and_ends_2(
     strategist_ms,
     voter,
     gauge,
-    cvxDeposit
+    cvxDeposit,
+    amount,
 ):
 
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(20e18, {"from": whale})
+    vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
     # send away all funds, will need to alter this based on strategy
-    strategy.withdrawToConvexDepositTokens()
+    strategy.withdrawToConvexDepositTokens({"from": gov})
     to_send = cvxDeposit.balanceOf(strategy)
     print("cvxToken Balance of Strategy", to_send)
     cvxDeposit.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
-    
+
     strategy.setEmergencyExit({"from": gov})
 
     chain.sleep(1)
@@ -158,12 +160,13 @@ def test_odds_and_ends_migration(
     chain,
     strategist_ms,
     proxy,
-    pid
+    pid,
+    amount,
 ):
 
     ## deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(20e18, {"from": whale})
+    vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
@@ -219,12 +222,23 @@ def test_odds_and_ends_migration(
 
 
 def test_odds_and_ends_liquidatePosition(
-    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, gauge, voter, rewardsContract
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    gauge,
+    voter,
+    rewardsContract,
+    amount,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(20e18, {"from": whale})
+    vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
 
     # this is part of our check into the staking contract balance
@@ -269,23 +283,36 @@ def test_odds_and_ends_liquidatePosition(
     chain.mine(1)
 
     # transfer funds to our strategy so we have enough for our withdrawal
-    token.transfer(strategy, 20e18, {"from": whale})
+    token.transfer(strategy, amount, {"from": whale})
 
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) + 20e18 >= startingWhale or math.isclose(
+    assert token.balanceOf(whale) + amount >= startingWhale or math.isclose(
         token.balanceOf(whale), startingWhale, abs_tol=5
     )
 
 
 def test_odds_and_ends_rekt(
-    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, voter, cvxDeposit, rewardsContract, crv, convexToken
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    voter,
+    cvxDeposit,
+    rewardsContract,
+    crv,
+    convexToken,
+    amount,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(20e18, {"from": whale})
+    vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
@@ -293,7 +320,7 @@ def test_odds_and_ends_rekt(
     # send away all funds, will need to alter this based on strategy
     # set claim rewards to true and send away CRV and CVX so we don't have dust leftover
     strategy.setClaimRewards(True, {"from": gov})
-    strategy.withdrawToConvexDepositTokens()
+    strategy.withdrawToConvexDepositTokens({"from": gov})
     to_send = cvxDeposit.balanceOf(strategy)
     print("cvxToken Balance of Strategy", to_send)
     cvxDeposit.transfer(gov, to_send, {"from": strategy})
@@ -302,8 +329,7 @@ def test_odds_and_ends_rekt(
     to_send = convexToken.balanceOf(strategy)
     convexToken.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
-    
-    
+
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
 
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -318,23 +344,34 @@ def test_odds_and_ends_rekt(
 
 # goal of this one is to hit a withdraw when we don't have any staked assets
 def test_odds_and_ends_liquidate_rekt(
-    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, voter, cvxDeposit
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    voter,
+    cvxDeposit,
+    amount,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(20e18, {"from": whale})
+    vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
     # send away all funds, will need to alter this based on strategy
-    strategy.withdrawToConvexDepositTokens()
+    strategy.withdrawToConvexDepositTokens({"from": gov})
     to_send = cvxDeposit.balanceOf(strategy)
     print("cvxToken Balance of Strategy", to_send)
     cvxDeposit.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
+    strategy.withdrawToConvexDepositTokens({"from": gov})
 
     # we can also withdraw from an empty vault as well, but make sure we're okay with losing 100%
     vault.withdraw(10e18, whale, 10000, {"from": whale})
@@ -350,6 +387,7 @@ def test_weird_reverts(
     chain,
     strategist_ms,
     other_vault_strategy,
+    amount,
 ):
 
     # only vault can call this
@@ -367,3 +405,37 @@ def test_weird_reverts(
     # can't do health check with a non-health check contract
     with brownie.reverts():
         strategy.withdraw(1e18, {"from": gov})
+
+
+# goal of this one is to hit a withdraw to cvx when we don't have any staked assets
+def test_odds_and_ends_liquidate_rekt(
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    voter,
+    cvxDeposit,
+    amount,
+):
+    ## deposit to the vault after approving. turn off health check since we're doing weird shit
+    strategy.setDoHealthCheck(False, {"from": gov})
+    startingWhale = token.balanceOf(whale)
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    vault.deposit(amount, {"from": whale})
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+
+    # send away all funds, will need to alter this based on strategy
+    strategy.withdrawToConvexDepositTokens({"from": gov})
+    to_send = cvxDeposit.balanceOf(strategy)
+    print("cvxToken Balance of Strategy", to_send)
+    cvxDeposit.transfer(gov, to_send, {"from": strategy})
+    assert strategy.estimatedTotalAssets() == 0
+
+    # we can also withdraw from an empty vault as well, but make sure we're okay with losing 100%
+    vault.withdraw(10e18, whale, 10000, {"from": whale})

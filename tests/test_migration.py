@@ -17,12 +17,13 @@ def test_migration(
     proxy,
     strategist_ms,
     healthCheck,
-    pid
+    pid,
+    amount,
 ):
 
     ## deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(20e18, {"from": whale})
+    vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)

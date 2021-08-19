@@ -17,9 +17,16 @@ def pid():
 @pytest.fixture(scope="module")
 def whale(accounts):
     # Totally in it for the tech
-    # Update this with a large holder of your want token (the only EOA holder of EURt LP)
+    # Update this with a large holder of your want token
     whale = accounts.at("0x1eb8271d94292d5bb9e043eb94ba0904115eb5f4", force=True)
     yield whale
+
+
+# this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
+@pytest.fixture(scope="module")
+def amount():
+    amount = 20e18
+    yield amount
 
 
 # all contracts below should be able to stay static based on the pid
