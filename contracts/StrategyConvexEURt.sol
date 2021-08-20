@@ -234,18 +234,6 @@ contract StrategyConvexEURt is BaseStrategy {
             }
         }
 
-        // serious loss should never happen, but if it does (for instance, if Curve is hacked), let's record it accurately
-        uint256 assets = estimatedTotalAssets();
-        uint256 debt = vault.strategies(address(this)).totalDebt;
-
-        // if assets are greater than debt, things are working great!
-        if (assets > debt) {
-            _profit = want.balanceOf(address(this));
-        } else {
-            // if assets are less than debt, we are in trouble
-            _loss = debt.sub(assets);
-        }
-
         // debtOustanding will only be > 0 in the event of revoking or lowering debtRatio of a strategy
         if (_debtOutstanding > 0) {
             if (stakedBalance() > 0) {
@@ -258,17 +246,18 @@ contract StrategyConvexEURt is BaseStrategy {
                 _debtOutstanding,
                 want.balanceOf(address(this))
             );
-            // want to make sure we report losses properly here
-            if (_debtPayment < _debtOutstanding) {
-                _loss = _debtOutstanding.sub(_debtPayment);
-                if (_profit > _loss) {
-                    _profit = _profit.sub(_loss);
-                    _loss = 0;
-                } else {
-                    _loss = _loss.sub(_profit);
-                    _profit = 0;
-                }
-            }
+        }
+
+        // serious loss should never happen, but if it does (for instance, if Curve is hacked), let's record it accurately
+        uint256 assets = estimatedTotalAssets();
+        uint256 debt = vault.strategies(address(this)).totalDebt;
+
+        // if assets are greater than debt, things are working great!
+        if (assets > debt) {
+            _profit = want.balanceOf(address(this));
+        } else {
+            // if assets are less than debt, we are in trouble
+            _loss = debt.sub(assets);
         }
     }
 
