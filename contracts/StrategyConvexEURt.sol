@@ -118,6 +118,7 @@ contract StrategyConvexEURt is BaseStrategy {
     IERC20 public constant weth =
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     uint256 public harvestProfitNeeded;
+    string internal stratName;
 
     // convex-specific variables
     bool public claimRewards; // boolean if we should always claim rewards when withdrawing, usually withdrawAndUnwrap (generally this should be false)
@@ -178,7 +179,7 @@ contract StrategyConvexEURt is BaseStrategy {
     /* ========== VIEWS ========== */
 
     function name() external view override returns (string memory) {
-        return "StrategyConvexEURt";
+        return stratName;
     }
 
     function stakedBalance() public view returns (uint256) {
@@ -505,5 +506,10 @@ contract StrategyConvexEURt is BaseStrategy {
         onlyAuthorized
     {
         harvestProfitNeeded = _harvestProfitNeeded;
+    }
+
+    // This allows us to change the name of a strategy
+    function setName(string calldata _stratName) external onlyAuthorized {
+        stratName = _stratName;
     }
 }
