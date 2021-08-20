@@ -309,7 +309,7 @@ contract StrategyConvexEURt is BaseStrategy {
     /* ========== KEEP3RS ========== */
 
     // we will need to add rewards token here if we have them
-    function claimableProfitInUsd() internal view returns (uint256) {
+    function claimableProfitInUsdt() internal view returns (uint256) {
         // calculations pulled directly from CVX's contract for minting CVX per CRV claimed
         uint256 totalCliffs = 1000;
         uint256 maxSupply = 100 * 1000000 * 1e18; // 100mil
@@ -483,7 +483,7 @@ contract StrategyConvexEURt is BaseStrategy {
     {
         return
             super.harvestTrigger(callCostinEth) ||
-            claimableProfitInUsd() > harvestProfitNeeded;
+            claimableProfitInUsdt() > harvestProfitNeeded;
     }
 
     /* ========== SETTERS ========== */
