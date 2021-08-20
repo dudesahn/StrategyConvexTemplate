@@ -254,7 +254,7 @@ contract StrategyConvexEURt is BaseStrategy {
 
         // if assets are greater than debt, things are working great!
         if (assets > debt) {
-            _profit = want.balanceOf(address(this));
+            _profit = assets.sub(debt);
         } else {
             // if assets are less than debt, we are in trouble
             _loss = debt.sub(assets);
