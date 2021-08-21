@@ -118,7 +118,7 @@ contract StrategyConvexEURt is BaseStrategy {
     IERC20 public constant weth =
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     uint256 public harvestProfitNeeded;
-    string internal stratName;
+    bool internal manualHarvestNow = false; // only set this to true when we want to trigger our keepers to harvest for us
 
     // convex-specific variables
     bool public claimRewards; // boolean if we should always claim rewards when withdrawing, usually withdrawAndUnwrap (generally this should be false)
@@ -135,6 +135,7 @@ contract StrategyConvexEURt is BaseStrategy {
     IERC20 public constant usdt =
         IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
     IOracle public oracle = IOracle(0x0F1f5A87f99f0918e6C81F16E59F3518698221Ff); // this is only needed for strats that use uniV3 for swaps
+    string internal stratName = "StrategyConvexEURt"; // set our strategy name here
 
     constructor(address _vault, uint256 _pid) public BaseStrategy(_vault) {
         /* ========== CONSTRUCTOR CONSTANTS ========== */
@@ -259,6 +260,9 @@ contract StrategyConvexEURt is BaseStrategy {
             // if assets are less than debt, we are in trouble
             _loss = debt.sub(assets);
         }
+
+        // we're done harvesting, so reset our trigger if we used it
+        if (manualHarvestNow) manualHarvestNow = false;
     }
 
     // migrate our want token to a new strategy if needed, make sure to check claimRewards first
@@ -472,7 +476,8 @@ contract StrategyConvexEURt is BaseStrategy {
     {
         return
             super.harvestTrigger(callCostinEth) ||
-            claimableProfitInUsdt() > harvestProfitNeeded;
+            claimableProfitInUsdt() > harvestProfitNeeded ||
+            manualHarvestNow;
     }
 
     /* ========== SETTERS ========== */
@@ -500,5 +505,10 @@ contract StrategyConvexEURt is BaseStrategy {
     // This allows us to change the name of a strategy
     function setName(string calldata _stratName) external onlyAuthorized {
         stratName = _stratName;
+    }
+
+    // This allows us to manually harvest with our keeper as needed
+    function setManualHarvest(bool _manualHarvestNow) external onlyAuthorized {
+        manualHarvestNow = _manualHarvestNow;
     }
 }
