@@ -17,6 +17,16 @@ def test_setters(
     print("\nShould we harvest? Should be false.", tx)
     assert tx == False
 
+    # test our manual harvest trigger, and that a harvest turns it off
+    strategy.setManualHarvest(True, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be true.", tx)
+    assert tx == True
+    strategy.harvest({"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be false.", tx)
+    assert tx == False
+
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
