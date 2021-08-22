@@ -7,7 +7,7 @@ def isolation(fn_isolation):
     pass
 
 
-# put our pool's convex pid here; this is the only thing that should need to change up here **************
+# put our pool's convex pid here
 @pytest.fixture(scope="module")
 def pid():
     pid = 39
@@ -28,6 +28,16 @@ def amount():
     amount = 20e18
     yield amount
 
+
+# this is the name we want to give our strategy
+@pytest.fixture(scope="module")
+def strategy_name():
+    strategy_name = "StrategyConvexEURt"
+    yield strategy_name
+
+
+# Only worry about changing things above this line, unless you want to make changes to the vault or strategy.
+# ----------------------------------------------------------------------- #
 
 # all contracts below should be able to stay static based on the pid
 @pytest.fixture(scope="module")
@@ -99,7 +109,7 @@ def pool(token, curve_registry):
     if curve_registry.get_pool_from_lp_token(token) == zero_address:
         _poolAddress = token
     else:
-        _poolAddress = registry.get_pool_from_lp_token(token)
+        _poolAddress = curve_registry.get_pool_from_lp_token(token)
     yield Contract(_poolAddress)
 
 
@@ -194,9 +204,11 @@ def strategy(
     chain,
     proxy,
     pid,
+    pool,
+    strategy_name,
 ):
     # parameters for this are: strategy, vault, max deposit, minTimePerInvest, slippage protection (10000 = 100% slippage allowed),
-    strategy = strategist.deploy(StrategyConvexEURt, vault, pid)
+    strategy = strategist.deploy(StrategyConvexEURt, vault, pid, pool, strategy_name)
     strategy.setKeeper(keeper, {"from": gov})
     # set our management fee to zero so it doesn't mess with our profit checking
     vault.setManagementFee(0, {"from": gov})

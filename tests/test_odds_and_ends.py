@@ -22,6 +22,8 @@ def test_odds_and_ends(
     crv,
     convexToken,
     amount,
+    pool,
+    strategy_name,
 ):
 
     ## deposit to the vault after approving. turn off health check before each harvest since we're doing weird shit
@@ -62,7 +64,9 @@ def test_odds_and_ends(
 
     # we can try to migrate too, lol
     # deploy our new strategy
-    new_strategy = strategist.deploy(StrategyConvexEURt, vault, pid)
+    new_strategy = strategist.deploy(
+        StrategyConvexEURt, vault, pid, pool, strategy_name
+    )
     total_old = strategy.estimatedTotalAssets()
 
     # migrate our old strategy
@@ -162,6 +166,8 @@ def test_odds_and_ends_migration(
     proxy,
     pid,
     amount,
+    pool,
+    strategy_name,
 ):
 
     ## deposit to the vault after approving
@@ -172,7 +178,9 @@ def test_odds_and_ends_migration(
     chain.sleep(1)
 
     # deploy our new strategy
-    new_strategy = strategist.deploy(StrategyConvexEURt, vault, pid)
+    new_strategy = strategist.deploy(
+        StrategyConvexEURt, vault, pid, pool, strategy_name
+    )
     total_old = strategy.estimatedTotalAssets()
 
     # can we harvest an unactivated strategy? should be no

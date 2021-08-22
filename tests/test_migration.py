@@ -19,6 +19,8 @@ def test_migration(
     healthCheck,
     pid,
     amount,
+    pool,
+    strategy_name,
 ):
 
     ## deposit to the vault after approving
@@ -29,7 +31,9 @@ def test_migration(
     chain.sleep(1)
 
     # deploy our new strategy
-    new_strategy = strategist.deploy(StrategyConvexEURt, vault, pid)
+    new_strategy = strategist.deploy(
+        StrategyConvexEURt, vault, pid, pool, strategy_name
+    )
     total_old = strategy.estimatedTotalAssets()
 
     # can we harvest an unactivated strategy? should be no

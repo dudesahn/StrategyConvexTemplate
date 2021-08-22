@@ -88,7 +88,7 @@ interface IConvexDeposit {
         );
 }
 
-contract StrategyConvexEURt is BaseStrategy {
+abstract contract StrategyConvexBase is BaseStrategy {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
@@ -104,6 +104,7 @@ contract StrategyConvexEURt is BaseStrategy {
         0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // default to sushiswap, more CRV and CVX liquidity there
     address public constant uniswapv3 =
         0xE592427A0AEce92De3Edee1F18E0157C05861564;
+    ICurveFi public curve; // Curve Pool, need this for buying more pool tokens
 
     address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     address[] public crvPath; // path to sell CRV
@@ -119,28 +120,18 @@ contract StrategyConvexEURt is BaseStrategy {
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     uint256 public harvestProfitNeeded;
     bool internal manualHarvestNow = false; // only set this to true when we want to trigger our keepers to harvest for us
+    string internal stratName; // we use this to be able to adjust our strategy's name
 
     // convex-specific variables
     bool public claimRewards; // boolean if we should always claim rewards when withdrawing, usually withdrawAndUnwrap (generally this should be false)
 
-    /* ========== STATE VARIABLES ========== */
-    // these will likely change across different wants.
-    // note that some strategies will require the "optimal" state variable here as well if we choose which token to sell into before depositing
-
-    // specific variables for this contract
-    ICurveFi public constant curve =
-        ICurveFi(0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890); // Curve Pool, need this for buying more pool tokens
-    IERC20 public constant eurt =
-        IERC20(0xC581b735A1688071A1746c968e0798D642EDE491);
-    IERC20 public constant usdt =
-        IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
-    IOracle public oracle = IOracle(0x0F1f5A87f99f0918e6C81F16E59F3518698221Ff); // this is only needed for strats that use uniV3 for swaps
-    string internal stratName = "StrategyConvexEURt"; // set our strategy name here
-
-    constructor(address _vault, uint256 _pid) public BaseStrategy(_vault) {
+    constructor(
+        address _vault,
+        uint256 _pid,
+        address _curvepool,
+        string memory _name
+    ) public BaseStrategy(_vault) {
         /* ========== CONSTRUCTOR CONSTANTS ========== */
-        // these should stay the same across different wants.
-
         // You can set these parameters on deployment to whatever you want
         maxReportDelay = 60 * 60 * 24 * 7; // 7 days in seconds, if we hit this then harvestTrigger = True
         debtThreshold = 5 * 1e18; // set a bit of a buffer
@@ -159,22 +150,11 @@ contract StrategyConvexEURt is BaseStrategy {
             pid
         );
 
-        /* ========== CONSTRUCTOR VARIABLES ========== */
-        // these will likely change across different wants.
+        // set our curve pool contract
+        curve = ICurveFi(_curvepool);
 
-        // strategy-specific approvals and paths
-        eurt.safeApprove(address(curve), type(uint256).max);
-        weth.safeApprove(uniswapv3, type(uint256).max);
-
-        // crv token path
-        crvPath = new address[](2);
-        crvPath[0] = address(crv);
-        crvPath[1] = address(weth);
-
-        // convex token path
-        convexTokenPath = new address[](2);
-        convexTokenPath[0] = address(convexToken);
-        convexTokenPath[1] = address(weth);
+        // set our strategy's name
+        stratName = _name;
     }
 
     /* ========== VIEWS ========== */
@@ -197,6 +177,168 @@ contract StrategyConvexEURt is BaseStrategy {
 
     function estimatedTotalAssets() public view override returns (uint256) {
         return balanceOfWant().add(stakedBalance());
+    }
+
+    /* ========== CONSTANT FUNCTIONS ========== */
+    // these should stay the same across different wants.
+
+    function adjustPosition(uint256 _debtOutstanding) internal override {
+        if (emergencyExit) {
+            return;
+        }
+        // Send all of our Curve pool tokens to be deposited
+        uint256 _toInvest = balanceOfWant();
+        // deposit into convex and stake immediately but only if we have something to invest
+        if (_toInvest > 0) {
+            IConvexDeposit(depositContract).deposit(pid, _toInvest, true);
+        }
+    }
+
+    function liquidatePosition(uint256 _amountNeeded)
+        internal
+        override
+        returns (uint256 _liquidatedAmount, uint256 _loss)
+    {
+        if (_amountNeeded > balanceOfWant()) {
+            if (stakedBalance() > 0) {
+                IConvexRewards(rewardsContract).withdrawAndUnwrap(
+                    Math.min(stakedBalance(), _amountNeeded - balanceOfWant()),
+                    claimRewards
+                );
+            }
+
+            _liquidatedAmount = Math.min(_amountNeeded, balanceOfWant());
+            _loss = _amountNeeded.sub(_liquidatedAmount);
+        } else {
+            // we have enough balance to cover the liquidation available
+            return (_amountNeeded, 0);
+        }
+    }
+
+    // fire sale, get rid of it all!
+    function liquidateAllPositions() internal override returns (uint256) {
+        if (stakedBalance() > 0) {
+            // don't bother withdrawing zero
+            IConvexRewards(rewardsContract).withdrawAndUnwrap(
+                stakedBalance(),
+                claimRewards
+            );
+        }
+        return balanceOfWant();
+    }
+
+    // Sells our harvested CRV into the selected output (ETH).
+    function _sellCrv(uint256 _crvAmount) internal {
+        IUniswapV2Router02(sushiswapRouter).swapExactTokensForTokens(
+            _crvAmount,
+            uint256(0),
+            crvPath,
+            address(this),
+            now
+        );
+    }
+
+    // Sells our harvested CVX into the selected output (ETH).
+    function _sellConvex(uint256 _convexAmount) internal {
+        IUniswapV2Router02(sushiswapRouter).swapExactTokensForTokens(
+            _convexAmount,
+            uint256(0),
+            convexTokenPath,
+            address(this),
+            now
+        );
+    }
+
+    // in case we need to exit into the convex deposit token, this will allow us to do that
+    // make sure to check claimRewards before this step if needed
+    // plan to have gov sweep convex deposit tokens from strategy after this
+    function withdrawToConvexDepositTokens() external onlyAuthorized {
+        if (stakedBalance() > 0) {
+            IConvexRewards(rewardsContract).withdraw(
+                stakedBalance(),
+                claimRewards
+            );
+        }
+    }
+
+    // we don't want for these tokens to be swept out. We allow gov to sweep out cvx vault tokens; we would only be holding these if things were really, really rekt.
+    function protectedTokens()
+        internal
+        view
+        override
+        returns (address[] memory)
+    {
+        address[] memory protected = new address[](0);
+        return protected;
+    }
+
+    /* ========== SETTERS ========== */
+
+    // These functions are useful for setting parameters of the strategy that may need to be adjusted.
+
+    // Set the amount of CRV to be locked in Yearn's veCRV voter from each harvest. Default is 10%.
+    function setKeepCRV(uint256 _keepCRV) external onlyAuthorized {
+        keepCRV = _keepCRV;
+    }
+
+    // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
+    function setClaimRewards(bool _claimRewards) external onlyAuthorized {
+        claimRewards = _claimRewards;
+    }
+
+    // This determines when we tell our keepers to harvest based on profit
+    function setHarvestProfitNeeded(uint256 _harvestProfitNeeded)
+        external
+        onlyAuthorized
+    {
+        harvestProfitNeeded = _harvestProfitNeeded;
+    }
+
+    // This allows us to change the name of a strategy
+    function setName(string calldata _stratName) external onlyAuthorized {
+        stratName = _stratName;
+    }
+
+    // This allows us to manually harvest with our keeper as needed
+    function setManualHarvest(bool _manualHarvestNow) external onlyAuthorized {
+        manualHarvestNow = _manualHarvestNow;
+    }
+}
+
+contract StrategyConvexEURt is StrategyConvexBase {
+    /* ========== STATE VARIABLES ========== */
+    // these will likely change across different wants.
+    // note that some strategies will require the "optimal" state variable here as well if we choose which token to sell into before depositing
+
+    // specific variables for this contract
+    IERC20 public constant eurt =
+        IERC20(0xC581b735A1688071A1746c968e0798D642EDE491);
+    IERC20 public constant usdt =
+        IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
+    IOracle public oracle = IOracle(0x0F1f5A87f99f0918e6C81F16E59F3518698221Ff); // this is only needed for strats that use uniV3 for swaps
+
+    constructor(
+        address _vault,
+        uint256 _pid,
+        address _curvePool,
+        string memory _name
+    ) public StrategyConvexBase(_vault, _pid, _curvePool, _name) {
+        /* ========== CONSTRUCTOR VARIABLES ========== */
+        // these will likely change across different wants.
+
+        // strategy-specific approvals and paths
+        eurt.safeApprove(address(curve), type(uint256).max);
+        weth.safeApprove(uniswapv3, type(uint256).max);
+
+        // crv token path
+        crvPath = new address[](2);
+        crvPath[0] = address(crv);
+        crvPath[1] = address(weth);
+
+        // convex token path
+        convexTokenPath = new address[](2);
+        convexTokenPath[0] = address(convexToken);
+        convexTokenPath[1] = address(weth);
     }
 
     /* ========== VARIABLE FUNCTIONS ========== */
@@ -301,6 +443,18 @@ contract StrategyConvexEURt is BaseStrategy {
 
     /* ========== KEEP3RS ========== */
 
+    function harvestTrigger(uint256 callCostinEth)
+        public
+        view
+        override
+        returns (bool)
+    {
+        return
+            super.harvestTrigger(callCostinEth) ||
+            claimableProfitInUsdt() > harvestProfitNeeded ||
+            manualHarvestNow;
+    }
+
     // we will need to add rewards token here if we have them
     function claimableProfitInUsdt() internal view returns (uint256) {
         // calculations pulled directly from CVX's contract for minting CVX per CRV claimed
@@ -371,144 +525,5 @@ contract StrategyConvexEURt is BaseStrategy {
             callCostInWant = curve.calc_token_amount([callCostInEur, 0], true);
         }
         return callCostInWant;
-    }
-
-    /* ========== CONSTANT FUNCTIONS ========== */
-    // these should stay the same across different wants.
-
-    function adjustPosition(uint256 _debtOutstanding) internal override {
-        if (emergencyExit) {
-            return;
-        }
-        // Send all of our Curve pool tokens to be deposited
-        uint256 _toInvest = balanceOfWant();
-        // deposit into convex and stake immediately but only if we have something to invest
-        if (_toInvest > 0) {
-            IConvexDeposit(depositContract).deposit(pid, _toInvest, true);
-        }
-    }
-
-    function liquidatePosition(uint256 _amountNeeded)
-        internal
-        override
-        returns (uint256 _liquidatedAmount, uint256 _loss)
-    {
-        if (_amountNeeded > balanceOfWant()) {
-            if (stakedBalance() > 0) {
-                IConvexRewards(rewardsContract).withdrawAndUnwrap(
-                    Math.min(stakedBalance(), _amountNeeded - balanceOfWant()),
-                    claimRewards
-                );
-            }
-
-            _liquidatedAmount = Math.min(_amountNeeded, balanceOfWant());
-            _loss = _amountNeeded.sub(_liquidatedAmount);
-        } else {
-            // we have enough balance to cover the liquidation available
-            return (_amountNeeded, 0);
-        }
-    }
-
-    // fire sale, get rid of it all!
-    function liquidateAllPositions() internal override returns (uint256) {
-        if (stakedBalance() > 0) {
-            // don't bother withdrawing zero
-            IConvexRewards(rewardsContract).withdrawAndUnwrap(
-                stakedBalance(),
-                claimRewards
-            );
-        }
-        return balanceOfWant();
-    }
-
-    // Sells our harvested CRV into the selected output (ETH).
-    function _sellCrv(uint256 _crvAmount) internal {
-        IUniswapV2Router02(sushiswapRouter).swapExactTokensForTokens(
-            _crvAmount,
-            uint256(0),
-            crvPath,
-            address(this),
-            now
-        );
-    }
-
-    // Sells our harvested CVX into the selected output (ETH).
-    function _sellConvex(uint256 _convexAmount) internal {
-        IUniswapV2Router02(sushiswapRouter).swapExactTokensForTokens(
-            _convexAmount,
-            uint256(0),
-            convexTokenPath,
-            address(this),
-            now
-        );
-    }
-
-    // in case we need to exit into the convex deposit token, this will allow us to do that
-    // make sure to check claimRewards before this step if needed
-    // plan to have gov sweep convex deposit tokens from strategy after this
-    function withdrawToConvexDepositTokens() external onlyAuthorized {
-        if (stakedBalance() > 0) {
-            IConvexRewards(rewardsContract).withdraw(
-                stakedBalance(),
-                claimRewards
-            );
-        }
-    }
-
-    // we don't want for these tokens to be swept out. We allow gov to sweep out cvx vault tokens; we would only be holding these if things were really, really rekt.
-    function protectedTokens()
-        internal
-        view
-        override
-        returns (address[] memory)
-    {
-        address[] memory protected = new address[](0);
-        return protected;
-    }
-
-    /* ========== KEEP3RS ========== */
-
-    function harvestTrigger(uint256 callCostinEth)
-        public
-        view
-        override
-        returns (bool)
-    {
-        return
-            super.harvestTrigger(callCostinEth) ||
-            claimableProfitInUsdt() > harvestProfitNeeded ||
-            manualHarvestNow;
-    }
-
-    /* ========== SETTERS ========== */
-
-    // These functions are useful for setting parameters of the strategy that may need to be adjusted.
-
-    // Set the amount of CRV to be locked in Yearn's veCRV voter from each harvest. Default is 10%.
-    function setKeepCRV(uint256 _keepCRV) external onlyAuthorized {
-        keepCRV = _keepCRV;
-    }
-
-    // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
-    function setClaimRewards(bool _claimRewards) external onlyAuthorized {
-        claimRewards = _claimRewards;
-    }
-
-    // This determines when we tell our keepers to harvest based on profit
-    function setHarvestProfitNeeded(uint256 _harvestProfitNeeded)
-        external
-        onlyAuthorized
-    {
-        harvestProfitNeeded = _harvestProfitNeeded;
-    }
-
-    // This allows us to change the name of a strategy
-    function setName(string calldata _stratName) external onlyAuthorized {
-        stratName = _stratName;
-    }
-
-    // This allows us to manually harvest with our keeper as needed
-    function setManualHarvest(bool _manualHarvestNow) external onlyAuthorized {
-        manualHarvestNow = _manualHarvestNow;
     }
 }
