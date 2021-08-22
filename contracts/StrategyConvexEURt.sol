@@ -100,7 +100,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
         0xF403C135812408BFbE8713b5A23a04b3D48AAE31; // this is the deposit contract that all pools use, aka booster
     address public rewardsContract; // This is unique to each curve pool
     uint256 public pid; // this is unique to each pool
-    address public constant sushiswapRouter =
+    address public constant sushiswap =
         0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // default to sushiswap, more CRV and CVX liquidity there
     address public constant uniswapv3 =
         0xE592427A0AEce92De3Edee1F18E0157C05861564;
@@ -137,13 +137,13 @@ abstract contract StrategyConvexBase is BaseStrategy {
         maxReportDelay = 60 * 60 * 24 * 7; // 7 days in seconds, if we hit this then harvestTrigger = True
         debtThreshold = 5 * 1e18; // set a bit of a buffer
         profitFactor = 10000; // in this strategy, profitFactor is only used for telling keep3rs when to move funds from vault to strategy (what previously was an earn call)
-        harvestProfitNeeded = 20_000e18;
+        harvestProfitNeeded = 20000 * 1e6; // this is how much in USDT we need to make. remember, 6 decimals!
         healthCheck = address(0xDDCea799fF1699e98EDF118e0629A974Df7DF012); // health.ychad.eth
 
         // want = Curve LP
         want.safeApprove(address(depositContract), type(uint256).max);
-        crv.safeApprove(sushiswapRouter, type(uint256).max);
-        convexToken.safeApprove(sushiswapRouter, type(uint256).max);
+        crv.safeApprove(sushiswap, type(uint256).max);
+        convexToken.safeApprove(sushiswap, type(uint256).max);
 
         // setup our rewards contract
         pid = _pid; // this is the pool ID on convex, we use this to determine what the reweardsContract address is
@@ -233,7 +233,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
 
     // Sells our harvested CRV into the selected output (ETH).
     function _sellCrv(uint256 _crvAmount) internal {
-        IUniswapV2Router02(sushiswapRouter).swapExactTokensForTokens(
+        IUniswapV2Router02(sushiswap).swapExactTokensForTokens(
             _crvAmount,
             uint256(0),
             crvPath,
@@ -244,7 +244,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
 
     // Sells our harvested CVX into the selected output (ETH).
     function _sellConvex(uint256 _convexAmount) internal {
-        IUniswapV2Router02(sushiswapRouter).swapExactTokensForTokens(
+        IUniswapV2Router02(sushiswap).swapExactTokensForTokens(
             _convexAmount,
             uint256(0),
             convexTokenPath,
@@ -290,7 +290,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
         claimRewards = _claimRewards;
     }
 
-    // This determines when we tell our keepers to harvest based on profit
+    // This determines when we tell our keepers to harvest based on profit. this is how much in USDT we need to make. remember, 6 decimals!
     function setHarvestProfitNeeded(uint256 _harvestProfitNeeded)
         external
         onlyAuthorized
@@ -453,10 +453,16 @@ contract StrategyConvexEURt is StrategyConvexBase {
         override
         returns (bool)
     {
-        return
-            super.harvestTrigger(callCostinEth) ||
-            claimableProfitInUsdt() > harvestProfitNeeded ||
-            manualHarvestNow;
+        // trigger if we want to manually harvest
+        if (manualHarvestNow) return true;
+
+        // harvest if we have a profit to claim
+        if (claimableProfitInUsdt() > harvestProfitNeeded) return true;
+
+        // Should not trigger if strategy is not active (no assets and no debtRatio). This means we don't need to adjust keeper job.
+        if (!isActive()) return false;
+
+        return super.harvestTrigger(callCostinEth);
     }
 
     // we will need to add rewards token here if we have them
@@ -496,21 +502,21 @@ contract StrategyConvexEURt is StrategyConvexBase {
         uint256 crvValue;
         if (claimableBalance() > 0) {
             uint256[] memory crvSwap =
-                IUniswapV2Router02(sushiswapRouter).getAmountsOut(
+                IUniswapV2Router02(sushiswap).getAmountsOut(
                     claimableBalance(),
                     crv_usd_path
                 );
-            crvValue = crvSwap[1];
+            crvValue = crvSwap[crvSwap.length - 1];
         }
 
         uint256 cvxValue;
         if (mintableCvx > 0) {
             uint256[] memory cvxSwap =
-                IUniswapV2Router02(sushiswapRouter).getAmountsOut(
+                IUniswapV2Router02(sushiswap).getAmountsOut(
                     mintableCvx,
                     cvx_usd_path
                 );
-            cvxValue = cvxSwap[1];
+            cvxValue = cvxSwap[cvxSwap.length - 1];
         }
         return crvValue.add(cvxValue);
     }

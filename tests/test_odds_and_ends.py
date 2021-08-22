@@ -415,8 +415,8 @@ def test_weird_reverts(
         strategy.withdraw(1e18, {"from": gov})
 
 
-# goal of this one is to hit a withdraw to cvx when we don't have any staked assets
-def test_odds_and_ends_liquidate_rekt(
+# this one makes sure our harvestTrigger doesn't trigger when we don't have assets, but will trigger if we have profit
+def test_odds_and_ends_inactive_strat(
     gov,
     token,
     vault,
@@ -429,21 +429,49 @@ def test_odds_and_ends_liquidate_rekt(
     cvxDeposit,
     amount,
 ):
-    ## deposit to the vault after approving. turn off health check since we're doing weird shit
-    strategy.setDoHealthCheck(False, {"from": gov})
-    startingWhale = token.balanceOf(whale)
+    ## deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    # send away all funds, will need to alter this based on strategy
+    ## move our funds out of the strategy
+    vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
+    # sleep for a day since univ3 is weird
+    chain.sleep(86400)
+    strategy.harvest({"from": gov})
+
+    # we shouldn't harvest empty strategies
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be false.", tx)
+    assert tx == False
+
+    ## move our funds back into the strategy
+    vault.updateStrategyDebtRatio(strategy, 10000, {"from": gov})
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+
+    # sleep for five days to generate profit
+    chain.sleep(86400 * 5)
+
+    # send away all funds so we have profit but no assets
     strategy.withdrawToConvexDepositTokens({"from": gov})
     to_send = cvxDeposit.balanceOf(strategy)
     print("cvxToken Balance of Strategy", to_send)
     cvxDeposit.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
 
-    # we can also withdraw from an empty vault as well, but make sure we're okay with losing 100%
-    vault.withdraw(10e18, whale, 10000, {"from": whale})
+    # set debtRatio to zero so strategy will return inactive
+    vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
+
+    # we should harvest empty strategies with profit to take, but our current profit is below our limit
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be false.", tx)
+    assert tx == False
+
+    # adjust our limit to 0, then check
+    strategy.setHarvestProfitNeeded(0, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be true.", tx)
+    assert tx == True
