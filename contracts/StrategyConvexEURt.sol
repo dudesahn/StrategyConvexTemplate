@@ -203,15 +203,17 @@ abstract contract StrategyConvexBase is BaseStrategy {
         override
         returns (uint256 _liquidatedAmount, uint256 _loss)
     {
-        if (_amountNeeded > balanceOfWant()) {
-            if (stakedBalance() > 0) {
+        uint256 _wantBal = balanceOfWant();
+        if (_amountNeeded > _wantBal) {
+            uint256 _stakedBal = stakedBalance();
+            if (_stakedBal > 0) {
                 IConvexRewards(rewardsContract).withdrawAndUnwrap(
-                    Math.min(stakedBalance(), _amountNeeded - balanceOfWant()),
+                    Math.min(_stakedBal, _amountNeeded - _wantBal),
                     claimRewards
                 );
             }
-
-            _liquidatedAmount = Math.min(_amountNeeded, balanceOfWant());
+            uint256 _withdrawnBal = balanceOfWant();
+            _liquidatedAmount = Math.min(_amountNeeded, _withdrawnBal);
             _loss = _amountNeeded.sub(_liquidatedAmount);
         } else {
             // we have enough balance to cover the liquidation available
@@ -221,10 +223,11 @@ abstract contract StrategyConvexBase is BaseStrategy {
 
     // fire sale, get rid of it all!
     function liquidateAllPositions() internal override returns (uint256) {
-        if (stakedBalance() > 0) {
+        uint256 _stakedBal = stakedBalance();
+        if (_stakedBal > 0) {
             // don't bother withdrawing zero
             IConvexRewards(rewardsContract).withdrawAndUnwrap(
-                stakedBalance(),
+                _stakedBal,
                 claimRewards
             );
         }
@@ -257,11 +260,9 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // make sure to check claimRewards before this step if needed
     // plan to have gov sweep convex deposit tokens from strategy after this
     function withdrawToConvexDepositTokens() external onlyAuthorized {
-        if (stakedBalance() > 0) {
-            IConvexRewards(rewardsContract).withdraw(
-                stakedBalance(),
-                claimRewards
-            );
+        uint256 _stakedBal = stakedBalance();
+        if (_stakedBal > 0) {
+            IConvexRewards(rewardsContract).withdraw(_stakedBal, claimRewards);
         }
     }
 
@@ -383,9 +384,10 @@ contract StrategyConvexEURt is StrategyConvexBase {
 
         // debtOustanding will only be > 0 in the event of revoking or lowering debtRatio of a strategy
         if (_debtOutstanding > 0) {
-            if (stakedBalance() > 0) {
+            uint256 _stakedBal = stakedBalance();
+            if (_stakedBal > 0) {
                 IConvexRewards(rewardsContract).withdrawAndUnwrap(
-                    Math.min(stakedBalance(), _debtOutstanding),
+                    Math.min(_stakedBal, _debtOutstanding),
                     claimRewards
                 );
             }
@@ -414,9 +416,10 @@ contract StrategyConvexEURt is StrategyConvexBase {
     // migrate our want token to a new strategy if needed, make sure to check claimRewards first
     // also send over any CRV or CVX that is claimed; for migrations we definitely want to claim
     function prepareMigration(address _newStrategy) internal override {
-        if (stakedBalance() > 0) {
+        uint256 _stakedBal = stakedBalance();
+        if (_stakedBal > 0) {
             IConvexRewards(rewardsContract).withdrawAndUnwrap(
-                stakedBalance(),
+                _stakedBal,
                 claimRewards
             );
         }
@@ -475,12 +478,13 @@ contract StrategyConvexEURt is StrategyConvexBase {
         uint256 mintableCvx;
 
         uint256 cliff = supply.div(reductionPerCliff);
+        uint256 _claimableBal = claimableBalance();
         //mint if below total cliffs
         if (cliff < totalCliffs) {
             //for reduction% take inverse of current cliff
             uint256 reduction = totalCliffs.sub(cliff);
             //reduce
-            mintableCvx = claimableBalance().mul(reduction).div(totalCliffs);
+            mintableCvx = _claimableBal.mul(reduction).div(totalCliffs);
 
             //supply cap check
             uint256 amtTillMax = maxSupply.sub(supply);
@@ -500,10 +504,10 @@ contract StrategyConvexEURt is StrategyConvexBase {
         cvx_usd_path[2] = address(usdt);
 
         uint256 crvValue;
-        if (claimableBalance() > 0) {
+        if (_claimableBal > 0) {
             uint256[] memory crvSwap =
                 IUniswapV2Router02(sushiswap).getAmountsOut(
-                    claimableBalance(),
+                    _claimableBal,
                     crv_usd_path
                 );
             crvValue = crvSwap[crvSwap.length - 1];
