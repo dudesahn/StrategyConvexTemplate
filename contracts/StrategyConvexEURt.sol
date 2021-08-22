@@ -109,6 +109,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     address[] public crvPath; // path to sell CRV
     address[] public convexTokenPath; // path to sell CVX
+
     // Swap stuff
     uint256 public keepCRV = 1000; // the percentage of CRV we re-lock for boost (in basis points)
     uint256 public constant FEE_DENOMINATOR = 10000; // with this and the above, sending 10% of our CRV yield to our voter
@@ -118,7 +119,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
         IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
     IERC20 public constant weth =
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    uint256 public harvestProfitNeeded;
+    uint256 public harvestProfitNeeded; // we use this to set our dollar target for harvest sells
     bool internal manualHarvestNow = false; // only set this to true when we want to trigger our keepers to harvest for us
     string internal stratName; // we use this to be able to adjust our strategy's name
 
@@ -145,7 +146,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
         convexToken.safeApprove(sushiswapRouter, type(uint256).max);
 
         // setup our rewards contract
-        pid = _pid;
+        pid = _pid; // this is the pool ID on convex, we use this to determine what the reweardsContract address is
         (, , , rewardsContract, , ) = IConvexDeposit(depositContract).poolInfo(
             pid
         );
@@ -164,15 +165,18 @@ abstract contract StrategyConvexBase is BaseStrategy {
     }
 
     function stakedBalance() public view returns (uint256) {
+        // how much want we have staked in Convex
         return IConvexRewards(rewardsContract).balanceOf(address(this));
     }
 
     function balanceOfWant() public view returns (uint256) {
+        // balance of want sitting in our strategy
         return want.balanceOf(address(this));
     }
 
     function claimableBalance() public view returns (uint256) {
-        return IConvexRewards(rewardsContract).earned(address(this)); // how much CRV we can claim from the staking contract
+        // how much CRV we can claim from the staking contract
+        return IConvexRewards(rewardsContract).earned(address(this));
     }
 
     function estimatedTotalAssets() public view override returns (uint256) {
