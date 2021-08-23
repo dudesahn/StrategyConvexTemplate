@@ -208,7 +208,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
             uint256 _stakedBal = stakedBalance();
             if (_stakedBal > 0) {
                 IConvexRewards(rewardsContract).withdrawAndUnwrap(
-                    Math.min(_stakedBal, _amountNeeded - _wantBal),
+                    Math.min(_stakedBal, _amountNeeded.sub(_wantBal)),
                     claimRewards
                 );
             }
@@ -391,10 +391,8 @@ contract StrategyConvexEURt is StrategyConvexBase {
                     claimRewards
                 );
             }
-            _debtPayment = Math.min(
-                _debtOutstanding,
-                want.balanceOf(address(this))
-            );
+            uint256 _withdrawnBal = balanceOfWant();
+            _debtPayment = Math.min(_debtOutstanding, _withdrawnBal);
         }
 
         // serious loss should never happen, but if it does (for instance, if Curve is hacked), let's record it accurately
@@ -404,8 +402,14 @@ contract StrategyConvexEURt is StrategyConvexBase {
         // if assets are greater than debt, things are working great!
         if (assets > debt) {
             _profit = assets.sub(debt);
-        } else {
-            // if assets are less than debt, we are in trouble
+            uint256 _wantBal = balanceOfWant();
+            if (_profit.add(_debtPayment) > _wantBal) {
+                // this should only be hit following donations to strategy
+                liquidateAllPositions();
+            }
+        }
+        // if assets are less than debt, we are in trouble
+        else {
             _loss = debt.sub(assets);
         }
 
