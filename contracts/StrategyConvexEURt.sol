@@ -120,7 +120,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     IERC20 public constant weth =
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     uint256 public harvestProfitNeeded; // we use this to set our dollar target for harvest sells
-    bool internal manualHarvestNow = false; // only set this to true when we want to trigger our keepers to harvest for us
+    bool internal keeperHarvestNow = false; // only set this to true when we want to trigger our keepers to harvest for us
     string internal stratName; // we use this to be able to adjust our strategy's name
 
     // convex-specific variables
@@ -305,8 +305,8 @@ abstract contract StrategyConvexBase is BaseStrategy {
     }
 
     // This allows us to manually harvest with our keeper as needed
-    function setManualHarvest(bool _manualHarvestNow) external onlyAuthorized {
-        manualHarvestNow = _manualHarvestNow;
+    function setManualHarvest(bool _keeperHarvestNow) external onlyAuthorized {
+        keeperHarvestNow = _keeperHarvestNow;
     }
 }
 
@@ -367,18 +367,22 @@ contract StrategyConvexEURt is StrategyConvexBase {
             uint256 convexBalance = convexToken.balanceOf(address(this));
 
             uint256 _keepCRV = crvBalance.mul(keepCRV).div(FEE_DENOMINATOR);
-            crv.safeTransfer(voter, _keepCRV);
+            if (_keepCRV > 0) crv.safeTransfer(voter, _keepCRV);
             uint256 crvRemainder = crvBalance.sub(_keepCRV);
 
             if (crvRemainder > 0) _sellCrv(crvRemainder);
             if (convexBalance > 0) _sellConvex(convexBalance);
 
-            uint256 wethBalance = weth.balanceOf(address(this));
-            if (wethBalance > 0) _sellWethForEurt(wethBalance);
+            // convert our WETH to EURt, but don't want to swap dust
+            uint256 _wethBalance = weth.balanceOf(address(this));
+            uint256 _eurtBalance = 0;
+            if (_wethBalance > 0) {
+                _eurtBalance = _sellWethForEurt(_wethBalance);
+            }
 
-            uint256 eurtBalance = eurt.balanceOf(address(this));
-            if (eurtBalance > 0) {
-                curve.add_liquidity([eurtBalance, 0], 0);
+            // deposit our EURt to Curve if we have any
+            if (_eurtBalance > 0) {
+                curve.add_liquidity([_eurtBalance, 0], 0);
             }
         }
 
@@ -414,7 +418,7 @@ contract StrategyConvexEURt is StrategyConvexBase {
         }
 
         // we're done harvesting, so reset our trigger if we used it
-        if (manualHarvestNow) manualHarvestNow = false;
+        if (keeperHarvestNow) keeperHarvestNow = false;
     }
 
     // migrate our want token to a new strategy if needed, make sure to check claimRewards first
@@ -434,22 +438,25 @@ contract StrategyConvexEURt is StrategyConvexBase {
         );
     }
 
-    function _sellWethForEurt(uint256 _amount) internal {
-        IUniV3(uniswapv3).exactInput(
-            IUniV3.ExactInputParams(
-                abi.encodePacked(
-                    address(weth),
-                    uint24(500),
-                    address(usdt),
-                    uint24(500),
-                    address(eurt)
-                ),
-                address(this),
-                now,
-                _amount,
-                uint256(1)
-            )
-        );
+    // Sells our USDT for EURt
+    function _sellWethForEurt(uint256 _amount) internal returns (uint256) {
+        uint256 _eurtOutput =
+            IUniV3(uniswapv3).exactInput(
+                IUniV3.ExactInputParams(
+                    abi.encodePacked(
+                        address(weth),
+                        uint24(500),
+                        address(usdt),
+                        uint24(500),
+                        address(eurt)
+                    ),
+                    address(this),
+                    now,
+                    _amount,
+                    uint256(1)
+                )
+            );
+        return _eurtOutput;
     }
 
     /* ========== KEEP3RS ========== */
@@ -461,7 +468,7 @@ contract StrategyConvexEURt is StrategyConvexBase {
         returns (bool)
     {
         // trigger if we want to manually harvest
-        if (manualHarvestNow) return true;
+        if (keeperHarvestNow) return true;
 
         // harvest if we have a profit to claim
         if (claimableProfitInUsdt() > harvestProfitNeeded) return true;
