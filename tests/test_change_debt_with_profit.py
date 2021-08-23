@@ -12,7 +12,7 @@ def test_change_debt_with_profit(
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
-    
+
     # sleep long enough to make uniswap v3 happy (need minimum out)
     chain.sleep(86400)
 
@@ -35,10 +35,10 @@ def test_change_debt_with_profit(
     chain.sleep(1)
     strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy).dict()
-    
+
     # sleep 10 hours to increase our credit available for last assert at the bottom.
     chain.sleep(60 * 60 * 10)
-    
+
     profit = new_params["totalGain"] - prev_params["totalGain"]
 
     # check that we've recorded a gain
@@ -67,4 +67,3 @@ def test_change_debt_with_profit(
         strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
         abs_tol=1e18,
     )
-
