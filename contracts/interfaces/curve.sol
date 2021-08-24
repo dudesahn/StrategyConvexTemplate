@@ -25,8 +25,48 @@ interface ICurveFi {
     function get_virtual_price() external view returns (uint256);
 
     function add_liquidity(
-        // Iron bank pool
+        // EURt
         uint256[2] calldata amounts,
+        uint256 min_mint_amount
+    ) external payable;
+
+    function add_liquidity(
+        // Compound, sAave
+        uint256[2] calldata amounts,
+        uint256 min_mint_amount,
+        bool _use_underlying
+    ) external payable returns (uint256);
+
+    function add_liquidity(
+        // Iron Bank, Aave
+        uint256[3] calldata amounts,
+        uint256 min_mint_amount,
+        bool _use_underlying
+    ) external payable returns (uint256);
+
+    function add_liquidity(
+        // 3Crv Metapools
+        address pool,
+        uint256[4] calldata amounts,
+        uint256 min_mint_amount
+    ) external;
+
+    function add_liquidity(
+        // Y and yBUSD
+        uint256[4] calldata amounts,
+        uint256 min_mint_amount,
+        bool _use_underlying
+    ) external payable returns (uint256);
+
+    function add_liquidity(
+        // 3pool
+        uint256[3] calldata amounts,
+        uint256 min_mint_amount
+    ) external payable;
+
+    function add_liquidity(
+        // sUSD
+        uint256[4] calldata amounts,
         uint256 min_mint_amount
     ) external payable;
 
@@ -59,7 +99,27 @@ interface ICurveFi {
         uint256 _from_amount
     ) external view returns (uint256);
 
-    function calc_token_amount(uint256[2] calldata amounts, bool _is_deposit)
+    // EURt
+    function calc_token_amount(uint256[2] calldata _amounts, bool _is_deposit)
+        external
+        view
+        returns (uint256);
+
+    // 3Crv Metapools
+    function calc_token_amount(
+        address _pool,
+        uint256[4] calldata _amounts,
+        bool _is_deposit
+    ) external view returns (uint256);
+
+    // sUSD, Y pool, etc
+    function calc_token_amount(uint256[4] calldata _amounts, bool _is_deposit)
+        external
+        view
+        returns (uint256);
+
+    // 3pool, Iron Bank, etc
+    function calc_token_amount(uint256[3] calldata _amounts, bool _is_deposit)
         external
         view
         returns (uint256);

@@ -16,29 +16,6 @@ import {
     StrategyParams
 } from "@yearnvaults/contracts/BaseStrategy.sol";
 
-interface IUniV3 {
-    struct ExactInputParams {
-        bytes path;
-        address recipient;
-        uint256 deadline;
-        uint256 amountIn;
-        uint256 amountOutMinimum;
-    }
-
-    function exactInput(ExactInputParams calldata params)
-        external
-        payable
-        returns (uint256 amountOut);
-}
-
-interface IOracle {
-    function ethToAsset(
-        uint256 _ethAmountIn,
-        address _tokenOut,
-        uint32 _twapPeriod
-    ) external view returns (uint256 amountOut);
-}
-
 interface IConvexRewards {
     // strategy's staked balance in the synthetix staking contract
     function balanceOf(address account) external view returns (uint256);
@@ -96,35 +73,39 @@ abstract contract StrategyConvexBase is BaseStrategy {
     /* ========== STATE CONSTANTS ========== */
     // these should stay the same across different wants.
 
+    // convex stuff
     address public constant depositContract =
         0xF403C135812408BFbE8713b5A23a04b3D48AAE31; // this is the deposit contract that all pools use, aka booster
     address public rewardsContract; // This is unique to each curve pool
     uint256 public pid; // this is unique to each pool
+
+    // Swap stuff
     address public constant sushiswap =
         0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // default to sushiswap, more CRV and CVX liquidity there
-    address public constant uniswapv3 =
-        0xE592427A0AEce92De3Edee1F18E0157C05861564;
-    ICurveFi public curve; // Curve Pool, need this for buying more pool tokens
-
-    address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     address[] public crvPath; // path to sell CRV
     address[] public convexTokenPath; // path to sell CVX
 
-    // Swap stuff
     uint256 public keepCRV = 1000; // the percentage of CRV we re-lock for boost (in basis points)
+    address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     uint256 public constant FEE_DENOMINATOR = 10000; // with this and the above, sending 10% of our CRV yield to our voter
+
     IERC20 public constant crv =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
     IERC20 public constant convexToken =
         IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
     IERC20 public constant weth =
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    uint256 public harvestProfitNeeded; // we use this to set our dollar target for harvest sells
-    bool internal keeperHarvestNow = false; // only set this to true when we want to trigger our keepers to harvest for us
+
+    // Keeper stuff
+    uint256 public harvestProfitNeeded;
+    bool internal manualHarvestNow = false; // only set this to true when we want to trigger our keepers to harvest for us
+
     string internal stratName; // we use this to be able to adjust our strategy's name
 
     // convex-specific variables
     bool public claimRewards; // boolean if we should always claim rewards when withdrawing, usually withdrawAndUnwrap (generally this should be false)
+
+    /* ========== CONSTRUCTOR ========== */
 
     constructor(
         address _vault,
@@ -132,12 +113,11 @@ abstract contract StrategyConvexBase is BaseStrategy {
         address _curvepool,
         string memory _name
     ) public BaseStrategy(_vault) {
-        /* ========== CONSTRUCTOR CONSTANTS ========== */
         // You can set these parameters on deployment to whatever you want
         maxReportDelay = 60 * 60 * 24 * 7; // 7 days in seconds, if we hit this then harvestTrigger = True
         debtThreshold = 5 * 1e18; // set a bit of a buffer
         profitFactor = 10000; // in this strategy, profitFactor is only used for telling keep3rs when to move funds from vault to strategy (what previously was an earn call)
-        harvestProfitNeeded = 20000 * 1e6; // this is how much in USDT we need to make. remember, 6 decimals!
+        harvestProfitNeeded = 20_000e18;
         healthCheck = address(0xDDCea799fF1699e98EDF118e0629A974Df7DF012); // health.ychad.eth
 
         // want = Curve LP
@@ -146,7 +126,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
         convexToken.safeApprove(sushiswap, type(uint256).max);
 
         // setup our rewards contract
-        pid = _pid; // this is the pool ID on convex, we use this to determine what the reweardsContract address is
+        pid = _pid;
         (, , , rewardsContract, , ) = IConvexDeposit(depositContract).poolInfo(
             pid
         );
@@ -310,40 +290,161 @@ abstract contract StrategyConvexBase is BaseStrategy {
     }
 }
 
-contract StrategyConvexEURt is StrategyConvexBase {
+contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
     /* ========== STATE VARIABLES ========== */
     // these will likely change across different wants.
-    // note that some strategies will require the "optimal" state variable here as well if we choose which token to sell into before depositing
 
-    // specific variables for this contract
-    IERC20 public constant eurt =
-        IERC20(0xC581b735A1688071A1746c968e0798D642EDE491);
+    address public curve; // Curve Pool, this is our pool specific to this vault
+    uint256 public optimal; // this is the optimal token to deposit back to our curve pool. 0 DAI, 1 USDC, 2 USDT
+
+    // addresses for our tokens
     IERC20 public constant usdt =
         IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
-    IOracle public oracle = IOracle(0x0F1f5A87f99f0918e6C81F16E59F3518698221Ff); // this is only needed for strats that use uniV3 for swaps
+    IERC20 public constant usdc =
+        IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+    IERC20 public constant dai =
+        IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+
+    ICurveFi public constant zapContract =
+        ICurveFi(0xA79828DF1850E8a3A3064576f380D90aECDD3359); // this is used for depositing to all 3Crv metapools
+
+    // used for rewards tokens
+    address public rewards;
+    bool public hasRewards;
+    address[] public rewardsPath;
+
+    // check for cloning
+    bool internal isOriginal = true;
+
+    /* ========== CONSTRUCTOR ========== */
 
     constructor(
         address _vault,
         uint256 _pid,
         address _curvePool,
+        bool _hasRewards,
+        address _rewards,
         string memory _name
     ) public StrategyConvexBase(_vault, _pid, _curvePool, _name) {
-        /* ========== CONSTRUCTOR VARIABLES ========== */
-        // these will likely change across different wants.
+        _initializeStrat(_hasRewards, _rewards);
+    }
 
-        // strategy-specific approvals and paths
-        eurt.safeApprove(address(curve), type(uint256).max);
-        weth.safeApprove(uniswapv3, type(uint256).max);
+    /* ========== CLONING ========== */
 
-        // crv token path
-        crvPath = new address[](2);
-        crvPath[0] = address(crv);
-        crvPath[1] = address(weth);
+    event Cloned(address indexed clone);
 
-        // convex token path
-        convexTokenPath = new address[](2);
-        convexTokenPath[0] = address(convexToken);
-        convexTokenPath[1] = address(weth);
+    // we use this to clone our original strategy to other vaults
+    function clone(
+        address _vault,
+        address _strategist,
+        address _rewards,
+        address _keeper,
+        uint256 _pid,
+        address _curvePool,
+        bool _hasRewards,
+        address _rewards,
+        string memory _name
+    ) external returns (address newStrategy) {
+        require(isOriginal);
+        // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
+        bytes20 addressBytes = bytes20(address(this));
+        assembly {
+            // EIP-1167 bytecode
+            let clone_code := mload(0x40)
+            mstore(
+                clone_code,
+                0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000
+            )
+            mstore(add(clone_code, 0x14), addressBytes)
+            mstore(
+                add(clone_code, 0x28),
+                0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000
+            )
+            newStrategy := create(0, clone_code, 0x37)
+        }
+
+        StrategyCurve3CrvRewardsClonable(newStrategy).initialize(
+            _vault,
+            _strategist,
+            _rewards,
+            _keeper,
+            _pid,
+            _curvePool,
+            _hasRewards,
+            _rewards,
+            _name
+        );
+
+        emit Cloned(newStrategy);
+    }
+
+    // this will only be called by the clone function above
+    function initialize(
+        address _vault,
+        address _strategist,
+        address _rewards,
+        address _keeper,
+        uint256 _pid,
+        address _curvePool,
+        bool _hasRewards,
+        address _rewards,
+        string memory _name
+    ) public {
+        _initialize(_vault, _strategist, _rewards, _keeper);
+        _initializeStrat(_pid, _curvePool, _hasRewards, _rewards, _name);
+    }
+
+    // this is called by our original strategy, as well as any clones
+    function _initializeStrat(
+        uint256 _pid,
+        address _curvePool,
+        bool _hasRewards,
+        address _rewards,
+        string memory _name
+    ) internal {
+        // You can set these parameters on deployment to whatever you want
+        maxReportDelay = 60 * 60 * 24 * 7; // 7 days in seconds, if we hit this then harvestTrigger = True
+        debtThreshold = 5 * 1e18; // set a bit of a buffer
+        profitFactor = 10000; // in this strategy, profitFactor is only used for telling keep3rs when to move funds from vault to strategy (what previously was an earn call)
+        harvestProfitNeeded = 20_000e18; // this is our goal for harvest profit in dollars
+        healthCheck = address(0xDDCea799fF1699e98EDF118e0629A974Df7DF012); // health.ychad.eth
+
+        // want = Curve LP
+        want.safeApprove(address(depositContract), type(uint256).max);
+        crv.safeApprove(sushiswap, type(uint256).max);
+        convexToken.safeApprove(sushiswap, type(uint256).max);
+
+        // setup our rewards contract
+        pid = _pid;
+        (, , , rewardsContract, , ) = IConvexDeposit(depositContract).poolInfo(
+            pid
+        );
+
+        // setup our rewards if we have them
+        if (_hasRewards) {
+            rewards = _rewards;
+            IERC20(rewards).approve(sushiswap, type(uint256).max);
+            rewardsPath = [address(rewards), address(weth), address(dai)];
+            hasRewards = _hasRewards;
+        }
+
+        // set our curve gauge contract
+        gauge = address(_gauge);
+
+        // set our strategy's name
+        stratName = _name;
+
+        // these are our approvals and path specific to this contract
+        dai.safeApprove(address(zapContract), type(uint256).max);
+        usdt.safeApprove(address(zapContract), type(uint256).max);
+        usdc.safeApprove(address(zapContract), type(uint256).max);
+
+        // start off with dai
+        crvPath = [address(crv), address(weth), address(dai)];
+        convexTokenPath = [address(convexToken), address(weth), address(dai)];
+
+        // this is the pool specific to this vault
+        curve = ICurveFi(_curvepool);
     }
 
     /* ========== VARIABLE FUNCTIONS ========== */
@@ -361,28 +462,34 @@ contract StrategyConvexEURt is StrategyConvexBase {
         // if we have anything staked, then harvest CRV and CVX from the rewards contract
         if (claimableBalance() > 0) {
             // this claims our CRV, CVX, and any extra tokens like SNX or ANKR. set to false if these tokens don't exist, true if they do.
-            IConvexRewards(rewardsContract).getReward(address(this), false);
+            IConvexRewards(rewardsContract).getReward(address(this), true);
 
             uint256 crvBalance = crv.balanceOf(address(this));
             uint256 convexBalance = convexToken.balanceOf(address(this));
 
             uint256 _keepCRV = crvBalance.mul(keepCRV).div(FEE_DENOMINATOR);
-            if (_keepCRV > 0) crv.safeTransfer(voter, _keepCRV);
+            crv.safeTransfer(voter, _keepCRV);
             uint256 crvRemainder = crvBalance.sub(_keepCRV);
 
             if (crvRemainder > 0) _sellCrv(crvRemainder);
             if (convexBalance > 0) _sellConvex(convexBalance);
 
-            // convert our WETH to EURt, but don't want to swap dust
-            uint256 _wethBalance = weth.balanceOf(address(this));
-            uint256 _eurtBalance = 0;
-            if (_wethBalance > 0) {
-                _eurtBalance = _sellWethForEurt(_wethBalance);
+            if (hasRewards) {
+                uint256 _rewardsBalance =
+                    IERC20(rewards).balanceOf(address(this));
+                if (_rewardsBalance > 0) _sellRewards(_rewardsBalance);
             }
 
-            // deposit our EURt to Curve if we have any
-            if (_eurtBalance > 0) {
-                curve.add_liquidity([_eurtBalance, 0], 0);
+            // deposit our balance to Curve if we have any
+            if (optimal == 0) {
+                uint256 daiBalance = dai.balanceOf(address(this));
+                zapContract.add_liquidity(curve, [0, daiBalance, 0, 0], 0);
+            } else if (optimal == 1) {
+                uint256 usdcBalance = usdc.balanceOf(address(this));
+                zapContract.add_liquidity(curve, [0, 0, usdcBalance, 0], 0);
+            } else {
+                uint256 usdtBalance = usdt.balanceOf(address(this));
+                zapContract.add_liquidity(curve, [0, 0, 0, usdtBalance], 0);
             }
         }
 
@@ -438,25 +545,15 @@ contract StrategyConvexEURt is StrategyConvexBase {
         );
     }
 
-    // Sells our USDT for EURt
-    function _sellWethForEurt(uint256 _amount) internal returns (uint256) {
-        uint256 _eurtOutput =
-            IUniV3(uniswapv3).exactInput(
-                IUniV3.ExactInputParams(
-                    abi.encodePacked(
-                        address(weth),
-                        uint24(500),
-                        address(usdt),
-                        uint24(500),
-                        address(eurt)
-                    ),
-                    address(this),
-                    now,
-                    _amount,
-                    uint256(1)
-                )
-            );
-        return _eurtOutput;
+    // Sells our harvested reward token into the selected output.
+    function _sellRewards(uint256 _amount) internal {
+        IUniswapV2Router02(sushiswap).swapExactTokensForTokens(
+            _amount,
+            uint256(0),
+            rewardsPath,
+            address(this),
+            now
+        );
     }
 
     /* ========== KEEP3RS ========== */
@@ -533,6 +630,24 @@ contract StrategyConvexEURt is StrategyConvexBase {
                 );
             cvxValue = cvxSwap[cvxSwap.length - 1];
         }
+
+        if (hasRewards) {
+            address[] memory rewards_usd_path = new address[](3);
+            rewards_usd_path[0] = address(rewards);
+            rewards_usd_path[1] = address(weth);
+            rewards_usd_path[2] = address(usdt);
+
+            uint256 rewardsValue;
+            if (_claimableBal > 0) {
+                uint256[] memory rewardSwap =
+                    IUniswapV2Router02(sushiswap).getAmountsOut(
+                        _claimableBal,
+                        crv_usd_path
+                    );
+                crvValue = crvSwap[crvSwap.length - 1];
+            }
+        }
+
         return crvValue.add(cvxValue);
     }
 
@@ -545,10 +660,58 @@ contract StrategyConvexEURt is StrategyConvexBase {
     {
         uint256 callCostInWant;
         if (_ethAmount > 0) {
-            uint256 callCostInEur =
-                oracle.ethToAsset(_ethAmount, address(eurt), 1800);
-            callCostInWant = curve.calc_token_amount([callCostInEur, 0], true);
+            address[] memory ethPath = new address[](2);
+            ethPath[0] = address(weth);
+            ethPath[1] = address(dai);
+
+            uint256[] memory _callCostInDaiTuple =
+                IUniswapV2Router02(sushiswapRouter).getAmountsOut(
+                    _ethAmount,
+                    ethPath
+                );
+
+            uint256 _callCostInDai =
+                _callCostInDaiTuple[_callCostInDaiTuple.length - 1];
+            callCostInWant = curve.calc_token_amount(
+                curve,
+                [0, _callCostInDai, 0, 0],
+                true
+            );
         }
         return callCostInWant;
+    }
+
+    /* ========== SETTERS ========== */
+
+    // These functions are useful for setting parameters of the strategy that may need to be adjusted.
+
+    // Use to update whether we have extra rewards or not
+    function setHasRewards(bool _hasRewards) external onlyGovernance {
+        hasRewards = _hasRewards;
+    }
+
+    // Use to update our rewards token address
+    function setRewardsAddress(address _rewards) external onlyGovernance {
+        rewards = _rewards;
+    }
+
+    // Set optimal token to sell harvested funds for depositing to Curve.
+    // Default is DAI, but can be set to USDC or USDT as needed by strategist or governance.
+    function setOptimal(uint256 _optimal) external onlyAuthorized {
+        if (_optimal == 0) {
+            crvPath[2] = address(dai);
+            if (hasRewards) rewardsPath[2] = address(dai);
+            optimal = 0;
+        } else if (_optimal == 1) {
+            crvPath[2] = address(usdc);
+            if (hasRewards) rewardsPath[2] = address(usdc);
+            optimal = 1;
+        } else if (_optimal == 2) {
+            crvPath[2] = address(usdt);
+            if (hasRewards) rewardsPath[2] = address(usdt);
+            optimal = 2;
+        } else {
+            require(false, "incorrect token");
+        }
     }
 }
