@@ -120,7 +120,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     IERC20 public constant weth =
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     uint256 public harvestProfitNeeded; // we use this to set our dollar target for harvest sells
-    bool internal keeperHarvestNow = false; // only set this to true when we want to trigger our keepers to harvest for us
+    bool internal forceHarvestTriggerOnce = false; // only set this to true when we want to trigger our keepers to harvest for us
     string internal stratName; // we use this to be able to adjust our strategy's name
 
     // convex-specific variables
@@ -134,21 +134,21 @@ abstract contract StrategyConvexBase is BaseStrategy {
     ) public BaseStrategy(_vault) {
         /* ========== CONSTRUCTOR CONSTANTS ========== */
         // You can set these parameters on deployment to whatever you want
-        maxReportDelay = 60 * 60 * 24 * 7; // 7 days in seconds, if we hit this then harvestTrigger = True
+        maxReportDelay = 7 days; // 7 days in seconds, if we hit this then harvestTrigger = True
         debtThreshold = 5 * 1e18; // set a bit of a buffer
-        profitFactor = 10000; // in this strategy, profitFactor is only used for telling keep3rs when to move funds from vault to strategy (what previously was an earn call)
-        harvestProfitNeeded = 20000 * 1e6; // this is how much in USDT we need to make. remember, 6 decimals!
-        healthCheck = address(0xDDCea799fF1699e98EDF118e0629A974Df7DF012); // health.ychad.eth
+        profitFactor = 10_000; // in this strategy, profitFactor is only used for telling keep3rs when to move funds from vault to strategy (what previously was an earn call)
+        harvestProfitNeeded = 20_000 * 1e6; // this is how much in USDT we need to make. remember, 6 decimals!
+        healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; // health.ychad.eth
 
         // want = Curve LP
-        want.safeApprove(address(depositContract), type(uint256).max);
-        crv.safeApprove(sushiswap, type(uint256).max);
-        convexToken.safeApprove(sushiswap, type(uint256).max);
+        want.approve(address(depositContract), type(uint256).max);
+        crv.approve(sushiswap, type(uint256).max);
+        convexToken.approve(sushiswap, type(uint256).max);
 
         // setup our rewards contract
         pid = _pid; // this is the pool ID on convex, we use this to determine what the reweardsContract address is
         (, , , rewardsContract, , ) = IConvexDeposit(depositContract).poolInfo(
-            pid
+            _pid
         );
 
         // set our curve pool contract
@@ -273,8 +273,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
         override
         returns (address[] memory)
     {
-        address[] memory protected = new address[](0);
-        return protected;
+        return new address[](0);
     }
 
     /* ========== SETTERS ========== */
@@ -305,8 +304,8 @@ abstract contract StrategyConvexBase is BaseStrategy {
     }
 
     // This allows us to manually harvest with our keeper as needed
-    function setManualHarvest(bool _keeperHarvestNow) external onlyAuthorized {
-        keeperHarvestNow = _keeperHarvestNow;
+    function setForceHarvestTriggerOnce(bool _forceHarvestTriggerOnce) external onlyAuthorized {
+        forceHarvestTriggerOnce = _forceHarvestTriggerOnce;
     }
 }
 
@@ -332,8 +331,8 @@ contract StrategyConvexEURt is StrategyConvexBase {
         // these will likely change across different wants.
 
         // strategy-specific approvals and paths
-        eurt.safeApprove(address(curve), type(uint256).max);
-        weth.safeApprove(uniswapv3, type(uint256).max);
+        eurt.approve(address(curve), type(uint256).max);
+        weth.approve(uniswapv3, type(uint256).max);
 
         // crv token path
         crvPath = new address[](2);
@@ -418,7 +417,7 @@ contract StrategyConvexEURt is StrategyConvexBase {
         }
 
         // we're done harvesting, so reset our trigger if we used it
-        if (keeperHarvestNow) keeperHarvestNow = false;
+        if (forceHarvestTriggerOnce) forceHarvestTriggerOnce = false;
     }
 
     // migrate our want token to a new strategy if needed, make sure to check claimRewards first
@@ -468,7 +467,7 @@ contract StrategyConvexEURt is StrategyConvexBase {
         returns (bool)
     {
         // trigger if we want to manually harvest
-        if (keeperHarvestNow) return true;
+        if (forceHarvestTriggerOnce) return true;
 
         // harvest if we have a profit to claim
         if (claimableProfitInUsdt() > harvestProfitNeeded) return true;
@@ -482,9 +481,9 @@ contract StrategyConvexEURt is StrategyConvexBase {
     // we will need to add rewards token here if we have them
     function claimableProfitInUsdt() internal view returns (uint256) {
         // calculations pulled directly from CVX's contract for minting CVX per CRV claimed
-        uint256 totalCliffs = 1000;
-        uint256 maxSupply = 100 * 1000000 * 1e18; // 100mil
-        uint256 reductionPerCliff = 100000000000000000000000; // 100,000
+        uint256 totalCliffs = 1_000;
+        uint256 maxSupply = 100 * 1_000_000 * 1e18; // 100mil
+        uint256 reductionPerCliff = 100_000 * 1e18; // 100,000
         uint256 supply = convexToken.totalSupply();
         uint256 mintableCvx;
 
