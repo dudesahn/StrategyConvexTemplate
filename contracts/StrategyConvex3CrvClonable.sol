@@ -38,6 +38,9 @@ interface IConvexRewards {
     function getReward(address _account, bool _claimExtras)
         external
         returns (bool);
+
+    // see if we have extra rewards on this pool
+    function extraRewards(uint256 _reward) external returns (address);
 }
 
 interface IConvexDeposit {
@@ -631,24 +634,28 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
             cvxValue = cvxSwap[cvxSwap.length - 1];
         }
 
+        uint256 rewardsValue;
         if (hasRewards) {
             address[] memory rewards_usd_path = new address[](3);
             rewards_usd_path[0] = address(rewards);
             rewards_usd_path[1] = address(weth);
             rewards_usd_path[2] = address(usdt);
 
-            uint256 rewardsValue;
-            if (_claimableBal > 0) {
+            address _virtualRewardsPool =
+                IConvexRewards(rewardsContract).extraRewards(0);
+            uint256 _claimableBonusBal =
+                IConvexRewards(_rewardsStash).earned(address(this));
+            if (_claimableBonusBal > 0) {
                 uint256[] memory rewardSwap =
                     IUniswapV2Router02(sushiswap).getAmountsOut(
-                        _claimableBal,
-                        crv_usd_path
+                        _claimableBonusBal,
+                        rewards_usd_path
                     );
-                crvValue = crvSwap[crvSwap.length - 1];
+                rewardsValue = rewardSwap[rewardSwap.length - 1];
             }
         }
 
-        return crvValue.add(cvxValue);
+        return crvValue.add(cvxValue).add(rewardsValue);
     }
 
     // convert our keeper's eth cost into want
