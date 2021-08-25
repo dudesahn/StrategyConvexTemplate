@@ -39,8 +39,14 @@ interface IConvexRewards {
         external
         returns (bool);
 
-    // see if we have extra rewards on this pool
+    // check if we have rewards on a pool
+    function extraRewardsLength() external view returns (uint256);
+
+    // if we have rewards, see what the address is
     function extraRewards(uint256 _reward) external returns (address);
+
+    // read our rewards token
+    function rewardToken() external view returns (address);
 }
 
 interface IConvexDeposit {
@@ -312,7 +318,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         ICurveFi(0xA79828DF1850E8a3A3064576f380D90aECDD3359); // this is used for depositing to all 3Crv metapools
 
     // used for rewards tokens
-    address public rewards;
+    IERC20 public rewards;
     bool public hasRewards;
     address[] public rewardsPath;
 
@@ -344,8 +350,6 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         address _keeper,
         uint256 _pid,
         address _curvePool,
-        bool _hasRewards,
-        address _rewards,
         string memory _name
     ) external returns (address newStrategy) {
         require(isOriginal);
@@ -373,8 +377,6 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
             _keeper,
             _pid,
             _curvePool,
-            _hasRewards,
-            _rewards,
             _name
         );
 
@@ -389,20 +391,16 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         address _keeper,
         uint256 _pid,
         address _curvePool,
-        bool _hasRewards,
-        address _rewards,
         string memory _name
     ) public {
         _initialize(_vault, _strategist, _rewards, _keeper);
-        _initializeStrat(_pid, _curvePool, _hasRewards, _rewards, _name);
+        _initializeStrat(_pid, _curvePool, _name);
     }
 
     // this is called by our original strategy, as well as any clones
     function _initializeStrat(
         uint256 _pid,
         address _curvePool,
-        bool _hasRewards,
-        address _rewards,
         string memory _name
     ) internal {
         // You can set these parameters on deployment to whatever you want
@@ -422,6 +420,15 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         (, , , rewardsContract, , ) = IConvexDeposit(depositContract).poolInfo(
             pid
         );
+
+        if (IConvexRewards(rewardsContract).extraRewardsLength() == 1) {
+            address _virtualRewardsPool =
+                IConvexRewards(rewardsContract).extraRewards(0);
+            rewards = IERC20(IConvexRewards(_virtualRewardsPool).rewardToken());
+            rewards.approve(sushiswap, type(uint256).max);
+            rewardsPath = [address(rewards), address(weth), address(dai)];
+            hasRewards = true;
+        }
 
         // setup our rewards if we have them
         if (_hasRewards) {
@@ -644,7 +651,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
             address _virtualRewardsPool =
                 IConvexRewards(rewardsContract).extraRewards(0);
             uint256 _claimableBonusBal =
-                IConvexRewards(_rewardsStash).earned(address(this));
+                IConvexRewards(_virtualRewardsPool).earned(address(this));
             if (_claimableBonusBal > 0) {
                 uint256[] memory rewardSwap =
                     IUniswapV2Router02(sushiswap).getAmountsOut(
@@ -692,16 +699,6 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
 
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
-    // Use to update whether we have extra rewards or not
-    function setHasRewards(bool _hasRewards) external onlyGovernance {
-        hasRewards = _hasRewards;
-    }
-
-    // Use to update our rewards token address
-    function setRewardsAddress(address _rewards) external onlyGovernance {
-        rewards = _rewards;
-    }
-
     // Set optimal token to sell harvested funds for depositing to Curve.
     // Default is DAI, but can be set to USDC or USDT as needed by strategist or governance.
     function setOptimal(uint256 _optimal) external onlyAuthorized {
@@ -720,5 +717,20 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         } else {
             require(false, "incorrect token");
         }
+    }
+
+    // Use to add or update rewards
+    function addRewards() external onlyGovernance {
+        address _virtualRewardsPool =
+            IConvexRewards(rewardsContract).extraRewards(0);
+        rewards = IERC20(IConvexRewards(_virtualRewardsPool).rewardToken());
+        rewards.approve(sushiswap, type(uint256).max);
+        rewardsPath = [address(rewards), address(weth), address(dai)];
+        hasRewards = true;
+    }
+
+    // Use to update whether we have extra rewards or not, mostly useful if we need to turn them off.
+    function setHasRewards(bool _hasRewards) external onlyGovernance {
+        hasRewards = _hasRewards;
     }
 }
