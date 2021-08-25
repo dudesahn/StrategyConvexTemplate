@@ -120,7 +120,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     IERC20 public constant weth =
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     uint256 public harvestProfitNeeded; // we use this to set our dollar target for harvest sells
-    bool internal forceHarvestTriggerOnce = false; // only set this to true when we want to trigger our keepers to harvest for us
+    bool internal forceHarvestTriggerOnce; // only set this to true when we want to trigger our keepers to harvest for us
     string internal stratName; // we use this to be able to adjust our strategy's name
 
     // convex-specific variables
