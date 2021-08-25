@@ -370,7 +370,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
             newStrategy := create(0, clone_code, 0x37)
         }
 
-        StrategyCurve3CrvRewardsClonable(newStrategy).initialize(
+        StrategyConvex3CrvRewardsClonable(newStrategy).initialize(
             _vault,
             _strategist,
             _rewards,
