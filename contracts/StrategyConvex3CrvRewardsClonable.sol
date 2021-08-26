@@ -556,7 +556,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
 
     // we will need to add rewards token here if we have them
     // make this public for testing and debugging only
-    function claimableProfitInUsdt() public view returns (uint256) {
+    function claimableProfitInUsdt() internal view returns (uint256) {
         // calculations pulled directly from CVX's contract for minting CVX per CRV claimed
         uint256 totalCliffs = 1_000;
         uint256 maxSupply = 100 * 1_000_000 * 1e18; // 100mil
