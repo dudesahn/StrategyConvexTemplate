@@ -447,11 +447,18 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
             uint256 convexBalance = convexToken.balanceOf(address(this));
 
             uint256 _sendToVoter = crvBalance.mul(keepCRV).div(FEE_DENOMINATOR);
-            crv.safeTransfer(voter, _sendToVoter);
+            if (_sendToVoter > 0) {
+                crv.safeTransfer(voter, _sendToVoter);
+            }
             uint256 crvRemainder = crvBalance.sub(_sendToVoter);
 
-            if (crvRemainder > 0) _sellCrv(crvRemainder);
-            if (convexBalance > 0) _sellConvex(convexBalance);
+            if (crvRemainder > 0) {
+                _sellCrv(crvRemainder);
+            }
+
+            if (convexBalance > 0) {
+                _sellConvex(convexBalance);
+            }
 
             if (hasRewards) {
                 uint256 _rewardsBalance =
