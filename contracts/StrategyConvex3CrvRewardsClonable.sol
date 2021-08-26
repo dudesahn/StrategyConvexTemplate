@@ -94,7 +94,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     address[] public crvPath; // path to sell CRV
     address[] public convexTokenPath; // path to sell CVX
 
-    uint256 public keepCRV = 1000; // the percentage of CRV we re-lock for boost (in basis points)
+    uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points)
     address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     uint256 public constant FEE_DENOMINATOR = 10000; // with this and the above, sending 10% of our CRV yield to our voter
 
@@ -383,6 +383,9 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         want.safeApprove(address(depositContract), type(uint256).max);
         crv.safeApprove(sushiswap, type(uint256).max);
         convexToken.safeApprove(sushiswap, type(uint256).max);
+
+        // set our KeepCRV
+        keepCRV = 1000;
 
         // setup our rewards contract
         pid = _pid;
