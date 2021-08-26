@@ -76,6 +76,8 @@ def test_setters(
         strategy.setMaxReportDelay(1000, {"from": whale})
     with brownie.reverts():
         strategy.setRewards(strategist, {"from": whale})
+    with brownie.reverts():
+        strategy.setKeepCRV(10_001, {"from": gov})
 
     # try a health check with zero address as health check
     strategy.setHealthCheck(zero, {"from": gov})
