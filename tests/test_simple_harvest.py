@@ -57,8 +57,7 @@ def test_simple_harvest(
     print(
         "\nEstimated DAI APR: ",
         "{:.2%}".format(
-            ((new_assets - old_assets) * 365)
-            / (strategy.estimatedTotalAssets())
+            ((new_assets - old_assets) * 365) / (strategy.estimatedTotalAssets())
         ),
     )
 

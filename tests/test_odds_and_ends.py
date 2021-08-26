@@ -65,11 +65,7 @@ def test_odds_and_ends(
     # we can try to migrate too, lol
     # deploy our new strategy
     new_strategy = strategist.deploy(
-        StrategyConvex3CrvRewardsClonable,
-        vault,
-        pid,
-        pool,
-        strategy_name,
+        StrategyConvex3CrvRewardsClonable, vault, pid, pool, strategy_name,
     )
     total_old = strategy.estimatedTotalAssets()
 
@@ -183,11 +179,7 @@ def test_odds_and_ends_migration(
 
     # deploy our new strategy
     new_strategy = strategist.deploy(
-        StrategyConvex3CrvRewardsClonable,
-        vault,
-        pid,
-        pool,
-        strategy_name,
+        StrategyConvex3CrvRewardsClonable, vault, pid, pool, strategy_name,
     )
     total_old = strategy.estimatedTotalAssets()
 
