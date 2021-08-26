@@ -241,8 +241,9 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
     // Set the amount of CRV to be locked in Yearn's veCRV voter from each harvest. Default is 10%.
-    function setKeepCRV(uint256 _sendToVoter) external onlyAuthorized {
-        keepCRV = _sendToVoter;
+    function setKeepCRV(uint256 _keepCRV) external onlyAuthorized {
+        require(_keepCRV <= 10_000);
+        keepCRV = _keepCRV;
     }
 
     // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
