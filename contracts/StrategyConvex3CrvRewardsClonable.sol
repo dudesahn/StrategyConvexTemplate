@@ -388,10 +388,13 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         keepCRV = 1000;
 
         // setup our rewards contract
-        pid = _pid;
-        (, , , rewardsContract, , ) = IConvexDeposit(depositContract).poolInfo(
-            pid
-        );
+        pid = _pid; // this is the pool ID on convex, we use this to determine what the reweardsContract address is
+        address lptoken;
+        (lptoken, , , rewardsContract, , ) = IConvexDeposit(depositContract)
+            .poolInfo(pid);
+
+        // check that our LP token based on our pid matches our want
+        require(address(lptoken) == address(want));
 
         if (IConvexRewards(rewardsContract).extraRewardsLength() == 1) {
             address _virtualRewardsPool =
