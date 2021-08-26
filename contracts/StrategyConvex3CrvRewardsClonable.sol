@@ -96,7 +96,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
 
     uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points)
     address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
-    uint256 public constant FEE_DENOMINATOR = 10000; // with this and the above, sending 10% of our CRV yield to our voter
+    uint256 public constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in bips
 
     IERC20 public constant crv =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
@@ -107,7 +107,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
 
     // Keeper stuff
     uint256 public harvestProfitNeeded;
-    bool internal keeperHarvestNow; // only set this to true when we want to trigger our keepers to harvest for us
+    bool internal forceHarvestTriggerOnce; // only set this to true when we want to trigger our keepers to harvest for us
 
     string internal stratName; // we use this to be able to adjust our strategy's name
 
@@ -233,8 +233,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
         override
         returns (address[] memory)
     {
-        address[] memory protected = new address[](0);
-        return protected;
+        return new address[](0);
     }
 
     /* ========== SETTERS ========== */
@@ -265,8 +264,11 @@ abstract contract StrategyConvexBase is BaseStrategy {
     }
 
     // This allows us to manually harvest with our keeper as needed
-    function setManualHarvest(bool _keeperHarvestNow) external onlyAuthorized {
-        keeperHarvestNow = _keeperHarvestNow;
+    function setForceHarvestTriggerOnce(bool _forceHarvestTriggerOnce)
+        external
+        onlyAuthorized
+    {
+        forceHarvestTriggerOnce = _forceHarvestTriggerOnce;
     }
 }
 
@@ -373,16 +375,16 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         string memory _name
     ) internal {
         // You can set these parameters on deployment to whatever you want
-        maxReportDelay = 60 * 60 * 24 * 7; // 7 days in seconds, if we hit this then harvestTrigger = True
+        maxReportDelay = 7 days; // 7 days in seconds, if we hit this then harvestTrigger = True
         debtThreshold = 5 * 1e18; // set a bit of a buffer
-        profitFactor = 10000; // in this strategy, profitFactor is only used for telling keep3rs when to move funds from vault to strategy (what previously was an earn call)
-        harvestProfitNeeded = 20_000e18; // this is our goal for harvest profit in dollars
-        healthCheck = address(0xDDCea799fF1699e98EDF118e0629A974Df7DF012); // health.ychad.eth
+        profitFactor = 10_000; // in this strategy, profitFactor is only used for telling keep3rs when to move funds from vault to strategy (what previously was an earn call)
+        harvestProfitNeeded = 20_000 * 1e6; // this is how much in USDT we need to make. remember, 6 decimals!
+        healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; // health.ychad.eth
 
         // want = Curve LP
-        want.safeApprove(address(depositContract), type(uint256).max);
-        crv.safeApprove(sushiswap, type(uint256).max);
-        convexToken.safeApprove(sushiswap, type(uint256).max);
+        want.approve(address(depositContract), type(uint256).max);
+        crv.approve(sushiswap, type(uint256).max);
+        convexToken.approve(sushiswap, type(uint256).max);
 
         // set our KeepCRV
         keepCRV = 1000;
@@ -391,7 +393,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         pid = _pid; // this is the pool ID on convex, we use this to determine what the reweardsContract address is
         address lptoken;
         (lptoken, , , rewardsContract, , ) = IConvexDeposit(depositContract)
-            .poolInfo(pid);
+            .poolInfo(_pid);
 
         // check that our LP token based on our pid matches our want
         require(address(lptoken) == address(want));
@@ -411,9 +413,9 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         stratName = _name;
 
         // these are our approvals and path specific to this contract
-        dai.safeApprove(address(zapContract), type(uint256).max);
-        usdt.safeApprove(address(zapContract), type(uint256).max);
-        usdc.safeApprove(address(zapContract), type(uint256).max);
+        dai.approve(address(zapContract), type(uint256).max);
+        usdt.safeApprove(address(zapContract), type(uint256).max); // USDT requires safeApprove(), funky token
+        usdc.approve(address(zapContract), type(uint256).max);
 
         // start off with dai
         crvPath = [address(crv), address(weth), address(dai)];
@@ -501,7 +503,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         }
 
         // we're done harvesting, so reset our trigger if we used it
-        if (keeperHarvestNow) keeperHarvestNow = false;
+        forceHarvestTriggerOnce = false;
     }
 
     // migrate our want token to a new strategy if needed, make sure to check claimRewards first
@@ -541,7 +543,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         returns (bool)
     {
         // trigger if we want to manually harvest
-        if (keeperHarvestNow) return true;
+        if (forceHarvestTriggerOnce) return true;
 
         // harvest if we have a profit to claim
         if (claimableProfitInUsdt() > harvestProfitNeeded) return true;
@@ -556,9 +558,9 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
     // make this public for testing and debugging only
     function claimableProfitInUsdt() public view returns (uint256) {
         // calculations pulled directly from CVX's contract for minting CVX per CRV claimed
-        uint256 totalCliffs = 1000;
-        uint256 maxSupply = 100 * 1000000 * 1e18; // 100mil
-        uint256 reductionPerCliff = 100000000000000000000000; // 100,000
+        uint256 totalCliffs = 1_000;
+        uint256 maxSupply = 100 * 1_000_000 * 1e18; // 100mil
+        uint256 reductionPerCliff = 100_000 * 1e18; // 100,000
         uint256 supply = convexToken.totalSupply();
         uint256 mintableCvx;
 

@@ -8,17 +8,17 @@ def test_setters(
 ):
 
     # test our manual harvest trigger
-    strategy.setManualHarvest(True, {"from": gov})
+    strategy.setForceHarvestTriggerOnce(True, {"from": gov})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be true.", tx)
     assert tx == True
-    strategy.setManualHarvest(False, {"from": gov})
+    strategy.setForceHarvestTriggerOnce(False, {"from": gov})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be false.", tx)
     assert tx == False
 
     # test our manual harvest trigger, and that a harvest turns it off
-    strategy.setManualHarvest(True, {"from": gov})
+    strategy.setForceHarvestTriggerOnce(True, {"from": gov})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be true.", tx)
     assert tx == True
