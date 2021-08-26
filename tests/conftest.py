@@ -7,32 +7,32 @@ def isolation(fn_isolation):
     pass
 
 
-# put our pool's convex pid here
+# put our pool's convex pid here; this is the only thing that should need to change up here **************
 @pytest.fixture(scope="module")
 def pid():
-    pid = 39
+    pid = 40
     yield pid
 
 
 @pytest.fixture(scope="module")
 def whale(accounts):
     # Totally in it for the tech
-    # Update this with a large holder of your want token
-    whale = accounts.at("0x1eb8271d94292d5bb9e043eb94ba0904115eb5f4", force=True)
+    # Update this with a large holder of your want token (the largest EOA holder of LP)
+    whale = accounts.at("0xdd8e2Dd11D38b3e27ad4d7349A61B5C2B5aF427a", force=True)
     yield whale
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 20e18
+    amount = 2000e18
     yield amount
 
 
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexEURt"
+    strategy_name = "StrategyConvexMIM"
     yield strategy_name
 
 
@@ -107,10 +107,11 @@ def gauge(pid, booster):
 def pool(token, curve_registry):
     zero_address = "0x0000000000000000000000000000000000000000"
     if curve_registry.get_pool_from_lp_token(token) == zero_address:
-        _poolAddress = token
+        poolAddress = token
     else:
         _poolAddress = curve_registry.get_pool_from_lp_token(token)
-    yield Contract(_poolAddress)
+        poolAddress = Contract(_poolAddress)
+    yield poolAddress
 
 
 @pytest.fixture(scope="module")
@@ -193,7 +194,7 @@ def vault(pm, gov, rewards, guardian, management, token, chain):
 # replace the first value with the name of your strategy
 @pytest.fixture(scope="function")
 def strategy(
-    StrategyConvexEURt,
+    StrategyConvex3CrvRewardsClonable,
     strategist,
     keeper,
     vault,
@@ -207,8 +208,14 @@ def strategy(
     pool,
     strategy_name,
 ):
-    # parameters for this are: strategy, vault, max deposit, minTimePerInvest, slippage protection (10000 = 100% slippage allowed),
-    strategy = strategist.deploy(StrategyConvexEURt, vault, pid, pool, strategy_name)
+    # make sure to include all constructor parameters needed here
+    strategy = strategist.deploy(
+        StrategyConvex3CrvRewardsClonable,
+        vault,
+        pid,
+        pool,
+        strategy_name,
+    )
     strategy.setKeeper(keeper, {"from": gov})
     # set our management fee to zero so it doesn't mess with our profit checking
     vault.setManagementFee(0, {"from": gov})
