@@ -79,7 +79,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     using Address for address;
     using SafeMath for uint256;
 
-    /* ========== STATE CONSTANTS ========== */
+    /* ========== STATE VARIABLES ========== */
     // these should stay the same across different wants.
 
     // convex stuff
@@ -88,15 +88,16 @@ abstract contract StrategyConvexBase is BaseStrategy {
     address public rewardsContract; // This is unique to each curve pool
     uint256 public pid; // this is unique to each pool
 
+    // keepCRV stuff
+    uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points)
+    address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
+    uint256 public constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in bips
+
     // Swap stuff
     address public constant sushiswap =
         0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // default to sushiswap, more CRV and CVX liquidity there
     address[] public crvPath; // path to sell CRV
     address[] public convexTokenPath; // path to sell CVX
-
-    uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points)
-    address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
-    uint256 public constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in bips
 
     IERC20 public constant crv =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
@@ -105,8 +106,8 @@ abstract contract StrategyConvexBase is BaseStrategy {
     IERC20 public constant weth =
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
-    // Keeper stuff
-    uint256 public harvestProfitNeeded;
+    // keeper stuff
+    uint256 public harvestProfitNeeded; // we use this to set our dollar target (in USDT) for harvest sells
     bool internal forceHarvestTriggerOnce; // only set this to true when we want to trigger our keepers to harvest for us
 
     string internal stratName; // we use this to be able to adjust our strategy's name
@@ -277,10 +278,13 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
     /* ========== STATE VARIABLES ========== */
     // these will likely change across different wants.
 
+    // Curve stuff
     address public curve; // Curve Pool, this is our pool specific to this vault
-    uint256 public optimal; // this is the optimal token to deposit back to our curve pool. 0 DAI, 1 USDC, 2 USDT
+    ICurveFi public constant zapContract =
+        ICurveFi(0xA79828DF1850E8a3A3064576f380D90aECDD3359); // this is used for depositing to all 3Crv metapools
 
-    // addresses for our tokens
+    // we use these to deposit to our curve pool
+    uint256 public optimal; // this is the optimal token to deposit back to our curve pool. 0 DAI, 1 USDC, 2 USDT
     IERC20 public constant usdt =
         IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
     IERC20 public constant usdc =
@@ -288,10 +292,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
     IERC20 public constant dai =
         IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
 
-    ICurveFi public constant zapContract =
-        ICurveFi(0xA79828DF1850E8a3A3064576f380D90aECDD3359); // this is used for depositing to all 3Crv metapools
-
-    // used for rewards tokens
+    // rewards token info
     IERC20 public rewardsToken;
     bool public hasRewards;
     address[] public rewardsPath;
@@ -387,8 +388,11 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         crv.approve(sushiswap, type(uint256).max);
         convexToken.approve(sushiswap, type(uint256).max);
 
-        // set our KeepCRV
+        // set our keepCRV
         keepCRV = 1000;
+
+        // this is the pool specific to this vault, but we only use it as an address
+        curve = address(_curvePool);
 
         // setup our rewards contract
         pid = _pid; // this is the pool ID on convex, we use this to determine what the reweardsContract address is
@@ -418,12 +422,9 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         usdt.safeApprove(address(zapContract), type(uint256).max); // USDT requires safeApprove(), funky token
         usdc.approve(address(zapContract), type(uint256).max);
 
-        // start off with dai
+        // set our paths
         crvPath = [address(crv), address(weth), address(dai)];
         convexTokenPath = [address(convexToken), address(weth), address(dai)];
-
-        // this is the pool specific to this vault
-        curve = address(_curvePool);
     }
 
     /* ========== VARIABLE FUNCTIONS ========== */
@@ -551,19 +552,24 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         returns (bool)
     {
         // trigger if we want to manually harvest
-        if (forceHarvestTriggerOnce) return true;
+        if (forceHarvestTriggerOnce) {
+            return true;
+        }
 
         // harvest if we have a profit to claim
-        if (claimableProfitInUsdt() > harvestProfitNeeded) return true;
+        if (claimableProfitInUsdt() > harvestProfitNeeded) {
+            return true;
+        }
 
         // Should not trigger if strategy is not active (no assets and no debtRatio). This means we don't need to adjust keeper job.
-        if (!isActive()) return false;
+        if (!isActive()) {
+            return false;
+        }
 
         return super.harvestTrigger(callCostinEth);
     }
 
     // we will need to add rewards token here if we have them
-    // make this public for testing and debugging only
     function claimableProfitInUsdt() internal view returns (uint256) {
         // calculations pulled directly from CVX's contract for minting CVX per CRV claimed
         uint256 totalCliffs = 1_000;
