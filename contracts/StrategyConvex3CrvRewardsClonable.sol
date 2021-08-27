@@ -461,6 +461,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
                 _sellConvex(convexBalance);
             }
 
+            // claim and sell our rewards if we have them
             if (hasRewards) {
                 uint256 _rewardsBalance =
                     IERC20(rewardsToken).balanceOf(address(this));
