@@ -26,7 +26,7 @@ def test_cloning(
         )
 
     ## clone our strategy
-    tx = strategy.clone(
+    tx = strategy.cloneConvex3CrvRewards(
         vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
     )
     newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)

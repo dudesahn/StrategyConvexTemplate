@@ -11,10 +11,7 @@ import "@openzeppelin/contracts/math/Math.sol";
 
 import "./interfaces/curve.sol";
 import {IUniswapV2Router02} from "./interfaces/uniswap.sol";
-import {
-    BaseStrategy,
-    StrategyParams
-} from "@yearnvaults/contracts/BaseStrategy.sol";
+import {BaseStrategy} from "@yearnvaults/contracts/BaseStrategy.sol";
 
 interface IConvexRewards {
     // strategy's staked balance in the synthetix staking contract
@@ -202,7 +199,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
             uint256(0),
             crvPath,
             address(this),
-            now
+            block.timestamp
         );
     }
 
@@ -213,7 +210,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
             uint256(0),
             convexTokenPath,
             address(this),
-            now
+            block.timestamp
         );
     }
 
@@ -233,9 +230,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
         view
         override
         returns (address[] memory)
-    {
-        return new address[](0);
-    }
+    {}
 
     /* ========== SETTERS ========== */
 
@@ -258,11 +253,6 @@ abstract contract StrategyConvexBase is BaseStrategy {
         onlyAuthorized
     {
         harvestProfitNeeded = _harvestProfitNeeded;
-    }
-
-    // This allows us to change the name of a strategy
-    function setName(string calldata _stratName) external onlyAuthorized {
-        stratName = _stratName;
     }
 
     // This allows us to manually harvest with our keeper as needed
@@ -292,7 +282,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
     IERC20 public constant dai =
         IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
 
-    // rewards token info
+    // rewards token info. we can have more than 1 reward token but this is rare, so we don't include this in the template
     IERC20 public rewardsToken;
     bool public hasRewards;
     address[] public rewardsPath;
@@ -316,7 +306,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
     event Cloned(address indexed clone);
 
     // we use this to clone our original strategy to other vaults
-    function clone(
+    function cloneConvex3CrvRewards(
         address _vault,
         address _strategist,
         address _rewardsToken,
@@ -376,6 +366,9 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         address _curvePool,
         string memory _name
     ) internal {
+        // make sure that we haven't initialized this before
+        require(address(curve) == address(0)); // already initialized.
+
         // You can set these parameters on deployment to whatever you want
         maxReportDelay = 7 days; // 7 days in seconds, if we hit this then harvestTrigger = True
         debtThreshold = 5 * 1e18; // set a bit of a buffer
@@ -465,7 +458,9 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
             if (hasRewards) {
                 uint256 _rewardsBalance =
                     IERC20(rewardsToken).balanceOf(address(this));
-                if (_rewardsBalance > 0) _sellRewards(_rewardsBalance);
+                if (_rewardsBalance > 0) {
+                    _sellRewards(_rewardsBalance);
+                }
             }
 
             // deposit our balance to Curve if we have any
@@ -540,7 +535,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
             uint256(0),
             rewardsPath,
             address(this),
-            now
+            block.timestamp
         );
     }
 
@@ -688,35 +683,49 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
     function setOptimal(uint256 _optimal) external onlyAuthorized {
         if (_optimal == 0) {
             crvPath[2] = address(dai);
-            if (hasRewards) rewardsPath[2] = address(dai);
+            convexTokenPath[2] = address(dai);
+            if (hasRewards) {
+                rewardsPath[2] = address(dai);
+            }
             optimal = 0;
         } else if (_optimal == 1) {
             crvPath[2] = address(usdc);
-            if (hasRewards) rewardsPath[2] = address(usdc);
+            convexTokenPath[2] = address(usdc);
+            if (hasRewards) {
+                rewardsPath[2] = address(usdc);
+            }
             optimal = 1;
         } else if (_optimal == 2) {
             crvPath[2] = address(usdt);
-            if (hasRewards) rewardsPath[2] = address(usdt);
+            convexTokenPath[2] = address(usdt);
+            if (hasRewards) {
+                rewardsPath[2] = address(usdt);
+            }
             optimal = 2;
         } else {
-            require(false, "incorrect token");
+            revert("incorrect token");
         }
     }
 
     // Use to add or update rewards
-    function addRewards() external onlyGovernance {
-        address _virtualRewardsPool =
-            IConvexRewards(rewardsContract).extraRewards(0);
-        rewardsToken = IERC20(
-            IConvexRewards(_virtualRewardsPool).rewardToken()
-        );
+    function updateRewards(address _rewardsToken) external onlyGovernance {
+        // reset allowance to zero for our previous token if we had one
+        if (address(rewardsToken) != address(0)) {
+            rewardsToken.approve(sushiswap, uint256(0));
+        }
+        // update with our new token, use dai as default
+        rewardsToken = IERC20(_rewardsToken);
         rewardsToken.approve(sushiswap, type(uint256).max);
-        rewardsPath = [address(rewards), address(weth), address(dai)];
+        rewardsPath = [address(rewardsToken), address(weth), address(dai)];
         hasRewards = true;
     }
 
-    // Use to update whether we have extra rewards or not, mostly useful if we need to turn them off.
-    function setHasRewards(bool _hasRewards) external onlyGovernance {
-        hasRewards = _hasRewards;
+    // Use to turn off extra rewards claiming
+    function turnOffRewards() external onlyGovernance {
+        hasRewards = false;
+        if (address(rewardsToken) != address(0)) {
+            rewardsToken.approve(sushiswap, uint256(0));
+        }
+        rewardsToken = IERC20(address(0));
     }
 }

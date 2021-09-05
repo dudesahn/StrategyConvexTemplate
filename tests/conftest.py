@@ -18,7 +18,7 @@ def pid():
 def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    whale = accounts.at("0xdd8e2Dd11D38b3e27ad4d7349A61B5C2B5aF427a", force=True)
+    whale = accounts.at("0x78aad3B7e06CD91b88c34B9Add4559Ed8731d59B", force=True)
     yield whale
 
 
@@ -94,6 +94,13 @@ def token(pid, booster):
     yield Contract(token_address)
 
 
+# zero address
+@pytest.fixture(scope="module")
+def zero_address():
+    zero_address = "0x0000000000000000000000000000000000000000"
+    yield zero_address
+
+
 # gauge for the curve pool
 @pytest.fixture(scope="module")
 def gauge(pid, booster):
@@ -104,8 +111,7 @@ def gauge(pid, booster):
 
 # curve deposit pool
 @pytest.fixture(scope="module")
-def pool(token, curve_registry):
-    zero_address = "0x0000000000000000000000000000000000000000"
+def pool(token, curve_registry, zero_address):
     if curve_registry.get_pool_from_lp_token(token) == zero_address:
         poolAddress = token
     else:
