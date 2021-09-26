@@ -58,7 +58,6 @@ def test_triggers(
     # harvest should trigger true
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be true.", tx)
-    print("Waiting period", strategy.checkWaitingPeriod())
     assert tx == True
 
     # withdraw and confirm we made money

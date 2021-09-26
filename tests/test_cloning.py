@@ -19,6 +19,7 @@ def test_cloning(
     pool,
     sToken,
     strategy_name,
+    
 ):
     # Shouldn't be able to call initialize again
     with brownie.reverts():
@@ -62,8 +63,16 @@ def test_cloning(
             {"from": gov},
         )
 
+    # revoke and send all funds back to vault
     vault.revokeStrategy(strategy, {"from": gov})
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
+    strategy.harvest({"from": gov})
+    
+    # attach our new strategy
     vault.addStrategy(newStrategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
+    
     assert vault.withdrawalQueue(1) == newStrategy
     assert vault.strategies(newStrategy)[2] == 10_000
     assert vault.withdrawalQueue(0) == strategy
@@ -73,14 +82,12 @@ def test_cloning(
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(amount, {"from": whale})
-
+    vault.deposit(20000e18, {"from": whale})
+    
     # harvest, store asset amount
-    chain.sleep(1)
     newStrategy.tend({"from": gov})
-    chain.mine(1)
     chain.sleep(361)
-    newStrategy.harvest({"from": gov})
+    tx = newStrategy.harvest({"from": gov})
     old_assets_dai = vault.totalAssets()
     assert old_assets_dai > 0
     assert token.balanceOf(newStrategy) == 0
@@ -94,9 +101,6 @@ def test_cloning(
     chain.mine(1)
 
     # harvest after a day, store new asset amount
-    chain.sleep(1)
-    newStrategy.tend({"from": gov})
-    chain.mine(1)
     chain.sleep(361)
     newStrategy.harvest({"from": gov})
     new_assets_dai = vault.totalAssets()
@@ -116,8 +120,10 @@ def test_cloning(
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
     chain.mine(1)
+    
+    tx = newStrategy.tend({"from": gov})
 
     # withdraw and confirm we made money
     vault.withdraw({"from": whale})
     assert token.balanceOf(whale) >= startingWhale
-    assert vault.pricePerShare() > before_pps
+    assert vault.pricePerShare() >= before_pps
