@@ -12,29 +12,54 @@ def test_cloning(
     keeper,
     rewards,
     chain,
-    StrategyConvex3CrvRewardsClonable,
+    StrategyConvexFixedForexClonable,
     rewardsContract,
     pid,
     amount,
     pool,
+    sToken,
     strategy_name,
 ):
     # Shouldn't be able to call initialize again
     with brownie.reverts():
         strategy.initialize(
-            vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov},
+            vault,
+            strategist,
+            rewards,
+            keeper,
+            pid,
+            pool,
+            sToken,
+            strategy_name,
+            {"from": gov},
         )
 
     ## clone our strategy
-    tx = strategy.cloneConvex3CrvRewards(
-        vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
+    tx = strategy.cloneConvexibFF(
+        vault,
+        strategist,
+        rewards,
+        keeper,
+        pid,
+        pool,
+        sToken,
+        strategy_name,
+        {"from": gov},
     )
-    newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)
+    newStrategy = StrategyConvexFixedForexClonable.at(tx.return_value)
 
     # Shouldn't be able to call initialize again
     with brownie.reverts():
         newStrategy.initialize(
-            vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov},
+            vault,
+            strategist,
+            rewards,
+            keeper,
+            pid,
+            pool,
+            sToken,
+            strategy_name,
+            {"from": gov},
         )
 
     vault.revokeStrategy(strategy, {"from": gov})
@@ -48,9 +73,13 @@ def test_cloning(
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(1000e18, {"from": whale})
+    vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
+    chain.sleep(1)
+    newStrategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     newStrategy.harvest({"from": gov})
     old_assets_dai = vault.totalAssets()
     assert old_assets_dai > 0
@@ -60,11 +89,15 @@ def test_cloning(
     print("\nStarting Assets: ", old_assets_dai / 1e18)
     print("\nAssets Staked: ", rewardsContract.balanceOf(newStrategy) / 1e18)
 
-    # simulate 1 day of earnings
-    chain.sleep(86400)
+    # simulate one hour of earnings
+    chain.sleep(3600)
     chain.mine(1)
 
     # harvest after a day, store new asset amount
+    chain.sleep(1)
+    newStrategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     newStrategy.harvest({"from": gov})
     new_assets_dai = vault.totalAssets()
     # we can't use strategyEstimated Assets because the profits are sent to the vault
@@ -73,9 +106,9 @@ def test_cloning(
 
     # Display estimated APR based on the two days before the pay out
     print(
-        "\nEstimated DAI APR: ",
+        "\nEstimated ibEUR APR: ",
         "{:.2%}".format(
-            ((new_assets_dai - old_assets_dai) * (365))
+            ((new_assets_dai - old_assets_dai) * (365 * 24))
             / (newStrategy.estimatedTotalAssets())
         ),
     )

@@ -5,7 +5,7 @@ import math
 
 
 def test_migration(
-    StrategyConvex3CrvRewardsClonable,
+    StrategyConvexFixedForexClonable,
     gov,
     token,
     vault,
@@ -20,6 +20,7 @@ def test_migration(
     pid,
     amount,
     pool,
+    sToken,
     strategy_name,
 ):
 
@@ -27,12 +28,20 @@ def test_migration(
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
     # deploy our new strategy
     new_strategy = strategist.deploy(
-        StrategyConvex3CrvRewardsClonable, vault, pid, pool, strategy_name,
+        StrategyConvexFixedForexClonable,
+        vault,
+        pid,
+        pool,
+        sToken,
+        strategy_name,
     )
     total_old = strategy.estimatedTotalAssets()
 
@@ -41,8 +50,8 @@ def test_migration(
     print("\nShould we harvest? Should be False.", tx)
     assert tx == False
 
-    # sleep for a week to build up some rewards
-    chain.sleep(86400 * 7)
+    # sleep for an hour to build up some rewards
+    chain.sleep(3600)
 
     # migrate our old strategy
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})
@@ -66,8 +75,8 @@ def test_migration(
     startingVault = vault.totalAssets()
     print("\nVault starting assets with new strategy: ", startingVault)
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate one hour of earnings
+    chain.sleep(3600)
     chain.mine(1)
 
     # Test out our migrated strategy, confirm we're making a profit

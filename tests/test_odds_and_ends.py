@@ -15,7 +15,7 @@ def test_odds_and_ends(
     strategist_ms,
     voter,
     gauge,
-    StrategyConvex3CrvRewardsClonable,
+    StrategyConvexFixedForexClonable,
     cvxDeposit,
     rewardsContract,
     pid,
@@ -23,6 +23,7 @@ def test_odds_and_ends(
     convexToken,
     amount,
     pool,
+    sToken,
     strategy_name,
 ):
 
@@ -32,6 +33,9 @@ def test_odds_and_ends(
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
@@ -53,9 +57,12 @@ def test_odds_and_ends(
     print("\nShould we harvest? Should be true.", tx)
     assert tx == True
 
-    chain.sleep(86400 * 2)
+    chain.sleep(3600)
     chain.mine(1)
     strategy.setDoHealthCheck(False, {"from": gov})
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
@@ -65,7 +72,12 @@ def test_odds_and_ends(
     # we can try to migrate too, lol
     # deploy our new strategy
     new_strategy = strategist.deploy(
-        StrategyConvex3CrvRewardsClonable, vault, pid, pool, strategy_name,
+        StrategyConvexFixedForexClonable,
+        vault,
+        pid,
+        pool,
+        sToken,
+        strategy_name,
     )
     total_old = strategy.estimatedTotalAssets()
 
@@ -77,6 +89,9 @@ def test_odds_and_ends(
     assert updated_total_old == 0
 
     # harvest to get funds back in strategy
+    new_strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     new_strategy.harvest({"from": gov})
     new_strat_balance = new_strategy.estimatedTotalAssets()
     assert new_strat_balance >= total_old
@@ -84,8 +99,8 @@ def test_odds_and_ends(
     startingVault = vault.totalAssets()
     print("\nVault starting assets with new strategy: ", startingVault)
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate one hour of earnings
+    chain.sleep(3600)
     chain.mine(1)
 
     # Test out our migrated strategy, confirm we're making a profit
@@ -131,6 +146,9 @@ def test_odds_and_ends_2(
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
@@ -145,6 +163,9 @@ def test_odds_and_ends_2(
 
     chain.sleep(1)
     strategy.setDoHealthCheck(False, {"from": gov})
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
@@ -153,7 +174,7 @@ def test_odds_and_ends_2(
 
 
 def test_odds_and_ends_migration(
-    StrategyConvex3CrvRewardsClonable,
+    StrategyConvexFixedForexClonable,
     gov,
     token,
     vault,
@@ -167,6 +188,7 @@ def test_odds_and_ends_migration(
     pid,
     amount,
     pool,
+    sToken,
     strategy_name,
 ):
 
@@ -174,12 +196,20 @@ def test_odds_and_ends_migration(
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
     # deploy our new strategy
     new_strategy = strategist.deploy(
-        StrategyConvex3CrvRewardsClonable, vault, pid, pool, strategy_name,
+        StrategyConvexFixedForexClonable,
+        vault,
+        pid,
+        pool,
+        sToken,
+        strategy_name,
     )
     total_old = strategy.estimatedTotalAssets()
 
@@ -188,8 +218,8 @@ def test_odds_and_ends_migration(
     print("\nShould we harvest? Should be False.", tx)
     assert tx == False
 
-    # sleep for a dau
-    chain.sleep(86400)
+    # simulate one hour of earnings
+    chain.sleep(3600)
 
     # migrate our old strategy
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})
@@ -200,6 +230,9 @@ def test_odds_and_ends_migration(
 
     # harvest to get funds back in strategy
     chain.sleep(1)
+    new_strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     new_strategy.harvest({"from": gov})
     new_strat_balance = new_strategy.estimatedTotalAssets()
 
@@ -211,8 +244,8 @@ def test_odds_and_ends_migration(
     startingVault = vault.totalAssets()
     print("\nVault starting assets with new strategy: ", startingVault)
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate one hour of earnings
+    chain.sleep(3600)
     chain.mine(1)
 
     # simulate a day of waiting for share price to bump back up
@@ -254,6 +287,9 @@ def test_odds_and_ends_liquidatePosition(
 
     # harvest, store asset amount
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
     old_assets = vault.totalAssets()
@@ -265,12 +301,15 @@ def test_odds_and_ends_liquidatePosition(
     # try and include custom logic here to check that funds are in the staking contract (if needed)
     assert rewardsContract.balanceOf(strategy) > stakingBeforeHarvest
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate one hour of earnings
+    chain.sleep(3600)
     chain.mine(1)
 
     # harvest, store new asset amount
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
     new_assets = vault.totalAssets()
@@ -280,9 +319,9 @@ def test_odds_and_ends_liquidatePosition(
 
     # Display estimated APR
     print(
-        "\nEstimated EURt APR: ",
+        "\nEstimated ibEUR APR: ",
         "{:.2%}".format(
-            ((new_assets - old_assets) * (365)) / (strategy.estimatedTotalAssets())
+            ((new_assets - old_assets) * (365 * 24)) / (strategy.estimatedTotalAssets())
         ),
     )
 
@@ -322,6 +361,9 @@ def test_odds_and_ends_rekt(
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
@@ -370,6 +412,9 @@ def test_odds_and_ends_liquidate_rekt(
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
@@ -433,13 +478,19 @@ def test_odds_and_ends_inactive_strat(
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
     ## move our funds out of the strategy
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
-    # sleep for a day since univ3 is weird
-    chain.sleep(86400)
+    # sleep for an hour since univ3 is weird
+    chain.sleep(3600)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
 
     # we shouldn't harvest empty strategies
@@ -450,10 +501,17 @@ def test_odds_and_ends_inactive_strat(
     ## move our funds back into the strategy
     vault.updateStrategyDebtRatio(strategy, 10000, {"from": gov})
     chain.sleep(1)
-    strategy.harvest({"from": gov})
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
+    strategy.setDoHealthCheck(False, {"from": gov})
+    tx = strategy.harvest({"from": gov})
+    profits = tx.events["Harvested"]["profit"]
+    losses = tx.events["Harvested"]["loss"]
+    assert profits > losses  # turning off health check, figure out why
 
-    # sleep for five days to generate profit
-    chain.sleep(86400 * 5)
+    # sleep for one hour
+    chain.sleep(3600)
 
     # send away all funds so we have profit but no assets
     strategy.withdrawToConvexDepositTokens({"from": gov})

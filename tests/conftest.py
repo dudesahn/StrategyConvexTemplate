@@ -1,5 +1,6 @@
 import pytest
 from brownie import config, Wei, Contract
+from eth_abi import encode_single
 
 # Snapshots the chain before each test and reverts after test completion.
 @pytest.fixture(autouse=True)
@@ -10,30 +11,35 @@ def isolation(fn_isolation):
 # put our pool's convex pid here; this is the only thing that should need to change up here **************
 @pytest.fixture(scope="module")
 def pid():
-    pid = 40
+    pid = 45
     yield pid
 
 
 @pytest.fixture(scope="module")
 def whale(accounts):
     # Totally in it for the tech
-    # Update this with a large holder of your want token (the largest EOA holder of LP)
-    whale = accounts.at("0x78aad3B7e06CD91b88c34B9Add4559Ed8731d59B", force=True)
+    # Update this with a large holder of your want token (attenboro.eth, holding some ibEUR LPs)
+    whale = accounts.at("0x4D0e439ba905EB39aee88097433aDd619cf5257b", force=True)
     yield whale
 
 
-# this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
+# this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance. Make sure to do no more than half of their balance.
 @pytest.fixture(scope="module")
 def amount():
-    amount = 2000e18
+    amount = 20_000e18
     yield amount
 
 
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexMIM"
+    strategy_name = "StrategyConvexibEUR"
     yield strategy_name
+
+
+@pytest.fixture(scope="module")
+def sToken():  # this is the token we swap CRV for and then deposit to our LP
+    yield Contract("0xD71eCFF9342A5Ced620049e616c5035F1dB98620")
 
 
 # Only worry about changing things above this line, unless you want to make changes to the vault or strategy.
@@ -88,30 +94,24 @@ def farmed():
 
 # Define relevant tokens and contracts in this section
 @pytest.fixture(scope="module")
-def token(pid, booster):
+def token():
     # this should be the address of the ERC-20 used by the strategy/vault
-    token_address = booster.poolInfo(pid)[0]
+    token_address = "0x19b080FE1ffA0553469D20Ca36219F17Fcf03859"
     yield Contract(token_address)
-
-
-# zero address
-@pytest.fixture(scope="module")
-def zero_address():
-    zero_address = "0x0000000000000000000000000000000000000000"
-    yield zero_address
 
 
 # gauge for the curve pool
 @pytest.fixture(scope="module")
-def gauge(pid, booster):
+def gauge():
     # this should be the address of the convex deposit token
-    gauge = booster.poolInfo(pid)[2]
+    gauge = "0x99fb76F75501039089AAC8f20f487bf84E51d76F"
     yield Contract(gauge)
 
 
 # curve deposit pool
 @pytest.fixture(scope="module")
-def pool(token, curve_registry, zero_address):
+def pool(token, curve_registry):
+    zero_address = "0x0000000000000000000000000000000000000000"
     if curve_registry.get_pool_from_lp_token(token) == zero_address:
         poolAddress = token
     else:
@@ -200,7 +200,7 @@ def vault(pm, gov, rewards, guardian, management, token, chain):
 # replace the first value with the name of your strategy
 @pytest.fixture(scope="function")
 def strategy(
-    StrategyConvex3CrvRewardsClonable,
+    StrategyConvexFixedForexClonable,
     strategist,
     keeper,
     vault,
@@ -210,23 +210,35 @@ def strategy(
     healthCheck,
     chain,
     proxy,
-    pid,
     pool,
     strategy_name,
+    sToken,
+    gauge,
+    accounts,
+    pid,
 ):
-    # make sure to include all constructor parameters needed here
+    # force open the markets if they're closed
+    _target = sToken.target()
+    target = Contract(_target)
+    currencyKey = [target.currencyKey()]
+    systemStatus = Contract("0x1c86B3CDF2a60Ae3a574f7f71d44E2C50BDdB87E")
+    synthGod = accounts.at("0xc105ea57eb434fbe44690d7dec2702e4a2fbfcf7", force=True)
+    systemStatus.resumeSynthsExchange(currencyKey, {"from": synthGod})
+
+    # parameters for this are: strategy, vault, max deposit, minTimePerInvest, slippage protection (10000 = 100% slippage allowed),
     strategy = strategist.deploy(
-        StrategyConvex3CrvRewardsClonable, vault, pid, pool, strategy_name,
+        StrategyConvexFixedForexClonable, vault, pid, pool, sToken, strategy_name
     )
     strategy.setKeeper(keeper, {"from": gov})
     # set our management fee to zero so it doesn't mess with our profit checking
     vault.setManagementFee(0, {"from": gov})
     # add our new strategy
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
-    # proxy.approveStrategy(strategy.gauge(), strategy, {"from": gov}), only need this step for curve voter strats
     strategy.setHealthCheck(healthCheck, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
-    chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
     yield strategy

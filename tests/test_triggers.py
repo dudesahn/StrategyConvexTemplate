@@ -5,7 +5,14 @@ import math
 
 
 def test_triggers(
-    gov, token, vault, strategist, whale, strategy, chain, amount,
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    amount,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -14,11 +21,14 @@ def test_triggers(
     newWhale = token.balanceOf(whale)
     starting_assets = vault.totalAssets()
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    # simulate a day of earnings
-    chain.sleep(86400)
+    # simulate an hour of earnings
+    chain.sleep(3600)
     chain.mine(1)
 
     # harvest should trigger false
@@ -26,24 +36,29 @@ def test_triggers(
     print("\nShould we harvest? Should be False.", tx)
     assert tx == False
 
-    # simulate eight days of earnings
-    chain.sleep(86400 * 8)
+    # simulate one hour of earnings
+    chain.sleep(3600)
+    chain.mine(1)
+
+    # harvest should trigger false
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be true.", tx)
+    chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+    assert tx == False
+
+    # simulate 10 days of earnings
+    chain.sleep(86400 * 10)
     chain.mine(1)
 
     # harvest should trigger true
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be true.", tx)
-    chain.sleep(1)
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
-    assert tx == True
-
-    # simulate a day of waiting for share price to bump back up
-    chain.sleep(86400 * 9)
-    chain.mine(1)
-    strategy.setMaxReportDelay(1e18, {"from": gov})
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be true.", tx)
+    print("Waiting period", strategy.checkWaitingPeriod())
     assert tx == True
 
     # withdraw and confirm we made money
@@ -52,7 +67,14 @@ def test_triggers(
 
 
 def test_less_useful_triggers(
-    gov, token, vault, strategist, whale, strategy, chain, amount,
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    amount,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -61,6 +83,9 @@ def test_less_useful_triggers(
     newWhale = token.balanceOf(whale)
     starting_assets = vault.totalAssets()
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 

@@ -5,26 +5,41 @@ from brownie import config
 
 # test passes as of 21-06-26
 def test_emergency_exit(
-    gov, token, vault, whale, strategy, chain, amount,
+    gov,
+    token,
+    vault,
+    whale,
+    strategy,
+    chain,
+    amount,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    # simulate seven days of earnings
-    chain.sleep(86400 * 7)
+    # simulate an hour of earnings
+    chain.sleep(3600)
     chain.mine(1)
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
     # set emergency and exit, then confirm that the strategy has no funds
     strategy.setEmergencyExit({"from": gov})
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
     assert strategy.estimatedTotalAssets() == 0
@@ -39,7 +54,13 @@ def test_emergency_exit(
 
 
 def test_emergency_exit_with_profit(
-    gov, token, vault, whale, strategy, chain, amount,
+    gov,
+    token,
+    vault,
+    whale,
+    strategy,
+    chain,
+    amount,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -47,13 +68,19 @@ def test_emergency_exit_with_profit(
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    # simulate seven days of earnings
-    chain.sleep(86400 * 7)
+    # simulate one hour of earnings
+    chain.sleep(3600)
     chain.mine(1)
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
@@ -63,6 +90,9 @@ def test_emergency_exit_with_profit(
     strategy.setDoHealthCheck(False, {"from": gov})
     strategy.setEmergencyExit({"from": gov})
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
     assert strategy.estimatedTotalAssets() == 0
@@ -77,7 +107,16 @@ def test_emergency_exit_with_profit(
 
 
 def test_emergency_exit_with_no_gain_or_loss(
-    gov, token, vault, whale, strategy, chain, gauge, voter, cvxDeposit, amount,
+    gov,
+    token,
+    vault,
+    whale,
+    strategy,
+    chain,
+    gauge,
+    voter,
+    cvxDeposit,
+    amount,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -85,6 +124,9 @@ def test_emergency_exit_with_no_gain_or_loss(
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
@@ -103,12 +145,15 @@ def test_emergency_exit_with_no_gain_or_loss(
     strategy.setEmergencyExit({"from": gov})
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
     assert strategy.estimatedTotalAssets() == 0
 
     # simulate a day of waiting for share price to bump back up
-    chain.sleep(86400)
+    chain.sleep(3600)
     chain.mine(1)
 
     # withdraw and confirm we made money, accounting for all of the funds we lost lol
@@ -134,10 +179,13 @@ def test_emergency_withdraw_method_0(
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
-    # simulate a day of earnings
-    chain.sleep(86400)
+    # simulate an hour of earnings
+    chain.sleep(3600)
     chain.mine(1)
 
     # set emergency exit so no funds will go back to strategy, and we assume that deposit contract is borked so we go through staking contract
@@ -150,6 +198,9 @@ def test_emergency_withdraw_method_0(
     # turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     chain.sleep(1)
     assert strategy.estimatedTotalAssets() == 0
@@ -179,10 +230,13 @@ def test_emergency_withdraw_method_1(
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
 
-    # simulate a day of earnings
-    chain.sleep(86400)
+    # simulate one hour of earnings
+    chain.sleep(3600)
     chain.mine(1)
 
     # set emergency exit so no funds will go back to strategy, and we assume that deposit contract is borked so we go through staking contract
@@ -195,6 +249,9 @@ def test_emergency_withdraw_method_1(
     # turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
     assert strategy.estimatedTotalAssets() == 0
     assert rewardsContract.balanceOf(strategy) == 0
