@@ -765,7 +765,7 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
         return IExchanger(resolver().getAddress(CONTRACT_EXCHANGER));
     }
 
-    function checkWaitingPeriod() public view returns (bool freeToMove) {
+    function checkWaitingPeriod() internal view returns (bool freeToMove) {
         return
             // check if it's been >5 mins since we traded our sETH for our synth
             _exchanger().maxSecsLeftInWaitingPeriod(
