@@ -10,7 +10,7 @@ interface IReadProxy {
 }
 
 interface ISystemStatus {
-    function getSynthExchangeSuspensions(bytes32[] calldata synths)
+    function getSynthExchangeSuspensions(bytes32[1] memory synths)
         external
         view
         returns (bool[] memory exchangeSuspensions, uint256[] memory reasons);

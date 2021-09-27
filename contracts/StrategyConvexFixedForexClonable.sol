@@ -777,11 +777,7 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
     function isMarketClosed() public returns (bool) {
         // set up our arrays to use
         bool[] memory tradingSuspended;
-        bytes32[] memory synthArray;
-
-        // use our synth key
-        synthArray = new bytes32[](1);
-        synthArray[0] = synthCurrencyKey;
+        bytes32[1] memory synthArray = [synthCurrencyKey];
 
         // check if trading is open or not. true = market is closed
         (tradingSuspended, ) = systemStatus.getSynthExchangeSuspensions(

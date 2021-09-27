@@ -101,6 +101,7 @@ def test_cloning(
     chain.mine(1)
 
     # harvest after a day, store new asset amount
+    tx = newStrategy.tend({"from": gov})
     chain.sleep(361)
     newStrategy.harvest({"from": gov})
     new_assets_dai = vault.totalAssets()
@@ -120,8 +121,6 @@ def test_cloning(
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
     chain.mine(1)
-    
-    tx = newStrategy.tend({"from": gov})
 
     # withdraw and confirm we made money
     vault.withdraw({"from": whale})
