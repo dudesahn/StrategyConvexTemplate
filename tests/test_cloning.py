@@ -19,7 +19,6 @@ def test_cloning(
     pool,
     sToken,
     strategy_name,
-    
 ):
     # Shouldn't be able to call initialize again
     with brownie.reverts():
@@ -69,10 +68,10 @@ def test_cloning(
     chain.mine(1)
     chain.sleep(361)
     strategy.harvest({"from": gov})
-    
+
     # attach our new strategy
     vault.addStrategy(newStrategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
-    
+
     assert vault.withdrawalQueue(1) == newStrategy
     assert vault.strategies(newStrategy)[2] == 10_000
     assert vault.withdrawalQueue(0) == strategy
@@ -83,7 +82,7 @@ def test_cloning(
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(20000e18, {"from": whale})
-    
+
     # harvest, store asset amount
     newStrategy.tend({"from": gov})
     chain.sleep(361)

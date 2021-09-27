@@ -267,11 +267,11 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
     // swap stuff
     address public constant uniswapv3 =
         address(0xE592427A0AEce92De3Edee1F18E0157C05861564);
-    bool public sellOnSushi = true; // determine if we sell partially on sushi or all on Uni v3
+    bool public sellOnSushi; // determine if we sell partially on sushi or all on Uni v3
     bool internal harvestNow; // this tells us if we're currently harvesting or tending
     IERC20 public constant usdt =
         IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7); // use this to check our pending harvest
-    uint256 public uniCrvFee = 10000; // this is equal to 1%, can change this later if a different path becomes more optimal
+    uint24 public uniCrvFee; // this is equal to 1%, can change this later if a different path becomes more optimal
 
     // check for cloning
     bool internal isOriginal = true;
@@ -377,6 +377,9 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
         // set our keepCRV
         keepCRV = 1000;
 
+        // set our fee for univ3 pool
+        uniCrvFee = 10000;
+
         // this is the pool specific to this vault, used for depositing
         curve = ICurveFi(_curvePool);
 
@@ -391,6 +394,9 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
 
         // set our strategy's name
         stratName = _name;
+
+        // start off using sushi
+        sellOnSushi = true;
 
         // set our token to swap for and deposit with
         sTokenProxy = IReadProxy(_sTokenProxy);
@@ -498,7 +504,6 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
     // sell from CRV and CVX into WETH via sushiswap, then sell WETH for sETH on Uni v3
     function _sellCrvOnSushiFirst(uint256 _crvAmount, uint256 _convexAmount)
         internal
-        returns (uint256)
     {
         if (_crvAmount > 0) {
             IUniswapV2Router02(sushiswap).swapExactTokensForTokens(
@@ -519,9 +524,8 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
             );
         }
         uint256 _wethBalance = weth.balanceOf(address(this));
-        uint256 _output;
         if (_wethBalance > 0) {
-            _output = IUniV3(uniswapv3).exactInput(
+            IUniV3(uniswapv3).exactInput(
                 IUniV3.ExactInputParams(
                     abi.encodePacked(
                         address(weth),
@@ -535,13 +539,11 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
                 )
             );
         }
-        return _output;
     }
 
     // Sells our CRV -> WETH on UniV3 and CVX -> WETH on Sushi, then WETH -> sETH together on UniV3
     function _sellCrvOnUniOnly(uint256 _crvAmount, uint256 _convexAmount)
         internal
-        returns (uint256)
     {
         if (_convexAmount > 0) {
             IUniswapV2Router02(sushiswap).swapExactTokensForTokens(
@@ -568,9 +570,8 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
             );
         }
         uint256 _wethBalance = weth.balanceOf(address(this));
-        uint256 _output;
         if (_wethBalance > 0) {
-            _output = IUniV3(uniswapv3).exactInput(
+            IUniV3(uniswapv3).exactInput(
                 IUniV3.ExactInputParams(
                     abi.encodePacked(
                         address(weth),
@@ -584,7 +585,6 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
                 )
             );
         }
-        return _output;
     }
 
     /* ========== KEEP3RS ========== */
@@ -777,7 +777,11 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
     function isMarketClosed() public returns (bool) {
         // set up our arrays to use
         bool[] memory tradingSuspended;
-        bytes32[1] memory synthArray = [synthCurrencyKey];
+        bytes32[] memory synthArray;
+
+        // use our synth key
+        synthArray = new bytes32[](1);
+        synthArray[0] = synthCurrencyKey;
 
         // check if trading is open or not. true = market is closed
         (tradingSuspended, ) = systemStatus.getSynthExchangeSuspensions(
@@ -788,7 +792,7 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
 
     /* ========== SETTERS ========== */
     // set the fee pool we'd like to swap through for if we're swapping CRV on UniV3
-    function setUniCrvFee(uint256 _fee) external onlyAuthorized {
+    function setUniCrvFee(uint24 _fee) external onlyAuthorized {
         uniCrvFee = _fee;
     }
 }
