@@ -293,6 +293,14 @@ interface ISynthetix {
         bytes32 trackingCode
     ) external returns (uint256 amountReceived);
 
+    function exchangeWithTrackingForInitiator(
+        bytes32 sourceCurrencyKey,
+        uint256 sourceAmount,
+        bytes32 destinationCurrencyKey,
+        address rewardAddress,
+        bytes32 trackingCode
+    ) external returns (uint256 amountReceived);
+
     function issueMaxSynths() external;
 
     function issueMaxSynthsOnBehalf(address issueForAddress) external;

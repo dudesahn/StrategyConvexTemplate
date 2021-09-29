@@ -21,7 +21,7 @@ interface IGauge {
     function withdraw(uint256) external;
 }
 
-interface ICurveFi {
+interface ICurveFi is IERC20 {
     function get_virtual_price() external view returns (uint256);
 
     function add_liquidity(
