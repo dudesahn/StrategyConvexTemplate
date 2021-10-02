@@ -19,6 +19,10 @@ import {
 // these are the libraries to use with synthetix
 import "./interfaces/synthetix.sol";
 
+interface IBaseFee {
+    function basefee_global() external view returns (uint256);
+}
+
 interface IUniV3 {
     struct ExactInputParams {
         bytes path;
@@ -272,6 +276,8 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
     IERC20 public constant usdt =
         IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7); // use this to check our pending harvest
     uint24 public uniCrvFee; // this is equal to 1%, can change this later if a different path becomes more optimal
+    uint256 public lastTendTime; // this is the timestamp that our last tend was called
+    uint256 public maxGasPrice; // this is the max gas price we want our keepers to pay for harvests/tends
 
     // check for cloning
     bool internal isOriginal = true;
@@ -600,6 +606,11 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
             return false;
         }
 
+        // check if the base fee gas price is higher than we allow
+        if (readBaseFee() > maxGasPrice) {
+            return false;
+        }
+
         // harvest if we have a profit to claim
         if (claimableProfitInUsdt() > harvestProfitNeeded) {
             return true;
@@ -624,10 +635,13 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
             return false;
         }
 
+        // check if the base fee gas price is higher than we allow
+        if (readBaseFee() > maxGasPrice) {
+            return false;
+        }
+
         // Should trigger if hasn't been called in a while. Running this based on harvest even though this is a tend call since a harvest should run ~5 mins after every tend.
-        StrategyParams memory params = vault.strategies(address(this));
-        if (block.timestamp.sub(params.lastReport) >= maxReportDelay)
-            return true;
+        if (block.timestamp.sub(lastTendTime) >= maxReportDelay) return true;
     }
 
     // we will need to add rewards token here if we have them
@@ -695,6 +709,12 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
         returns (uint256)
     {
         return _ethAmount;
+    }
+
+    function readBaseFee() internal view returns (uint256 baseFee) {
+        IBaseFee _baseFeeOracle =
+            IBaseFee(0xf8d0Ec04e94296773cE20eFbeeA82e76220cD549);
+        return _baseFeeOracle.basefee_global();
     }
 
     /* ========== SYNTHETIX ========== */
@@ -774,7 +794,7 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
             ) == 0;
     }
 
-    function isMarketClosed() public returns (bool) {
+    function isMarketClosed() public view returns (bool) {
         // set up our arrays to use
         bool[] memory tradingSuspended;
         bytes32[] memory synthArray;
@@ -794,5 +814,10 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
     // set the fee pool we'd like to swap through for if we're swapping CRV on UniV3
     function setUniCrvFee(uint24 _fee) external onlyAuthorized {
         uniCrvFee = _fee;
+    }
+
+    // set the maximum gas price we want to pay for a harvest/tend
+    function setGasPrice(uint256 _gasPrice) external onlyAuthorized {
+        gasPrice = _gasPrice;
     }
 }
