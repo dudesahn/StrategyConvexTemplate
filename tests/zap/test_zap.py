@@ -18,11 +18,11 @@ def test_zap_weth(
     startingWhale = weth.balanceOf(whale)
 
     # adjust our amount for decimals
-    amount = amount * 10 ** weth.decimals() * 14.54
+    amount = amount * 10 ** weth.decimals() * 13.99
 
     # approve and zap in our asset
     weth.approve(zap, 2 ** 256 - 1, {"from": whale})
-    tx = zap.zapInTokens(weth, amount, zapTarget, {"from": whale})
+    tx = zap.zapIn(weth, amount, vaultTarget, {"from": whale})
 
     newWhale = weth.balanceOf(whale)
     print("Balance of zap", weth.balanceOf(zap))
@@ -51,7 +51,7 @@ def test_zap_weth(
     # test our zap out, approve it to spend our tokens
     vault_balance = vaultTarget.balanceOf(whale)
     vaultTarget.approve(zap, 2 ** 256 - 1, {"from": whale})
-    zap.zapOut(vaultTarget, vault_balance, synth, {"from": whale})
+    zap.zapOut(vaultTarget, vault_balance, {"from": whale})
     seth_balance = sETH.balanceOf(whale)
     assert seth_balance > 0
     print("sETH Balance", seth_balance / 1e18)
@@ -86,7 +86,7 @@ def test_zap_wbtc(
 
     # approve and zap in our asset
     wbtc.approve(zap, 2 ** 256 - 1, {"from": whale})
-    tx = zap.zapInTokens(wbtc, amount, zapTarget, {"from": whale})
+    tx = zap.zapIn(wbtc, amount, vaultTarget, {"from": whale})
 
     newWhale = wbtc.balanceOf(whale)
     print("Balance of zap", wbtc.balanceOf(zap))
@@ -115,7 +115,7 @@ def test_zap_wbtc(
     # test our zap out, approve it to spend our tokens
     vault_balance = vaultTarget.balanceOf(whale)
     vaultTarget.approve(zap, 2 ** 256 - 1, {"from": whale})
-    zap.zapOut(vaultTarget, vault_balance, synth, {"from": whale})
+    zap.zapOut(vaultTarget, vault_balance, {"from": whale})
     seth_balance = sETH.balanceOf(whale)
     assert seth_balance > 0
     print("sETH Balance", seth_balance / 1e18)
@@ -146,11 +146,11 @@ def test_zap_usdc(
     startingWhale = usdc.balanceOf(whale)
 
     # adjust our amount for decimals
-    amount = amount * 10 ** usdc.decimals() * 41933.12
+    amount = amount * 10 ** usdc.decimals() * 48194.21
 
     # approve and zap in our asset
     usdc.approve(zap, 2 ** 256 - 1, {"from": whale})
-    tx = zap.zapInTokens(usdc, amount, zapTarget, {"from": whale})
+    tx = zap.zapIn(usdc, amount, vaultTarget, {"from": whale})
 
     newWhale = usdc.balanceOf(whale)
     print("Balance of zap", usdc.balanceOf(zap))
@@ -179,7 +179,7 @@ def test_zap_usdc(
     # test our zap out, approve it to spend our tokens
     vault_balance = vaultTarget.balanceOf(whale)
     vaultTarget.approve(zap, 2 ** 256 - 1, {"from": whale})
-    zap.zapOut(vaultTarget, vault_balance, synth, {"from": whale})
+    zap.zapOut(vaultTarget, vault_balance, {"from": whale})
     seth_balance = sETH.balanceOf(whale)
     assert seth_balance > 0
     print("sETH Balance", seth_balance / 1e18)
@@ -214,11 +214,11 @@ def test_zap_dai(
     startingWhale = dai.balanceOf(whale)
 
     # adjust our amount for decimals
-    amount = amount * 10 ** dai.decimals() * 41933.12
+    amount = amount * 10 ** dai.decimals() * 48194.21
 
     # approve and zap in our asset
     dai.approve(zap, 2 ** 256 - 1, {"from": whale})
-    tx = zap.zapInTokens(dai, amount, zapTarget, {"from": whale})
+    tx = zap.zapIn(dai, amount, vaultTarget, {"from": whale})
 
     newWhale = dai.balanceOf(whale)
     print("Balance of zap", dai.balanceOf(zap))
@@ -247,7 +247,7 @@ def test_zap_dai(
     # test our zap out, approve it to spend our tokens
     vault_balance = vaultTarget.balanceOf(whale)
     vaultTarget.approve(zap, 2 ** 256 - 1, {"from": whale})
-    zap.zapOut(vaultTarget, vault_balance, synth, {"from": whale})
+    zap.zapOut(vaultTarget, vault_balance, {"from": whale})
     seth_balance = sETH.balanceOf(whale)
     assert seth_balance > 0
     print("sETH Balance", seth_balance / 1e18)
@@ -278,11 +278,11 @@ def test_zap_usdt(
     startingWhale = usdt.balanceOf(whale)
 
     # adjust our amount for decimals
-    amount = amount * 10 ** usdt.decimals() * 41933.12
+    amount = amount * 10 ** usdt.decimals() * 48194.21
 
     # approve and zap in our asset
     usdt.approve(zap, 2 ** 256 - 1, {"from": whale})
-    tx = zap.zapInTokens(usdt, amount, zapTarget, {"from": whale})
+    tx = zap.zapIn(usdt, amount, vaultTarget, {"from": whale})
 
     newWhale = usdt.balanceOf(whale)
     print("Balance of zap", usdt.balanceOf(zap))
@@ -311,7 +311,7 @@ def test_zap_usdt(
     # test our zap out, approve it to spend our tokens
     vault_balance = vaultTarget.balanceOf(whale)
     vaultTarget.approve(zap, 2 ** 256 - 1, {"from": whale})
-    zap.zapOut(vaultTarget, vault_balance, synth, {"from": whale})
+    zap.zapOut(vaultTarget, vault_balance, {"from": whale})
     seth_balance = sETH.balanceOf(whale)
     assert seth_balance > 0
     print("sETH Balance", seth_balance / 1e18)
@@ -342,8 +342,11 @@ def test_zap_eth(
     ## deposit to the vault after approving
     startingWhale = whale.balance()
 
+    # adjust our amount for decimals
+    amount = amount * 10 ** weth.decimals() * 13.99
+
     # approve and zap in our asset (don't need to approve for ETH)
-    zap.zapInEth(zapTarget, {"value": Wei("14.54 ether"), "from": whale})
+    zap.zapIn(eth, amount, vaultTarget, {"value": Wei("13.99 ether"), "from": whale})
 
     newWhale = whale.balance()
     print("Balance of zap", zap.balance())
@@ -372,7 +375,7 @@ def test_zap_eth(
     # test our zap out, approve it to spend our tokens
     vault_balance = vaultTarget.balanceOf(whale)
     vaultTarget.approve(zap, 2 ** 256 - 1, {"from": whale})
-    zap.zapOut(vaultTarget, vault_balance, synth, {"from": whale})
+    zap.zapOut(vaultTarget, vault_balance, {"from": whale})
     seth_balance = sETH.balanceOf(whale)
     assert seth_balance > 0
     print("sETH Balance", seth_balance / 1e18)

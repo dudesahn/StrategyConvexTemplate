@@ -817,7 +817,7 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
     }
 
     // set the maximum gas price we want to pay for a harvest/tend
-    function setGasPrice(uint256 _gasPrice) external onlyAuthorized {
-        gasPrice = _gasPrice;
+    function setGasPrice(uint256 _maxGasPrice) external onlyAuthorized {
+        maxGasPrice = _maxGasPrice;
     }
 }

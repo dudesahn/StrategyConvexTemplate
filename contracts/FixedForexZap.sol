@@ -62,7 +62,6 @@ contract FixedForexZap {
     ISystemStatus internal constant systemStatus =
         ISystemStatus(0x1c86B3CDF2a60Ae3a574f7f71d44E2C50BDdB87E); // this is how we check if our market is closed
 
-    bytes32 internal synthCurrencyKey;
     bytes32 internal constant TRACKING_CODE = "YEARN"; // this is our referral code for SNX volume incentives
     bytes32 internal constant CONTRACT_SYNTHETIX = "Synthetix";
     bytes32 internal constant CONTRACT_EXCHANGER = "Exchanger";
@@ -159,26 +158,46 @@ contract FixedForexZap {
 
     /* ========== ZAP IN ========== */
 
-    // zap our tokens for sETH
-    function zapInTokens(
+    // zap in for sETH
+    function zapIn(
         address _inputToken,
         uint256 _amount,
-        uint256 _forex
-    ) external {
-        // check if our forex markets are open
-        require(!isMarketClosed(), "Forex markets currently closed");
-        require(_amount > 0, "Invalid token amount");
+        address _vaultToken
+    ) public payable {
+        require(_amount > 0 || msg.value > 0); // dev: invalid token or ETH amount
 
-        //transfer token
-        IERC20(_inputToken).safeTransferFrom(
-            msg.sender,
-            address(this),
-            _amount
-        );
-        if (
+        if (_inputToken == 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE) {
+            // if we start with ETH
+            //convert ETH to WETH
+            IWeth weth = IWeth(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+            _amount = msg.value;
+            weth.deposit{value: _amount}();
+
+            // swap for sETH
+            IUniV3(uniswapv3).exactInput(
+                IUniV3.ExactInputParams(
+                    abi.encodePacked(
+                        address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2), // weth
+                        uint24(500),
+                        address(0x5e74C9036fb86BD7eCdcb084a0673EFc32eA31cb) // sETH
+                    ),
+                    address(this),
+                    block.timestamp,
+                    _amount,
+                    uint256(1)
+                )
+            );
+        } else if (
             // this is if we start with WETH
             _inputToken == address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)
         ) {
+            //transfer token
+            IERC20(_inputToken).safeTransferFrom(
+                msg.sender,
+                address(this),
+                _amount
+            );
+
             // swap for sETH
             IUniV3(uniswapv3).exactInput(
                 IUniV3.ExactInputParams(
@@ -197,6 +216,13 @@ contract FixedForexZap {
             // this is DAI, 0.3% is much better liquidity sadly
             _inputToken == address(0x6B175474E89094C44Da98b954EedeAC495271d0F)
         ) {
+            //transfer token
+            IERC20(_inputToken).safeTransferFrom(
+                msg.sender,
+                address(this),
+                _amount
+            );
+
             // swap for sETH
             IUniV3(uniswapv3).exactInput(
                 IUniV3.ExactInputParams(
@@ -214,6 +240,13 @@ contract FixedForexZap {
                 )
             );
         } else {
+            //transfer token
+            IERC20(_inputToken).safeTransferFrom(
+                msg.sender,
+                address(this),
+                _amount
+            );
+
             // this is if we start with any token but WETH or DAI
             IUniV3(uniswapv3).exactInput(
                 IUniV3.ExactInputParams(
@@ -235,113 +268,99 @@ contract FixedForexZap {
         IERC20 seth = IERC20(0x5e74C9036fb86BD7eCdcb084a0673EFc32eA31cb);
         uint256 _sEthBalance = seth.balanceOf(address(this));
 
-        // generate our synth currency key
-        if (_forex == 0) {
+        // generate our synth currency key to check if enough time has elapsed
+        address _synth;
+        bytes32 _synthCurrencyKey;
+        if (_vaultToken == 0x1b905331F7dE2748F4D6a0678e1521E20347643F) {
             // sAUD
-            synthCurrencyKey = "sAUD";
-        } else if (_forex == 1) {
+            _synth = 0xF48e200EAF9906362BB1442fca31e0835773b8B4;
+            _synthCurrencyKey = "sAUD";
+        } else if (_vaultToken == 0x490bD0886F221A5F79713D3E84404355A9293C50) {
             // sCHF
-            synthCurrencyKey = "sCHF";
-        } else if (_forex == 2) {
+            _synth = 0x0F83287FF768D1c1e17a42F44d644D7F22e8ee1d;
+            _synthCurrencyKey = "sCHF";
+        } else if (_vaultToken == 0x67e019bfbd5a67207755D04467D6A70c0B75bF60) {
             // sEUR
-            synthCurrencyKey = "sEUR";
-        } else if (_forex == 3) {
+            _synth = 0xD71eCFF9342A5Ced620049e616c5035F1dB98620;
+            _synthCurrencyKey = "sEUR";
+        } else if (_vaultToken == 0x595a68a8c9D5C230001848B69b1947ee2A607164) {
             // sGBP
-            synthCurrencyKey = "sGBP";
-        } else if (_forex == 4) {
+            _synth = 0x97fe22E7341a0Cd8Db6F6C021A24Dc8f4DAD855F;
+            _synthCurrencyKey = "sGBP";
+        } else if (_vaultToken == 0x59518884EeBFb03e90a18ADBAAAB770d4666471e) {
             // sJPY
-            synthCurrencyKey = "sJPY";
-        } else {
+            _synth = 0xF6b1C627e95BFc3c1b4c9B825a032Ff0fBf3e07d;
+            _synthCurrencyKey = "sJPY";
+        } else if (_vaultToken == 0x528D50dC9a333f01544177a924893FA1F5b9F748) {
             // sKRW
-            synthCurrencyKey = "sKRW";
+            _synth = 0x269895a3dF4D73b077Fc823dD6dA1B95f72Aaf9B;
+            _synthCurrencyKey = "sKRW";
+        } else {
+            require(false); // dev: not a Fixed Forex vault token
         }
-        // swap our sETH for our underlying synth
-        exchangeSEthToSynth(_sEthBalance, synthCurrencyKey);
-    }
 
-    // zap our tokens for sETH
-    function zapInEth(uint256 _forex) external payable {
         // check if our forex markets are open
-        require(!isMarketClosed(), "Forex markets currently closed");
+        require(!isMarketClosed(_synth)); // dev: synthetix forex markets currently closed
 
-        //convert ETH to WETH
-        IWeth weth = IWeth(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-        uint256 _amount = msg.value;
-        require(_amount > 0, "Invalid ETH amount");
-        weth.deposit{value: _amount}();
-
-        // swap for sETH
-        IUniV3(uniswapv3).exactInput(
-            IUniV3.ExactInputParams(
-                abi.encodePacked(
-                    address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2), // weth
-                    uint24(500),
-                    address(0x5e74C9036fb86BD7eCdcb084a0673EFc32eA31cb) // sETH
-                ),
-                address(this),
-                block.timestamp,
-                _amount,
-                uint256(1)
-            )
-        );
-        // check our output balance of sETH
-        IERC20 seth = IERC20(0x5e74C9036fb86BD7eCdcb084a0673EFc32eA31cb);
-        uint256 _sEthBalance = seth.balanceOf(address(this));
-
-        // generate our synth currency key
-        if (_forex == 0) {
-            // sAUD
-            synthCurrencyKey = "sAUD";
-        } else if (_forex == 1) {
-            // sCHF
-            synthCurrencyKey = "sCHF";
-        } else if (_forex == 2) {
-            // sEUR
-            synthCurrencyKey = "sEUR";
-        } else if (_forex == 3) {
-            // sGBP
-            synthCurrencyKey = "sGBP";
-        } else if (_forex == 4) {
-            // sJPY
-            synthCurrencyKey = "sJPY";
-        } else {
-            // sKRW
-            synthCurrencyKey = "sKRW";
-        }
         // swap our sETH for our underlying synth
-        exchangeSEthToSynth(_sEthBalance, synthCurrencyKey);
+        exchangeSEthToSynth(_sEthBalance, _synthCurrencyKey);
     }
 
-    function exchangeSEthToSynth(uint256 _amount, bytes32 _currencyKey)
+    function exchangeSEthToSynth(uint256 _amount, bytes32 _synthCurrencyKey)
         internal
     {
         // swap amount of sETH for Synth
-        require(_amount > 0, "Can't swap zero");
+        require(_amount > 0); // dev: invalid token or ETH amount
 
         bytes32 _sethCurrencyKey = "sETH";
 
         _synthetix().exchangeWithTrackingForInitiator(
             _sethCurrencyKey,
             _amount,
-            _currencyKey,
+            _synthCurrencyKey,
             address(0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7),
             TRACKING_CODE
         );
     }
 
     function synthToVault(address _synth, uint256 _amount) external {
-        // deposit our sToken to Curve if our trade has finalized
-        require(
-            checkWaitingPeriod(msg.sender),
-            "Wait ~6mins for trade to finalize"
-        );
-        require(_amount > 0, "Can't zap zero");
+        require(_amount > 0); // dev: invalid token or ETH amount
+        // make sure the user has the synth needed
         address _user = msg.sender;
+        IERC20 synth = IERC20(_synth);
+        uint256 _synthBalance = synth.balanceOf(_user);
+        require(_synthBalance > 0); // dev: you don't hold any of the specified synth
+        synth.transferFrom(_user, address(this), _amount);
+
+        // generate our synth currency key first to check if enough time has elapsed
+        bytes32 _synthCurrencyKey;
+        if (_synth == 0xF48e200EAF9906362BB1442fca31e0835773b8B4) {
+            // sAUD
+            _synthCurrencyKey = "sAUD";
+        } else if (_synth == 0x0F83287FF768D1c1e17a42F44d644D7F22e8ee1d) {
+            // sCHF
+            _synthCurrencyKey = "sCHF";
+        } else if (_synth == 0xD71eCFF9342A5Ced620049e616c5035F1dB98620) {
+            // sEUR
+            _synthCurrencyKey = "sEUR";
+        } else if (_synth == 0x97fe22E7341a0Cd8Db6F6C021A24Dc8f4DAD855F) {
+            // sGBP
+            _synthCurrencyKey = "sGBP";
+        } else if (_synth == 0xF6b1C627e95BFc3c1b4c9B825a032Ff0fBf3e07d) {
+            // sJPY
+            _synthCurrencyKey = "sJPY";
+        } else if (_synth == 0x269895a3dF4D73b077Fc823dD6dA1B95f72Aaf9B) {
+            // sKRW
+            _synthCurrencyKey = "sKRW";
+        } else {
+            require(false); // dev: not a Fixed Forex synth
+        }
+
+        // deposit our sToken to Curve but only if our trade has finalized
+        require(checkWaitingPeriod(msg.sender, _synthCurrencyKey)); // dev: wait ~6mins for trade to finalize on synthetix
 
         if (_synth == 0xF48e200EAF9906362BB1442fca31e0835773b8B4) {
             // sAUD
-            IERC20 synth = IERC20(_synth);
-            synth.transferFrom(_user, address(this), _amount);
             ICurveFi curve =
                 ICurveFi(0x3F1B0278A9ee595635B61817630cC19DE792f506); // Curve LP/Pool
             curve.add_liquidity([0, _amount], 0);
@@ -352,8 +371,6 @@ contract FixedForexZap {
             );
         } else if (_synth == 0x0F83287FF768D1c1e17a42F44d644D7F22e8ee1d) {
             // sCHF
-            IERC20 synth = IERC20(_synth);
-            synth.transferFrom(_user, address(this), _amount);
             ICurveFi curve =
                 ICurveFi(0x9c2C8910F113181783c249d8F6Aa41b51Cde0f0c); // Curve LP/Pool
             curve.add_liquidity([0, _amount], 0);
@@ -364,8 +381,6 @@ contract FixedForexZap {
             );
         } else if (_synth == 0xD71eCFF9342A5Ced620049e616c5035F1dB98620) {
             // sEUR
-            IERC20 synth = IERC20(_synth);
-            synth.transferFrom(_user, address(this), _amount);
             ICurveFi curve =
                 ICurveFi(0x19b080FE1ffA0553469D20Ca36219F17Fcf03859); // Curve LP/Pool
             curve.add_liquidity([0, _amount], 0);
@@ -376,8 +391,6 @@ contract FixedForexZap {
             );
         } else if (_synth == 0x97fe22E7341a0Cd8Db6F6C021A24Dc8f4DAD855F) {
             // sGBP
-            IERC20 synth = IERC20(_synth);
-            synth.transferFrom(_user, address(this), _amount);
             ICurveFi curve =
                 ICurveFi(0xD6Ac1CB9019137a896343Da59dDE6d097F710538); // Curve LP/Pool
             curve.add_liquidity([0, _amount], 0);
@@ -388,8 +401,6 @@ contract FixedForexZap {
             );
         } else if (_synth == 0xF6b1C627e95BFc3c1b4c9B825a032Ff0fBf3e07d) {
             // sJPY
-            IERC20 synth = IERC20(_synth);
-            synth.transferFrom(_user, address(this), _amount);
             ICurveFi curve =
                 ICurveFi(0x8818a9bb44Fbf33502bE7c15c500d0C783B73067); // Curve LP/Pool
             curve.add_liquidity([0, _amount], 0);
@@ -400,8 +411,6 @@ contract FixedForexZap {
             );
         } else {
             // sKRW
-            IERC20 synth = IERC20(_synth);
-            synth.transferFrom(_user, address(this), _amount);
             ICurveFi curve =
                 ICurveFi(0x8461A004b50d321CB22B7d034969cE6803911899); // Curve LP/Pool
             curve.add_liquidity([0, _amount], 0);
@@ -416,14 +425,8 @@ contract FixedForexZap {
     /* ========== ZAP OUT ========== */
 
     // zap our tokens for sETH
-    function zapOut(
-        address _vaultToken,
-        uint256 _amount,
-        address _synth
-    ) external {
-        // check if our forex markets are open
-        require(!isMarketClosed(), "Forex markets currently closed");
-        require(_amount > 0, "Invalid token amount");
+    function zapOut(address _vaultToken, uint256 _amount) external {
+        require(_amount > 0); // dev: invalid token or ETH amount
         address _user = msg.sender;
 
         // withdraw from our vault
@@ -432,48 +435,56 @@ contract FixedForexZap {
         _vault.withdraw();
 
         // withdraw from our Curve pool
-        ICurveFi curve = ICurveFi(_vault.token());
+        ICurveFi curve = ICurveFi(_vault.token()); // our curve pool is the underlying token for our vault
         uint256 _poolBalance = curve.balanceOf(address(this));
         curve.remove_liquidity_one_coin(_poolBalance, 1, 0);
 
         // check our output balance of synth
+        address _synth = curve.coins(1); // our synth is the second token in each of the curve pools
         IERC20 synth = IERC20(_synth);
         uint256 _synthBalance = synth.balanceOf(address(this));
 
-        // generate our synth currency key
-        if (_synth == 0xF48e200EAF9906362BB1442fca31e0835773b8B4) {
+        // generate our synth currency key to check if enough time has elapsed
+        bytes32 _synthCurrencyKey;
+        if (_vaultToken == 0x1b905331F7dE2748F4D6a0678e1521E20347643F) {
             // sAUD
-            synthCurrencyKey = "sAUD";
-        } else if (_synth == 0x0F83287FF768D1c1e17a42F44d644D7F22e8ee1d) {
+            _synthCurrencyKey = "sAUD";
+        } else if (_vaultToken == 0x490bD0886F221A5F79713D3E84404355A9293C50) {
             // sCHF
-            synthCurrencyKey = "sCHF";
-        } else if (_synth == 0xD71eCFF9342A5Ced620049e616c5035F1dB98620) {
+            _synthCurrencyKey = "sCHF";
+        } else if (_vaultToken == 0x67e019bfbd5a67207755D04467D6A70c0B75bF60) {
             // sEUR
-            synthCurrencyKey = "sEUR";
-        } else if (_synth == 0x97fe22E7341a0Cd8Db6F6C021A24Dc8f4DAD855F) {
+            _synthCurrencyKey = "sEUR";
+        } else if (_vaultToken == 0x595a68a8c9D5C230001848B69b1947ee2A607164) {
             // sGBP
-            synthCurrencyKey = "sGBP";
-        } else if (_synth == 0xF6b1C627e95BFc3c1b4c9B825a032Ff0fBf3e07d) {
+            _synthCurrencyKey = "sGBP";
+        } else if (_vaultToken == 0x59518884EeBFb03e90a18ADBAAAB770d4666471e) {
             // sJPY
-            synthCurrencyKey = "sJPY";
-        } else {
+            _synthCurrencyKey = "sJPY";
+        } else if (_vaultToken == 0x528D50dC9a333f01544177a924893FA1F5b9F748) {
             // sKRW
-            synthCurrencyKey = "sKRW";
+            _synthCurrencyKey = "sKRW";
+        } else {
+            require(false); // dev: not a Fixed Forex vault token
         }
+
+        // check if our forex markets are open
+        require(!isMarketClosed(_synth)); // dev: synthetix forex markets currently closed
+
         // swap our sETH for our underlying synth
-        exchangeSynthToSEth(_synthBalance, synthCurrencyKey);
+        exchangeSynthToSEth(_synthBalance, _synthCurrencyKey);
     }
 
-    function exchangeSynthToSEth(uint256 _amount, bytes32 _currencyKey)
+    function exchangeSynthToSEth(uint256 _amount, bytes32 _synthCurrencyKey)
         internal
     {
         // swap amount of sETH for Synth
-        require(_amount > 0, "Can't swap zero");
+        require(_amount > 0); // dev: can't swap zero
 
         bytes32 _sethCurrencyKey = "sETH";
 
         _synthetix().exchangeWithTrackingForInitiator(
-            _currencyKey,
+            _synthCurrencyKey,
             _amount,
             _sethCurrencyKey,
             address(0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7),
@@ -481,28 +492,30 @@ contract FixedForexZap {
         );
     }
 
-    function sETHToWant(address _target, uint256 _amount) external {
+    function sETHToWant(address _targetToken, uint256 _amount) external {
         // make sure that our synth trade has finalized
-        require(
-            checkWaitingPeriod(msg.sender),
-            "Wait ~6mins for trade to finalize"
-        );
-        require(_amount > 0, "Can't swap zero");
+        bytes32 _sethCurrencyKey = "sETH";
+        require(checkWaitingPeriod(msg.sender, _sethCurrencyKey)); // dev: wait ~6mins for trade to finalize on synthetix
+        require(_amount > 0); // dev: invalid token or ETH amount
 
         //transfer sETH to zap
         address payable _user = msg.sender;
         IERC20 seth = IERC20(0x5e74C9036fb86BD7eCdcb084a0673EFc32eA31cb);
+        uint256 _sethBalance = seth.balanceOf(_user);
+        require(_sethBalance > 0); // dev: you don't hold any sETH
         seth.safeTransferFrom(_user, address(this), _amount);
 
         // this is if we want to end up with WETH
-        if (_target == address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)) {
+        if (
+            _targetToken == address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2)
+        ) {
             // swap for sETH
             IUniV3(uniswapv3).exactInput(
                 IUniV3.ExactInputParams(
                     abi.encodePacked(
                         address(seth),
                         uint24(500),
-                        address(_target)
+                        address(_targetToken)
                     ),
                     address(_user),
                     block.timestamp,
@@ -511,7 +524,7 @@ contract FixedForexZap {
                 )
             );
         } else if (
-            _target == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)
+            _targetToken == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)
         ) {
             // swap for WETH
             IUniV3(uniswapv3).exactInput(
@@ -537,7 +550,7 @@ contract FixedForexZap {
             }
         } else if (
             // for DAI it's best to use 0.3% fee route
-            _target == address(0x6B175474E89094C44Da98b954EedeAC495271d0F)
+            _targetToken == address(0x6B175474E89094C44Da98b954EedeAC495271d0F)
         ) {
             // swap for DAI
             uint256 output =
@@ -548,7 +561,7 @@ contract FixedForexZap {
                             uint24(500),
                             address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2),
                             uint24(3000),
-                            address(_target)
+                            address(_targetToken)
                         ),
                         address(_user),
                         block.timestamp,
@@ -565,7 +578,7 @@ contract FixedForexZap {
                         uint24(500),
                         address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2),
                         uint24(500),
-                        address(_target)
+                        address(_targetToken)
                     ),
                     address(_user),
                     block.timestamp,
@@ -593,7 +606,7 @@ contract FixedForexZap {
         return IExchanger(resolver().getAddress(CONTRACT_EXCHANGER));
     }
 
-    function checkWaitingPeriod(address _user)
+    function checkWaitingPeriod(address _user, bytes32 _synthCurrencyKey)
         internal
         view
         returns (bool freeToMove)
@@ -602,18 +615,40 @@ contract FixedForexZap {
             // check if it's been >5 mins since we traded our sETH for our synth
             _exchanger().maxSecsLeftInWaitingPeriod(
                 address(_user),
-                synthCurrencyKey
+                _synthCurrencyKey
             ) == 0;
     }
 
-    function isMarketClosed() internal returns (bool) {
+    function isMarketClosed(address _synth) public view returns (bool) {
+        // keep this public so we can always check if markets are open
+        bytes32 _synthCurrencyKey;
+        if (_synth == 0xF48e200EAF9906362BB1442fca31e0835773b8B4) {
+            // sAUD
+            _synthCurrencyKey = "sAUD";
+        } else if (_synth == 0x0F83287FF768D1c1e17a42F44d644D7F22e8ee1d) {
+            // sCHF
+            _synthCurrencyKey = "sCHF";
+        } else if (_synth == 0xD71eCFF9342A5Ced620049e616c5035F1dB98620) {
+            // sEUR
+            _synthCurrencyKey = "sEUR";
+        } else if (_synth == 0x97fe22E7341a0Cd8Db6F6C021A24Dc8f4DAD855F) {
+            // sGBP
+            _synthCurrencyKey = "sGBP";
+        } else if (_synth == 0xF6b1C627e95BFc3c1b4c9B825a032Ff0fBf3e07d) {
+            // sJPY
+            _synthCurrencyKey = "sJPY";
+        } else {
+            // sKRW
+            _synthCurrencyKey = "sKRW";
+        }
+
         // set up our arrays to use
         bool[] memory tradingSuspended;
         bytes32[] memory synthArray;
 
         // use our synth key
         synthArray = new bytes32[](1);
-        synthArray[0] = synthCurrencyKey;
+        synthArray[0] = _synthCurrencyKey;
 
         // check if trading is open or not. true = market is closed
         (tradingSuspended, ) = systemStatus.getSynthExchangeSuspensions(

@@ -24,6 +24,8 @@ interface IGauge {
 interface ICurveFi is IERC20 {
     function get_virtual_price() external view returns (uint256);
 
+    function coins(uint256) external view returns (address);
+
     function add_liquidity(
         // EURt
         uint256[2] calldata amounts,
