@@ -278,6 +278,7 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
     uint24 public uniCrvFee; // this is equal to 1%, can change this later if a different path becomes more optimal
     uint256 public lastTendTime; // this is the timestamp that our last tend was called
     uint256 public maxGasPrice; // this is the max gas price we want our keepers to pay for harvests/tends
+    IBaseFee public _baseFeeOracle; // ******* REMOVE THIS AFTER TESTING *******
 
     // check for cloning
     bool internal isOriginal = true;
@@ -417,6 +418,12 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
         // set our paths
         crvPath = [address(crv), address(weth)];
         convexTokenPath = [address(convexToken), address(weth)];
+
+        // set our last tend time to the deployment block
+        lastTendTime = block.timestamp;
+
+        // set our max gas price
+        maxGasPrice = 100 * 1e9;
     }
 
     /* ========== VARIABLE FUNCTIONS ========== */
@@ -712,8 +719,7 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
     }
 
     function readBaseFee() internal view returns (uint256 baseFee) {
-        IBaseFee _baseFeeOracle =
-            IBaseFee(0xf8d0Ec04e94296773cE20eFbeeA82e76220cD549);
+        // IBaseFee _baseFeeOracle = IBaseFee(0xf8d0Ec04e94296773cE20eFbeeA82e76220cD549); ******* UNCOMMENT THIS AFTER TESTING *******
         return _baseFeeOracle.basefee_global();
     }
 
@@ -816,8 +822,13 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
         uniCrvFee = _fee;
     }
 
-    // set the maximum gas price we want to pay for a harvest/tend
+    // set the maximum gas price we want to pay for a harvest/tend in gwei
     function setGasPrice(uint256 _maxGasPrice) external onlyAuthorized {
-        maxGasPrice = _maxGasPrice;
+        maxGasPrice = _maxGasPrice.mul(1e9);
+    }
+
+    // set the maximum gas price we want to pay for a harvest/tend in gwei, ******* REMOVE THIS AFTER TESTING *******
+    function setGasOracle(address _gasOracle) external onlyAuthorized {
+        _baseFeeOracle = IBaseFee(_gasOracle);
     }
 }
