@@ -69,8 +69,6 @@ contract FixedForexZap {
     address internal constant uniswapv3 =
         0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
-    uint256 public setter;
-
     /* ========== CONSTRUCTOR ========== */
 
     constructor() public {
