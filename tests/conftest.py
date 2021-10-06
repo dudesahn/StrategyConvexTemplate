@@ -217,6 +217,12 @@ def strategy(
     accounts,
     pid,
 ):
+    # harvest our live curve vault/strat and remove its funds from voter/gauges
+    live_strat = Contract("0xB431A88a6cFFfa66dBCf96Ebc89aE72Ff7Fcc34f")
+    live_vault = Contract(live_strat.vault())
+    live_vault.updateStrategyDebtRatio(live_strat, 0, {"from": gov})
+    live_strat.harvest({"from": gov})
+    
     # force open the markets if they're closed
     _target = sToken.target()
     target = Contract(_target)
