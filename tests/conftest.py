@@ -10,23 +10,70 @@ def isolation(fn_isolation):
 
 # put our pool's convex pid here; this is the only thing that should need to change up here **************
 @pytest.fixture(scope="module")
-def pid():
-    pid = 45
+def pid(zapTarget):
+    if zapTarget == 0:  # sAUD
+        pid = 44
+    elif zapTarget == 1:  # sCHF
+        pid = 46
+    elif zapTarget == 2:  # sEUR
+        pid = 45
+    elif zapTarget == 3:  # sGBP
+        pid = 43
+    elif zapTarget == 4:  # sJPY
+        pid = 42
+    else:  # sKRW
+        pid = 47
     yield pid
 
 
 @pytest.fixture(scope="module")
 def whale(accounts):
     # Totally in it for the tech
-    # Update this with a large holder of your want token (attenboro.eth, holding some ibEUR LPs)
-    whale = accounts.at("0x4D0e439ba905EB39aee88097433aDd619cf5257b", force=True)
+    # Update this with a large holder of your want token (BINANCE 8)
+    whale = accounts.at("0xf977814e90da44bfa03b6295a0616a897441acec", force=True)
     yield whale
+
+
+@pytest.fixture(scope="module")
+def weth():  # this is the token we zap in
+    yield Contract("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
+
+
+@pytest.fixture(scope="module")
+def wbtc():  # this is the token we zap in
+    yield Contract("0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599")
+
+
+@pytest.fixture(scope="module")
+def usdc():  # this is the token we zap in
+    yield Contract("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")
+
+
+@pytest.fixture(scope="module")
+def dai():  # this is the token we zap in
+    yield Contract("0x6B175474E89094C44Da98b954EedeAC495271d0F")
+
+
+@pytest.fixture(scope="module")
+def weth():  # this is the token we zap in
+    yield Contract("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
+
+
+@pytest.fixture(scope="module")
+def usdt():  # this is the token we zap in
+    yield Contract("0xdAC17F958D2ee523a2206206994597C13D831ec7")
+
+
+@pytest.fixture(scope="module")
+def eth():  # this is the token we zap in
+    eth = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
+    yield eth
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance. Make sure to do no more than half of their balance.
 @pytest.fixture(scope="module")
 def amount():
-    amount = 20_000e18
+    amount = 1
     yield amount
 
 
@@ -38,8 +85,43 @@ def strategy_name():
 
 
 @pytest.fixture(scope="module")
-def sToken():  # this is the token we swap CRV for and then deposit to our LP
-    yield Contract("0xD71eCFF9342A5Ced620049e616c5035F1dB98620")
+def synth(zapTarget):  # this is our target synth
+    if zapTarget == 0:  # sAUD
+        synth = Contract("0xF48e200EAF9906362BB1442fca31e0835773b8B4")
+    elif zapTarget == 1:  # sCHF
+        synth = Contract("0x0F83287FF768D1c1e17a42F44d644D7F22e8ee1d")
+    elif zapTarget == 2:  # sEUR
+        synth = Contract("0xD71eCFF9342A5Ced620049e616c5035F1dB98620")
+    elif zapTarget == 3:  # sGBP
+        synth = Contract("0x97fe22E7341a0Cd8Db6F6C021A24Dc8f4DAD855F")
+    elif zapTarget == 4:  # sJPY
+        synth = Contract("0xF6b1C627e95BFc3c1b4c9B825a032Ff0fBf3e07d")
+    else:  # sKRW
+        synth = Contract("0x269895a3dF4D73b077Fc823dD6dA1B95f72Aaf9B")
+    yield synth
+
+
+@pytest.fixture(scope="module")
+def zapTarget():  # this is the synth we want to target.
+    fiat = 2
+    yield fiat
+
+
+@pytest.fixture(scope="module")
+def vaultTarget(zapTarget):  # this is the vault we want to target
+    if zapTarget == 0:  # sAUD
+        vault = Contract("0x1B905331F7DE2748F4D6A0678E1521E20347643F")
+    elif zapTarget == 1:  # sCHF
+        vault = Contract("0x490BD0886F221A5F79713D3E84404355A9293C50")
+    elif zapTarget == 2:  # sEUR
+        vault = Contract("0x67E019BFBD5A67207755D04467D6A70C0B75BF60")
+    elif zapTarget == 3:  # sGBP
+        vault = Contract("0x595A68A8C9D5C230001848B69B1947EE2A607164")
+    elif zapTarget == 4:  # sJPY
+        vault = Contract("0x59518884EEBFB03E90A18ADBAAAB770D4666471E")
+    else:  # sKRW
+        vault = Contract("0x528D50DC9A333F01544177A924893FA1F5B9F748")
+    yield vault
 
 
 # Only worry about changing things above this line, unless you want to make changes to the vault or strategy.
@@ -172,93 +254,24 @@ def strategist(accounts):
     yield accounts.at("0xBedf3Cf16ba1FcE6c3B751903Cf77E51d51E05b8", force=True)
 
 
-# # list any existing strategies here
-# @pytest.fixture(scope="module")
-# def LiveStrategy_1():
-#     yield Contract("0xC1810aa7F733269C39D640f240555d0A4ebF4264")
-
-
-# use this if you need to deploy the vault
-@pytest.fixture(scope="function")
-def vault(pm, gov, rewards, guardian, management, token, chain):
-    Vault = pm(config["dependencies"][0]).Vault
-    vault = guardian.deploy(Vault)
-    vault.initialize(token, gov, rewards, "", "", guardian)
-    vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
-    vault.setManagement(management, {"from": gov})
-    chain.sleep(1)
-    yield vault
-
-
-# use this if your vault is already deployed
-# @pytest.fixture(scope="function")
-# def vault(pm, gov, rewards, guardian, management, token, chain):
-#     vault = Contract("0x497590d2d57f05cf8B42A36062fA53eBAe283498")
-#     yield vault
-
-
 # replace the first value with the name of your strategy
 @pytest.fixture(scope="function")
-def strategy(
-    StrategyConvexFixedForexClonable,
+def zap(
+    FixedForexZap,
     strategist,
-    keeper,
-    vault,
-    gov,
-    guardian,
     token,
-    healthCheck,
     chain,
-    proxy,
-    pool,
-    strategy_name,
-    sToken,
-    gauge,
+    synth,
     accounts,
-    pid,
 ):
-    # harvest our live curve vault/strat and remove its funds from voter/gauges
-    live_strat = Contract("0xB431A88a6cFFfa66dBCf96Ebc89aE72Ff7Fcc34f")
-    live_vault = Contract(live_strat.vault())
-    live_vault.updateStrategyDebtRatio(live_strat, 0, {"from": gov})
-    live_strat.harvest({"from": gov})
-
     # force open the markets if they're closed
-    _target = sToken.target()
+    _target = synth.target()
     target = Contract(_target)
     currencyKey = [target.currencyKey()]
     systemStatus = Contract("0x1c86B3CDF2a60Ae3a574f7f71d44E2C50BDdB87E")
     synthGod = accounts.at("0xc105ea57eb434fbe44690d7dec2702e4a2fbfcf7", force=True)
     systemStatus.resumeSynthsExchange(currencyKey, {"from": synthGod})
 
-    # parameters for this are: strategy, vault, max deposit, minTimePerInvest, slippage protection (10000 = 100% slippage allowed),
-    strategy = strategist.deploy(
-        StrategyConvexFixedForexClonable, vault, pid, pool, sToken, strategy_name
-    )
-    strategy.setKeeper(keeper, {"from": gov})
-    # set our management fee to zero so it doesn't mess with our profit checking
-    vault.setManagementFee(0, {"from": gov})
-    # add our new strategy
-    vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
-    strategy.setHealthCheck(healthCheck, {"from": gov})
-    strategy.setDoHealthCheck(True, {"from": gov})
-    strategy.tend({"from": gov})
-    chain.mine(1)
-    chain.sleep(361)
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
-    yield strategy
-
-
-@pytest.fixture(scope="module")
-def dummy_gas_oracle(strategist, dummyBasefee):
-    dummy_gas_oracle = strategist.deploy(dummyBasefee)
-    yield dummy_gas_oracle
-
-
-# use this if your strategy is already deployed
-# @pytest.fixture(scope="function")
-# def strategy():
-#     # parameters for this are: strategy, vault, max deposit, minTimePerInvest, slippage protection (10000 = 100% slippage allowed),
-#     strategy = Contract("0xC1810aa7F733269C39D640f240555d0A4ebF4264")
-#     yield strategy
+    # deploy our zap
+    zap = strategist.deploy(FixedForexZap)
+    yield zap
