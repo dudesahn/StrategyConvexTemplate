@@ -222,7 +222,7 @@ def strategy(
     live_vault = Contract(live_strat.vault())
     live_vault.updateStrategyDebtRatio(live_strat, 0, {"from": gov})
     live_strat.harvest({"from": gov})
-    
+
     # force open the markets if they're closed
     _target = sToken.target()
     target = Contract(_target)
@@ -248,6 +248,7 @@ def strategy(
     strategy.harvest({"from": gov})
     chain.sleep(1)
     yield strategy
+
 
 @pytest.fixture(scope="module")
 def dummy_gas_oracle(strategist, dummyBasefee):

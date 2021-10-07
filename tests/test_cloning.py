@@ -62,6 +62,20 @@ def test_cloning(
             {"from": gov},
         )
 
+    ## shouldn't be able to clone a clone
+    with brownie.reverts():
+        newStrategy.cloneCurveibFF(
+            vault,
+            strategist,
+            rewards,
+            keeper,
+            pool,
+            gauge,
+            sToken,
+            strategy_name,
+            {"from": gov},
+        )
+
     # revoke and send all funds back to vault
     vault.revokeStrategy(strategy, {"from": gov})
     strategy.tend({"from": gov})

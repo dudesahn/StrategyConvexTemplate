@@ -491,7 +491,7 @@ def test_odds_and_ends_inactive_strat(
 
     ## move our funds out of the strategy
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
-    # sleep for an hour since univ3 is weird
+    # sleep for an hour
     chain.sleep(3600)
     strategy.tend({"from": gov})
     chain.mine(1)
@@ -541,3 +541,98 @@ def test_odds_and_ends_inactive_strat(
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be true.", tx)
     assert tx == True
+
+
+# this one tests how claimAndSell() responds when the forex markets are closed
+def test_odds_and_ends_closed_markets(
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    voter,
+    amount,
+    dummy_gas_oracle,
+    sToken,
+    accounts,
+):
+    # force close the markets if they're open
+    _target = sToken.target()
+    target = Contract(_target)
+    currencyKey = [target.currencyKey()]
+    systemStatus = Contract("0x1c86B3CDF2a60Ae3a574f7f71d44E2C50BDdB87E")
+    synthGod = accounts.at("0xc105ea57eb434fbe44690d7dec2702e4a2fbfcf7", force=True)
+    systemStatus.suspendSynthsExchange(currencyKey, 2, {"from": synthGod})
+
+    ## deposit to the vault after approving
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    vault.deposit(amount, {"from": whale})
+    chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+
+    # sleep for an hour to get some profit
+    chain.sleep(3600)
+    chain.mine(1)
+
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+
+
+# this one tests if we don't have any CRV to send to voter or any left over after sending
+def test_odds_and_ends_weird_amounts(
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    voter,
+    amount,
+    dummy_gas_oracle,
+):
+
+    ## deposit to the vault after approving
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    vault.deposit(amount, {"from": whale})
+    chain.sleep(1)
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+
+    # sleep for an hour to get some profit
+    chain.sleep(3600)
+    chain.mine(1)
+
+    # take 100% of our CRV to the voter
+    strategy.setKeepCRV(10000, {"from": gov})
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+
+    # sleep for an hour to get some profit
+    chain.sleep(3600)
+    chain.mine(1)
+
+    # take 0% of our CRV to the voter
+    strategy.setKeepCRV(0, {"from": gov})
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)

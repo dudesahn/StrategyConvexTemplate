@@ -276,7 +276,9 @@ def test_zap_usdt(
     accounts,
 ):
     ## deposit to the vault after approving
-    whale = accounts.at("0x05bE33684aC76dD47336b8B48AdD0491429D5C92", force=True) # add this because binance has no USDT anymore in that wallet
+    whale = accounts.at(
+        "0x05bE33684aC76dD47336b8B48AdD0491429D5C92", force=True
+    )  # add this because binance has no USDT anymore in that wallet
     startingWhale = usdt.balanceOf(whale)
 
     # adjust our amount for decimals

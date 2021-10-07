@@ -4,7 +4,9 @@ from brownie import config
 import math
 
 
-def test_base_strategy(gov, token, vault, strategist, whale, strategy, chain, amount, dummy_gas_oracle):
+def test_base_strategy(
+    gov, token, vault, strategist, whale, strategy, chain, amount, dummy_gas_oracle
+):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})

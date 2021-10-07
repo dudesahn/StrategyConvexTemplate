@@ -820,14 +820,19 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
     }
 
     /* ========== SETTERS ========== */
+    // set the maximum gas price we want to pay for a harvest/tend in gwei
+    function setGasPrice(uint256 _maxGasPrice) external onlyAuthorized {
+        maxGasPrice = _maxGasPrice.mul(1e9);
+    }
+
     // set the fee pool we'd like to swap through for if we're swapping CRV on UniV3
     function setUniCrvFee(uint24 _fee) external onlyAuthorized {
         uniCrvFee = _fee;
     }
 
-    // set the maximum gas price we want to pay for a harvest/tend in gwei
-    function setGasPrice(uint256 _maxGasPrice) external onlyAuthorized {
-        maxGasPrice = _maxGasPrice.mul(1e9);
+    // set if we want to sell our swap partly on sushi or just uniV3
+    function setSellOnSushi(bool _sellOnSushi) external onlyAuthorized {
+        sellOnSushi = _sellOnSushi;
     }
 
     // set the maximum gas price we want to pay for a harvest/tend in gwei, ******* REMOVE THIS AFTER TESTING *******

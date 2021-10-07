@@ -32,6 +32,8 @@ def test_change_debt(
     # debtRatio is in BPS (aka, max is 10,000, which represents 100%), and is a fraction of the funds that can be in the strategy
     currentDebt = 10000
     vault.updateStrategyDebtRatio(strategy, currentDebt / 2, {"from": gov})
+
+    # sleep for an hour to make sure we are swapping enough
     chain.sleep(3600)
     strategy.tend({"from": gov})
     chain.mine(1)
@@ -41,7 +43,7 @@ def test_change_debt(
 
     assert strategy.estimatedTotalAssets() <= startingStrategy
 
-    # simulate one hour of earnings
+    # simulate 1 hour of earnings (so chainlink oracles don't go stale, normally would do 1 day)
     chain.sleep(3600)
     chain.mine(1)
 
