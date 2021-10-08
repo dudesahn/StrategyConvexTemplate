@@ -64,13 +64,13 @@ def test_cloning(
 
     ## shouldn't be able to clone a clone
     with brownie.reverts():
-        newStrategy.cloneCurveibFF(
+        newStrategy.cloneConvexibFF(
             vault,
             strategist,
             rewards,
             keeper,
+            pid,
             pool,
-            gauge,
             sToken,
             strategy_name,
             {"from": gov},

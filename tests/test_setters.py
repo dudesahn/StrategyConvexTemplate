@@ -106,8 +106,6 @@ def test_sell_on_uni(
     strategy,
     chain,
     strategist_ms,
-    gauge,
-    voter,
     amount,
     crv,
     sToken,
@@ -118,9 +116,6 @@ def test_sell_on_uni(
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
-
-    # this is part of our check into the staking contract balance
-    stakingBeforeHarvest = gauge.balanceOf(voter)
 
     # harvest, store asset amount
     chain.sleep(1)
@@ -135,8 +130,6 @@ def test_sell_on_uni(
     assert strategy.estimatedTotalAssets() > 0
     print("\nStarting Assets: ", old_assets / 1e18)
 
-    # try and include custom logic here to check that funds are in the staking contract (if needed)
-    assert gauge.balanceOf(voter) > stakingBeforeHarvest
 
     # simulate 1 hour of earnings (so chainlink oracles don't go stale, normally would do 1 day)
     chain.sleep(3600)
