@@ -512,9 +512,6 @@ def test_odds_and_ends_inactive_strat(
     chain.sleep(361)
     strategy.setDoHealthCheck(False, {"from": gov})
     tx = strategy.harvest({"from": gov})
-    profits = tx.events["Harvested"]["profit"]
-    losses = tx.events["Harvested"]["loss"]
-    assert profits > losses  # turning off health check, figure out why
 
     # sleep for one hour
     chain.sleep(3600)
