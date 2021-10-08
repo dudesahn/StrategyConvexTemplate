@@ -731,7 +731,6 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
     // claim and swap our CRV for synths
     function claimAndSell() internal {
         // if we have anything in the gauge, then harvest CRV from the gauge
-        uint256 _stakedBal = stakedBalance();
         if (claimableBalance() > 0) {
             // check if we have any CRV to claim
             // this claims our CRV, CVX, and any extra tokens.
