@@ -130,7 +130,6 @@ def test_sell_on_uni(
     assert strategy.estimatedTotalAssets() > 0
     print("\nStarting Assets: ", old_assets / 1e18)
 
-
     # simulate 1 hour of earnings (so chainlink oracles don't go stale, normally would do 1 day)
     chain.sleep(3600)
     chain.mine(1)
