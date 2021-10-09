@@ -57,7 +57,7 @@ def test_simple_harvest(
     new_assets = vault.totalAssets()
     # confirm we made money, or at least that we have about the same
     assert new_assets >= old_assets
-    print("\nAssets after 1 day: ", new_assets / 1e18)
+    print("\nAssets after 1 hour: ", new_assets / 1e18)
 
     # Display estimated APR
     print(
