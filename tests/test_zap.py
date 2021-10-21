@@ -77,7 +77,11 @@ def test_zap_wbtc(
     vaultTarget,
     synth,
     chain,
+    accounts,
 ):
+    # need to use a different whale for WBTC, avax bridge
+    whale = accounts.at("0xE78388b4CE79068e89Bf8aA7f218eF6b9AB0e9d0", force=True)
+    
     ## deposit to the vault after approving
     startingWhale = wbtc.balanceOf(whale)
 
