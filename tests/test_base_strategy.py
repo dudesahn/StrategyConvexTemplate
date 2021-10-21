@@ -4,7 +4,17 @@ from brownie import config
 import math
 
 
-def test_base_strategy(gov, token, vault, strategist, whale, strategy, chain, amount):
+def test_base_strategy(
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    amount,
+    dummy_gas_oracle,
+):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
@@ -16,6 +26,7 @@ def test_base_strategy(gov, token, vault, strategist, whale, strategy, chain, am
     donation = 1e16
     token.transfer(strategy, donation, {"from": whale})
 
+    strategy.setGasOracle(dummy_gas_oracle, {"from": gov})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be true.", tx)
     assert tx == True

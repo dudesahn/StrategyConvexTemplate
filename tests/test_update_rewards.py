@@ -24,7 +24,14 @@ def test_update_to_zero_then_back(
 ):
     ## clone our strategy, set our rewards to zero address
     tx = strategy.cloneConvex3CrvRewards(
-        vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov},
+        vault,
+        strategist,
+        rewards,
+        keeper,
+        pid,
+        pool,
+        strategy_name,
+        {"from": gov},
     )
     newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)
 
@@ -187,7 +194,14 @@ def test_update_from_zero_to_off(
 ):
     ## clone our strategy, set our rewards to zero address
     tx = strategy.cloneConvex3CrvRewards(
-        vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov},
+        vault,
+        strategist,
+        rewards,
+        keeper,
+        pid,
+        pool,
+        strategy_name,
+        {"from": gov},
     )
     newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)
 
@@ -341,7 +355,14 @@ def test_change_rewards(
 ):
     ## clone our strategy, set our rewards to zero address
     tx = strategy.cloneConvex3CrvRewards(
-        vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov},
+        vault,
+        strategist,
+        rewards,
+        keeper,
+        pid,
+        pool,
+        strategy_name,
+        {"from": gov},
     )
     newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)
 

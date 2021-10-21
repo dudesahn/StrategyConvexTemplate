@@ -13,6 +13,10 @@ import "./interfaces/curve.sol";
 import {IUniswapV2Router02} from "./interfaces/uniswap.sol";
 import {BaseStrategy} from "@yearnvaults/contracts/BaseStrategy.sol";
 
+interface IBaseFee {
+    function basefee_global() external view returns (uint256);
+}
+
 interface IConvexRewards {
     // strategy's staked balance in the synthetix staking contract
     function balanceOf(address account) external view returns (uint256);
@@ -273,6 +277,9 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
     ICurveFi public constant zapContract =
         ICurveFi(0xA79828DF1850E8a3A3064576f380D90aECDD3359); // this is used for depositing to all 3Crv metapools
 
+    IBaseFee public _baseFeeOracle; // ******* REMOVE THIS AFTER TESTING *******
+    uint256 public maxGasPrice; // this is the max gas price we want our keepers to pay for harvests/tends in gwei
+
     // we use these to deposit to our curve pool
     uint256 public optimal; // this is the optimal token to deposit back to our curve pool. 0 DAI, 1 USDC, 2 USDT
     IERC20 public constant usdt =
@@ -372,8 +379,8 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         // You can set these parameters on deployment to whatever you want
         maxReportDelay = 7 days; // 7 days in seconds, if we hit this then harvestTrigger = True
         debtThreshold = 5 * 1e18; // set a bit of a buffer
-        profitFactor = 10_000; // in this strategy, profitFactor is only used for telling keep3rs when to move funds from vault to strategy (what previously was an earn call)
-        harvestProfitNeeded = 20_000 * 1e6; // this is how much in USDT we need to make. remember, 6 decimals!
+        profitFactor = 1_000_000; // in this strategy, profitFactor is only used for telling keep3rs when to move funds from vault to strategy (what previously was an earn call)
+        harvestProfitNeeded = 80_000 * 1e6; // this is how much in USDT we need to make. remember, 6 decimals!
         healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; // health.ychad.eth
 
         // want = Curve LP
@@ -418,6 +425,9 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         // set our paths
         crvPath = [address(crv), address(weth), address(dai)];
         convexTokenPath = [address(convexToken), address(weth), address(dai)];
+
+        // set our max gas price
+        maxGasPrice = 100 * 1e9;
     }
 
     /* ========== VARIABLE FUNCTIONS ========== */
@@ -465,14 +475,28 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
 
             // deposit our balance to Curve if we have any
             if (optimal == 0) {
-                uint256 daiBalance = dai.balanceOf(address(this));
-                zapContract.add_liquidity(curve, [0, daiBalance, 0, 0], 0);
+                uint256 _daiBalance = dai.balanceOf(address(this));
+                if (_daiBalance > 0) {
+                    zapContract.add_liquidity(curve, [0, _daiBalance, 0, 0], 0);
+                }
             } else if (optimal == 1) {
-                uint256 usdcBalance = usdc.balanceOf(address(this));
-                zapContract.add_liquidity(curve, [0, 0, usdcBalance, 0], 0);
+                uint256 _usdcBalance = usdc.balanceOf(address(this));
+                if (_usdcBalance > 0) {
+                    zapContract.add_liquidity(
+                        curve,
+                        [0, 0, _usdcBalance, 0],
+                        0
+                    );
+                }
             } else {
-                uint256 usdtBalance = usdt.balanceOf(address(this));
-                zapContract.add_liquidity(curve, [0, 0, 0, usdtBalance], 0);
+                uint256 _usdtBalance = usdt.balanceOf(address(this));
+                if (_usdtBalance > 0) {
+                    zapContract.add_liquidity(
+                        curve,
+                        [0, 0, 0, _usdtBalance],
+                        0
+                    );
+                }
             }
         }
 
@@ -559,6 +583,11 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
 
         // Should not trigger if strategy is not active (no assets and no debtRatio). This means we don't need to adjust keeper job.
         if (!isActive()) {
+            return false;
+        }
+
+        // check if the base fee gas price is higher than we allow
+        if (readBaseFee() > maxGasPrice) {
             return false;
         }
 
@@ -674,6 +703,12 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         return callCostInWant;
     }
 
+    // check the current baseFee
+    function readBaseFee() internal view returns (uint256 baseFee) {
+        // IBaseFee _baseFeeOracle = IBaseFee(0xf8d0Ec04e94296773cE20eFbeeA82e76220cD549); ******* UNCOMMENT THIS AFTER TESTING *******
+        return _baseFeeOracle.basefee_global();
+    }
+
     /* ========== SETTERS ========== */
 
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
@@ -727,5 +762,15 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
             rewardsToken.approve(sushiswap, uint256(0));
         }
         rewardsToken = IERC20(address(0));
+    }
+
+    // set the maximum gas price we want to pay for a harvest/tend in gwei
+    function setGasPrice(uint256 _maxGasPrice) external onlyAuthorized {
+        maxGasPrice = _maxGasPrice.mul(1e9);
+    }
+
+    // set the maximum gas price we want to pay for a harvest/tend in gwei, ******* REMOVE THIS AFTER TESTING *******
+    function setGasOracle(address _gasOracle) external onlyAuthorized {
+        _baseFeeOracle = IBaseFee(_gasOracle);
     }
 }
