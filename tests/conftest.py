@@ -19,14 +19,14 @@ def pid():
 def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (attenboro.eth, holding some ibEUR LPs)
-    whale = accounts.at("0x4D0e439ba905EB39aee88097433aDd619cf5257b", force=True)
+    whale = accounts.at("0x3Ee505bA316879d246a8fD2b3d7eE63b51B44FAB", force=True)
     yield whale
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance. Make sure to do no more than half of their balance.
 @pytest.fixture(scope="module")
 def amount():
-    amount = 20_000e18
+    amount = 5_000e18
     yield amount
 
 

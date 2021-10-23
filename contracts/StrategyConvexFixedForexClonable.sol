@@ -113,20 +113,20 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // keepCRV stuff
     uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points)
     address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
-    uint256 public constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in bips
+    uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in bips
 
     // Swap stuff
-    address public constant sushiswap =
+    address internal constant sushiswap =
         0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // default to sushiswap, more CRV and CVX liquidity there
     address[] public crvPath; // path to sell CRV
     address[] public convexTokenPath; // path to sell CVX
     ICurveFi public curve; // Curve Pool, need this for depositing into our curve pool
 
-    IERC20 public constant crv =
+    IERC20 internal constant crv =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
-    IERC20 public constant convexToken =
+    IERC20 internal constant convexToken =
         IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
-    IERC20 public constant weth =
+    IERC20 internal constant weth =
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
     // keeper stuff
@@ -253,27 +253,27 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
 
     // synthetix stuff
     IReadProxy public sTokenProxy; // this is the proxy for our synthetix token
-    IERC20 public constant sethProxy =
+    IERC20 internal constant sethProxy =
         IERC20(0x5e74C9036fb86BD7eCdcb084a0673EFc32eA31cb); // this is the proxy for sETH
-    IReadProxy public constant readProxy =
+    IReadProxy internal constant readProxy =
         IReadProxy(0x4E3b31eB0E5CB73641EE1E65E7dCEFe520bA3ef2);
 
-    ISystemStatus public constant systemStatus =
+    ISystemStatus internal constant systemStatus =
         ISystemStatus(0x1c86B3CDF2a60Ae3a574f7f71d44E2C50BDdB87E); // this is how we check if our market is closed
 
     bytes32 public synthCurrencyKey;
-    bytes32 public constant sethCurrencyKey = "sETH";
+    bytes32 internal constant sethCurrencyKey = "sETH";
 
     bytes32 internal constant TRACKING_CODE = "YEARN"; // this is our referral code for SNX volume incentives
     bytes32 internal constant CONTRACT_SYNTHETIX = "Synthetix";
     bytes32 internal constant CONTRACT_EXCHANGER = "Exchanger";
 
     // swap stuff
-    address public constant uniswapv3 =
+    address internal constant uniswapv3 =
         address(0xE592427A0AEce92De3Edee1F18E0157C05861564);
     bool public sellOnSushi; // determine if we sell partially on sushi or all on Uni v3
     bool internal harvestNow; // this tells us if we're currently harvesting or tending
-    IERC20 public constant usdt =
+    IERC20 internal constant usdt =
         IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7); // use this to check our pending harvest
     uint24 public uniCrvFee; // this is equal to 1%, can change this later if a different path becomes more optimal
     uint256 public lastTendTime; // this is the timestamp that our last tend was called
@@ -512,6 +512,10 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
         }
         crv.safeTransfer(_newStrategy, crv.balanceOf(address(this)));
         convexToken.safeTransfer(
+            _newStrategy,
+            convexToken.balanceOf(address(this))
+        );
+        sethProxy.safeTransfer(
             _newStrategy,
             convexToken.balanceOf(address(this))
         );
