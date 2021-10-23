@@ -54,10 +54,9 @@ def test_cloning(
     ## shouldn't be able to clone a clone
     with brownie.reverts():
         newStrategy.cloneConvex3CrvRewards(
-        vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
-    )
-        
-        
+            vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
+        )
+
     vault.revokeStrategy(strategy, {"from": gov})
     vault.addStrategy(newStrategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
     assert vault.withdrawalQueue(1) == newStrategy

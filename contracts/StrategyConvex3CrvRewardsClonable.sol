@@ -92,19 +92,19 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // keepCRV stuff
     uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points)
     address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
-    uint256 public constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in bips
+    uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
 
     // Swap stuff
-    address public constant sushiswap =
+    address internal constant sushiswap =
         0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // default to sushiswap, more CRV and CVX liquidity there
     address[] public crvPath; // path to sell CRV
     address[] public convexTokenPath; // path to sell CVX
 
-    IERC20 public constant crv =
+    IERC20 internal constant crv =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
-    IERC20 public constant convexToken =
+    IERC20 internal constant convexToken =
         IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
-    IERC20 public constant weth =
+    IERC20 internal constant weth =
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
     // keeper stuff
@@ -274,19 +274,19 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
 
     // Curve stuff
     address public curve; // Curve Pool, this is our pool specific to this vault
-    ICurveFi public constant zapContract =
+    ICurveFi internal constant zapContract =
         ICurveFi(0xA79828DF1850E8a3A3064576f380D90aECDD3359); // this is used for depositing to all 3Crv metapools
 
-    IBaseFee public _baseFeeOracle; // ******* REMOVE THIS AFTER TESTING *******
+    IBaseFee internal _baseFeeOracle; // ******* REMOVE THIS AFTER TESTING *******
     uint256 public maxGasPrice; // this is the max gas price we want our keepers to pay for harvests/tends in gwei
 
     // we use these to deposit to our curve pool
     uint256 public optimal; // this is the optimal token to deposit back to our curve pool. 0 DAI, 1 USDC, 2 USDT
-    IERC20 public constant usdt =
+    IERC20 internal constant usdt =
         IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
-    IERC20 public constant usdc =
+    IERC20 internal constant usdc =
         IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
-    IERC20 public constant dai =
+    IERC20 internal constant dai =
         IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
 
     // rewards token info. we can have more than 1 reward token but this is rare, so we don't include this in the template
@@ -378,7 +378,6 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
 
         // You can set these parameters on deployment to whatever you want
         maxReportDelay = 7 days; // 7 days in seconds, if we hit this then harvestTrigger = True
-        debtThreshold = 5 * 1e18; // set a bit of a buffer
         profitFactor = 1_000_000; // in this strategy, profitFactor is only used for telling keep3rs when to move funds from vault to strategy (what previously was an earn call)
         harvestProfitNeeded = 80_000 * 1e6; // this is how much in USDT we need to make. remember, 6 decimals!
         healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; // health.ychad.eth
@@ -745,7 +744,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
     // Use to add or update rewards
     function updateRewards(address _rewardsToken) external onlyGovernance {
         // reset allowance to zero for our previous token if we had one
-        if (address(rewardsToken) != address(0)) {
+        if (address(rewardsToken) != address(convexToken)) {
             rewardsToken.approve(sushiswap, uint256(0));
         }
         // update with our new token, use dai as default
@@ -755,13 +754,13 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         hasRewards = true;
     }
 
-    // Use to turn off extra rewards claiming
+    // Use to turn off extra rewards claiming. CVX is default rewards token when no others are present.
     function turnOffRewards() external onlyGovernance {
         hasRewards = false;
-        if (address(rewardsToken) != address(0)) {
+        if (address(rewardsToken) != address(convexToken)) {
             rewardsToken.approve(sushiswap, uint256(0));
         }
-        rewardsToken = IERC20(address(0));
+        rewardsToken = IERC20(address(convexToken));
     }
 
     // set the maximum gas price we want to pay for a harvest/tend in gwei

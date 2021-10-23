@@ -21,8 +21,8 @@ def test_emergency_exit(
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    # simulate seven days of earnings
-    chain.sleep(86400 * 7)
+    # simulate one day of earnings
+    chain.sleep(86400)
     chain.mine(1)
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -62,8 +62,8 @@ def test_emergency_exit_with_profit(
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    # simulate seven days of earnings
-    chain.sleep(86400 * 7)
+    # simulate one day of earnings
+    chain.sleep(86400)
     chain.mine(1)
     chain.sleep(1)
     strategy.harvest({"from": gov})

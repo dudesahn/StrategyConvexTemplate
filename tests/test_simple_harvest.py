@@ -17,6 +17,7 @@ def test_simple_harvest(
     voter,
     rewardsContract,
     amount,
+    dummy_gas_oracle,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)

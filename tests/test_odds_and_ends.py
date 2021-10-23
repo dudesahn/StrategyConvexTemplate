@@ -24,6 +24,7 @@ def test_odds_and_ends(
     amount,
     pool,
     strategy_name,
+    dummy_gas_oracle,
 ):
 
     ## deposit to the vault after approving. turn off health check before each harvest since we're doing weird shit
@@ -289,7 +290,7 @@ def test_odds_and_ends_liquidatePosition(
 
     # Display estimated APR
     print(
-        "\nEstimated EURt APR: ",
+        "\nEstimated APR: ",
         "{:.2%}".format(
             ((new_assets - old_assets) * (365)) / (strategy.estimatedTotalAssets())
         ),
@@ -437,6 +438,7 @@ def test_odds_and_ends_inactive_strat(
     voter,
     cvxDeposit,
     amount,
+    dummy_gas_oracle,
 ):
     ## deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
@@ -700,17 +702,3 @@ def test_odds_and_ends_rewards_stuff(
     # take 0% of our CRV to the voter
     strategy.setKeepCRV(0, {"from": gov})
     strategy.harvest({"from": gov})
-
-    ## clone our strategy with rewards on
-    tx = strategy.cloneCurve3CrvRewards(
-        vault,
-        strategist,
-        rewards,
-        keeper,
-        pool,
-        gauge,
-        True,
-        rewards_token,
-        strategy_name,
-        {"from": gov},
-    )

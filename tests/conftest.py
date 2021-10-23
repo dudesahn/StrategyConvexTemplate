@@ -18,7 +18,7 @@ def pid():
 def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    whale = accounts.at("0xe53ecA73fC23b395d4a6A5C652202923A7d0b240", force=True)
+    whale = accounts.at("0x6512cbdaD4d76ff79d3e96aCE168F2E1315c1ecE", force=True)
     yield whale
 
 
@@ -35,12 +35,19 @@ def strategy_name():
     strategy_name = "StrategyConvexUSDM"
     yield strategy_name
 
+
 # we need these next two fixtures for deploying our curve strategy, but not for convex. for convex we can pull them programmatically.
 # this is the address of our rewards token, in this case it's a dummy (ALCX) that our whale happens to hold just used to test stuff
 @pytest.fixture(scope="module")
 def rewards_token():
     yield Contract("0xdBdb4d16EdA451D0503b854CF79D55697F90c8DF")
 
+
+# this is whether our pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
+@pytest.fixture(scope="module")
+def has_rewards():
+    has_rewards = False
+    yield has_rewards
 
 
 # Only worry about changing things above this line, unless you want to make changes to the vault or strategy.

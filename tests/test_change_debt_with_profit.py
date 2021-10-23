@@ -36,7 +36,7 @@ def test_change_debt_with_profit(
     assert tx == True
 
     # our whale donates dust to the vault, what a nice person!
-    donation = amount
+    donation = 1e16
     token.transfer(strategy, donation, {"from": whale})
 
     # turn off health check since we just took big profit
