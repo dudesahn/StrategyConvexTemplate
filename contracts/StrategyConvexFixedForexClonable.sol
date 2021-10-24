@@ -278,7 +278,6 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
     uint24 public uniCrvFee; // this is equal to 1%, can change this later if a different path becomes more optimal
     uint256 public lastTendTime; // this is the timestamp that our last tend was called
     uint256 public maxGasPrice; // this is the max gas price we want our keepers to pay for harvests/tends
-    IBaseFee public _baseFeeOracle; // ******* REMOVE THIS AFTER TESTING *******
 
     // check for cloning
     bool internal isOriginal = true;
@@ -726,7 +725,8 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
     }
 
     function readBaseFee() internal view returns (uint256 baseFee) {
-        // IBaseFee _baseFeeOracle = IBaseFee(0xf8d0Ec04e94296773cE20eFbeeA82e76220cD549); ******* UNCOMMENT THIS AFTER TESTING *******
+        IBaseFee _baseFeeOracle =
+            IBaseFee(0xf8d0Ec04e94296773cE20eFbeeA82e76220cD549);
         return _baseFeeOracle.basefee_global();
     }
 
@@ -836,10 +836,5 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
     // set if we want to sell our swap partly on sushi or just uniV3
     function setSellOnSushi(bool _sellOnSushi) external onlyAuthorized {
         sellOnSushi = _sellOnSushi;
-    }
-
-    // set the maximum gas price we want to pay for a harvest/tend in gwei, ******* REMOVE THIS AFTER TESTING *******
-    function setGasOracle(address _gasOracle) external onlyAuthorized {
-        _baseFeeOracle = IBaseFee(_gasOracle);
     }
 }

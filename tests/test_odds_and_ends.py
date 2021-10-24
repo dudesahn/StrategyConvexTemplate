@@ -493,6 +493,7 @@ def test_odds_and_ends_inactive_strat(
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
     # sleep for an hour
     chain.sleep(3600)
+    assert strategy.claimableBalance() > 0
     strategy.tend({"from": gov})
     chain.mine(1)
     chain.sleep(361)
@@ -515,6 +516,7 @@ def test_odds_and_ends_inactive_strat(
 
     # sleep for one hour
     chain.sleep(3600)
+    assert strategy.claimableBalance() > 0
 
     # send away all funds so we have profit but no assets
     strategy.withdrawToConvexDepositTokens({"from": gov})

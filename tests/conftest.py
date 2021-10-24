@@ -18,7 +18,7 @@ def pid():
 @pytest.fixture(scope="module")
 def whale(accounts):
     # Totally in it for the tech
-    # Update this with a large holder of your want token (attenboro.eth, holding some ibEUR LPs)
+    # Update this with a large holder of your want token (holding some ibEUR LPs)
     whale = accounts.at("0x3Ee505bA316879d246a8fD2b3d7eE63b51B44FAB", force=True)
     yield whale
 
@@ -35,11 +35,6 @@ def amount():
 def strategy_name():
     strategy_name = "StrategyConvexibEUR"
     yield strategy_name
-
-
-@pytest.fixture(scope="module")
-def sToken():  # this is the token we swap CRV for and then deposit to our LP
-    yield Contract("0xD71eCFF9342A5Ced620049e616c5035F1dB98620")
 
 
 # Only worry about changing things above this line, unless you want to make changes to the vault or strategy.
@@ -92,20 +87,32 @@ def farmed():
     yield Contract("0xD533a949740bb3306d119CC777fa900bA034cd52")
 
 
+@pytest.fixture(scope="module")
+def yregistry():
+    # this is yearn's registry, we use it to get our most recent vault for a token
+    yield Contract("0x50c1a2eA0a861A967D9d0FFE2AE4012c2E053804")
+
+
 # Define relevant tokens and contracts in this section
 @pytest.fixture(scope="module")
-def token():
+def token(booster, pid):
     # this should be the address of the ERC-20 used by the strategy/vault
-    token_address = "0x19b080FE1ffA0553469D20Ca36219F17Fcf03859"
+    token_address = booster.poolInfo(pid)[0]
     yield Contract(token_address)
 
 
 # gauge for the curve pool
 @pytest.fixture(scope="module")
-def gauge():
+def gauge(booster, pid):
     # this should be the address of the convex deposit token
-    gauge = "0x99fb76F75501039089AAC8f20f487bf84E51d76F"
+    gauge = booster.poolInfo(pid)[2]
     yield Contract(gauge)
+
+
+@pytest.fixture(scope="module")
+def sToken(token):  # this is the token we swap CRV for and then deposit to our LP
+    synth = token.coins(1)
+    yield Contract(synth)
 
 
 # curve deposit pool
@@ -179,22 +186,23 @@ def strategist(accounts):
 
 
 # use this if you need to deploy the vault
-@pytest.fixture(scope="function")
-def vault(pm, gov, rewards, guardian, management, token, chain):
-    Vault = pm(config["dependencies"][0]).Vault
-    vault = guardian.deploy(Vault)
-    vault.initialize(token, gov, rewards, "", "", guardian)
-    vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
-    vault.setManagement(management, {"from": gov})
-    chain.sleep(1)
-    yield vault
+# @pytest.fixture(scope="function")
+# def vault(pm, gov, rewards, guardian, management, token, chain):
+#     Vault = pm(config["dependencies"][0]).Vault
+#     vault = guardian.deploy(Vault)
+#     vault.initialize(token, gov, rewards, "", "", guardian)
+#     vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
+#     vault.setManagement(management, {"from": gov})
+#     chain.sleep(1)
+#     yield vault
 
 
 # use this if your vault is already deployed
-# @pytest.fixture(scope="function")
-# def vault(pm, gov, rewards, guardian, management, token, chain):
-#     vault = Contract("0x497590d2d57f05cf8B42A36062fA53eBAe283498")
-#     yield vault
+@pytest.fixture(scope="function")
+def vault(yregistry, token):
+    vault_address = yregistry.latestVault(token)
+    vault = Contract(vault_address)
+    yield vault
 
 
 # replace the first value with the name of your strategy
@@ -217,7 +225,7 @@ def strategy(
     accounts,
     pid,
 ):
-    # harvest our live curve vault/strat and remove its funds from voter/gauges
+    # harvest our live curve vault/strat and remove its funds from voter/gauges; only need this for ibEUR
     live_strat = Contract("0xB431A88a6cFFfa66dBCf96Ebc89aE72Ff7Fcc34f")
     live_vault = Contract(live_strat.vault())
     live_vault.updateStrategyDebtRatio(live_strat, 0, {"from": gov})
@@ -230,6 +238,10 @@ def strategy(
     systemStatus = Contract("0x1c86B3CDF2a60Ae3a574f7f71d44E2C50BDdB87E")
     synthGod = accounts.at("0xc105ea57eb434fbe44690d7dec2702e4a2fbfcf7", force=True)
     systemStatus.resumeSynthsExchange(currencyKey, {"from": synthGod})
+
+    # set our current strategy to 0 debtRatio
+    live_strat = vault.withdrawalQueue(0)
+    vault.updateStrategyDebtRatio(live_strat, 0, {"from": gov})
 
     # parameters for this are: strategy, vault, max deposit, minTimePerInvest, slippage protection (10000 = 100% slippage allowed),
     strategy = strategist.deploy(

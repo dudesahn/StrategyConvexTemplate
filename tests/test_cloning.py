@@ -86,9 +86,9 @@ def test_cloning(
     # attach our new strategy
     vault.addStrategy(newStrategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 
-    assert vault.withdrawalQueue(1) == newStrategy
+    assert vault.withdrawalQueue(2) == newStrategy
     assert vault.strategies(newStrategy)[2] == 10_000
-    assert vault.withdrawalQueue(0) == strategy
+    assert vault.withdrawalQueue(1) == strategy
     assert vault.strategies(strategy)[2] == 0
 
     ## deposit to the vault after approving; this is basically just our simple_harvest test
