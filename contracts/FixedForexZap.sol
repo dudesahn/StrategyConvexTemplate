@@ -551,22 +551,21 @@ contract FixedForexZap {
             _targetToken == address(0x6B175474E89094C44Da98b954EedeAC495271d0F)
         ) {
             // swap for DAI
-            uint256 output =
-                IUniV3(uniswapv3).exactInput(
-                    IUniV3.ExactInputParams(
-                        abi.encodePacked(
-                            address(seth),
-                            uint24(500),
-                            address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2),
-                            uint24(3000),
-                            address(_targetToken)
-                        ),
-                        address(_user),
-                        block.timestamp,
-                        _amount,
-                        uint256(1)
-                    )
-                );
+            IUniV3(uniswapv3).exactInput(
+                IUniV3.ExactInputParams(
+                    abi.encodePacked(
+                        address(seth),
+                        uint24(500),
+                        address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2),
+                        uint24(3000),
+                        address(_targetToken)
+                    ),
+                    address(_user),
+                    block.timestamp,
+                    _amount,
+                    uint256(1)
+                )
+            );
         } else {
             // this is if we want any token but WETH or DAI
             IUniV3(uniswapv3).exactInput(
