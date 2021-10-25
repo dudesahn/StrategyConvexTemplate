@@ -574,6 +574,11 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
             return true;
         }
 
+        // check if the base fee gas price is higher than we allow
+        if (readBaseFee() > maxGasPrice) {
+            return false;
+        }
+
         // harvest if we have a profit to claim
         if (claimableProfitInUsdt() > harvestProfitNeeded) {
             return true;
@@ -581,11 +586,6 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
 
         // Should not trigger if strategy is not active (no assets and no debtRatio). This means we don't need to adjust keeper job.
         if (!isActive()) {
-            return false;
-        }
-
-        // check if the base fee gas price is higher than we allow
-        if (readBaseFee() > maxGasPrice) {
             return false;
         }
 
