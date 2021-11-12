@@ -108,7 +108,8 @@ abstract contract StrategyConvexBase is BaseStrategy {
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
     // keeper stuff
-    uint256 public harvestProfitNeeded; // we use this to set our dollar target (in USDT) for harvest sells
+    uint256 public harvestProfitMin = 80000 * 1e6; // minimum size in USDT that we want to harvest
+    uint256 public harvestProfitMax = 180000 * 1e6; // maximum size in USDT that we want to harvest
     bool internal forceHarvestTriggerOnce; // only set this to true when we want to trigger our keepers to harvest for us
 
     string internal stratName; // we use this to be able to adjust our strategy's name
@@ -251,12 +252,20 @@ abstract contract StrategyConvexBase is BaseStrategy {
         claimRewards = _claimRewards;
     }
 
-    // This determines when we tell our keepers to harvest based on profit. this is how much in USDT we need to make. remember, 6 decimals!
-    function setHarvestProfitNeeded(uint256 _harvestProfitNeeded)
+    // This determines when we tell our keepers to start allowing harvests based on profit. this is how much in USDT we need to make. remember, 6 decimals!
+    function setHarvestProfitMin(uint256 _harvestProfitMin)
         external
         onlyAuthorized
     {
-        harvestProfitNeeded = _harvestProfitNeeded;
+        harvestProfitMin = _harvestProfitMin;
+    }
+
+    // This determines when we tell our keepers to harvest based on profit no matter the gas price. this is how much in USDT we need to make. remember, 6 decimals!
+    function setHarvestProfitMax(uint256 _harvestProfitMax)
+        external
+        onlyAuthorized
+    {
+        harvestProfitMax = _harvestProfitMax;
     }
 
     // This allows us to manually harvest with our keeper as needed
@@ -569,8 +578,8 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         override
         returns (bool)
     {
-        // trigger if we want to manually harvest
-        if (forceHarvestTriggerOnce) {
+        // harvest if we have a profit to claim at our upper limit without considering gas price
+        if (claimableProfitInUsdt() > harvestProfitMax) {
             return true;
         }
 
@@ -579,8 +588,13 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
             return false;
         }
 
-        // harvest if we have a profit to claim
-        if (claimableProfitInUsdt() > harvestProfitNeeded) {
+        // trigger if we want to manually harvest
+        if (forceHarvestTriggerOnce) {
+            return true;
+        }
+
+        // harvest if we have a sufficient profit to claim, as long as gas is cheap enough
+        if (claimableProfitInUsdt() > harvestProfitMin) {
             return true;
         }
 
