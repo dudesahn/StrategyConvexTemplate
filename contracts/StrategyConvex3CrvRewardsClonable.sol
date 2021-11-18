@@ -48,6 +48,9 @@ interface IConvexRewards {
 
     // read our rewards token
     function rewardToken() external view returns (address);
+
+    // check our reward period finish
+    function periodFinish() external view returns (uint256);
 }
 
 interface IConvexDeposit {
@@ -287,6 +290,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         ICurveFi(0xA79828DF1850E8a3A3064576f380D90aECDD3359); // this is used for depositing to all 3Crv metapools
 
     uint256 public maxGasPrice; // this is the max gas price we want our keepers to pay for harvests/tends in gwei
+    bool public checkEarmark; // this determines if we should check if we need to earmark rewards before harvesting
 
     // we use these to deposit to our curve pool
     uint256 public optimal; // this is the optimal token to deposit back to our curve pool. 0 DAI, 1 USDC, 2 USDT
@@ -416,9 +420,15 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
             rewardsToken = IERC20(
                 IConvexRewards(_virtualRewardsPool).rewardToken()
             );
-            rewardsToken.approve(sushiswap, type(uint256).max);
-            rewardsPath = [address(rewardsToken), address(weth), address(dai)];
-            hasRewards = true;
+            if (rewardsToken != convexToken) {
+                rewardsToken.approve(sushiswap, type(uint256).max);
+                rewardsPath = [
+                    address(rewardsToken),
+                    address(weth),
+                    address(dai)
+                ];
+                hasRewards = true;
+            }
         }
 
         // set our strategy's name
@@ -571,13 +581,21 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
     }
 
     /* ========== KEEP3RS ========== */
-
+    // use this to determine when to harvest
     function harvestTrigger(uint256 callCostinEth)
         public
         view
         override
         returns (bool)
     {
+        // only check if we need to earmark on vaults we know are problematic
+        if (checkEarmark) {
+            // don't harvest if we need to earmark convex rewards
+            if (needsEarmarkReward()) {
+                return false;
+            }
+        }
+
         // harvest if we have a profit to claim at our upper limit without considering gas price
         if (claimableProfitInUsdt() > harvestProfitMax) {
             return true;
@@ -588,12 +606,12 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
             return false;
         }
 
-        // trigger if we want to manually harvest
+        // trigger if we want to manually harvest, but only if our gas price is acceptable
         if (forceHarvestTriggerOnce) {
             return true;
         }
 
-        // harvest if we have a sufficient profit to claim, as long as gas is cheap enough
+        // harvest if we have a sufficient profit to claim, but only if our gas price is acceptable
         if (claimableProfitInUsdt() > harvestProfitMin) {
             return true;
         }
@@ -722,6 +740,20 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         return _baseFeeOracle.basefee_global();
     }
 
+    // check if someone needs to earmark rewards on convex before keepers harvest again
+    function needsEarmarkReward() public view returns (bool needsEarmark) {
+        // check if there is any CRV we need to earmark
+        uint256 crvExpiry = IConvexRewards(rewardsContract).periodFinish();
+        if (crvExpiry < block.timestamp) return true;
+
+        // check if there is any bonus reward we need to earmark
+        address _virtualRewardsPool =
+            IConvexRewards(rewardsContract).extraRewards(0);
+        uint256 rewardsExpiry =
+            IConvexRewards(_virtualRewardsPool).periodFinish();
+        if (rewardsExpiry < block.timestamp) return true;
+    }
+
     /* ========== SETTERS ========== */
 
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
@@ -756,6 +788,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
     }
 
     // Use to add or update rewards
+    // need to fix this now that i better understand why some have convex as reward token
     function updateRewards(address _rewardsToken) external onlyGovernance {
         // reset allowance to zero for our previous token if we had one
         if (address(rewardsToken) != address(convexToken)) {
@@ -768,10 +801,10 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         hasRewards = true;
     }
 
-    // Use to turn off extra rewards claiming. CVX is default rewards token when no others are present.
+    // Use to turn off extra rewards claiming.
     function turnOffRewards() external onlyGovernance {
         hasRewards = false;
-        if (address(rewardsToken) != address(convexToken)) {
+        if (rewardsToken != convexToken) {
             rewardsToken.approve(sushiswap, uint256(0));
         }
         rewardsToken = IERC20(address(convexToken));
@@ -780,5 +813,10 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
     // set the maximum gas price we want to pay for a harvest/tend in gwei
     function setGasPrice(uint256 _maxGasPrice) external onlyAuthorized {
         maxGasPrice = _maxGasPrice.mul(1e9);
+    }
+
+    // determine whether we will check if our convex rewards need to be earmarked
+    function setCheckEarmark(bool _checkEarmark) external onlyAuthorized {
+        checkEarmark = _checkEarmark;
     }
 }
