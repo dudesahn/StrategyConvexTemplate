@@ -238,7 +238,7 @@ def strategy(
     )
     strategy.setKeeper(keeper, {"from": gov})
     strategy.setGasPrice(125, {"from": gov})
-    strategy.setHarvestProfit(80000e6, 180000e6, {"from": gov})
+    strategy.setHarvestProfitNeeded(80000e6, 180000e6, {"from": gov})
     strategy.setMaxReportDelay(86400 * 7, {"from": gov})
     # set our management fee to zero so it doesn't mess with our profit checking
     vault.setManagementFee(0, {"from": gov})
@@ -251,12 +251,6 @@ def strategy(
     strategy.harvest({"from": gov})
     chain.sleep(1)
     yield strategy
-
-
-@pytest.fixture(scope="module")
-def dummy_gas_oracle(strategist, dummyBasefee):
-    dummy_gas_oracle = strategist.deploy(dummyBasefee)
-    yield dummy_gas_oracle
 
 
 # use this if your strategy is already deployed

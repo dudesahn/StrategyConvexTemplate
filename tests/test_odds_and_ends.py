@@ -481,7 +481,7 @@ def test_odds_and_ends_inactive_strat(
     assert tx == False
 
     # adjust our limit to 0, then check
-    strategy.setHarvestProfitNeeded(0, {"from": gov})
+    strategy.setHarvestProfitNeeded(0, 0, {"from": gov})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be true.", tx)
     assert tx == True

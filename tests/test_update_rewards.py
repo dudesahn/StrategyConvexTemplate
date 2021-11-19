@@ -98,7 +98,7 @@ def test_update_to_zero_then_back(
 
     # turn off our rewards
     newStrategy.turnOffRewards({"from": gov})
-    assert newStrategy.rewardsToken() == convexToken.address
+    assert newStrategy.rewardsToken() == zero_address
     assert newStrategy.hasRewards() == False
     if (
         has_rewards
@@ -273,7 +273,7 @@ def test_update_from_zero_to_off(
 
     # turn off our rewards
     newStrategy.turnOffRewards({"from": gov})
-    assert newStrategy.rewardsToken() == convexToken.address
+    assert newStrategy.rewardsToken() == zero_address
     assert newStrategy.hasRewards() == False
     if (
         has_rewards
@@ -306,7 +306,7 @@ def test_update_from_zero_to_off(
 
     # try turning off our rewards again
     newStrategy.turnOffRewards({"from": gov})
-    assert newStrategy.rewardsToken() == convexToken.address
+    assert newStrategy.rewardsToken() == zero_address
     assert newStrategy.hasRewards() == False
     if (
         has_rewards
@@ -463,4 +463,4 @@ def test_check_rewards(
     if has_rewards:
         assert convexToken != rewards_token
     else:
-        assert convexToken == rewards_token
+        assert zero_address == rewards_token
