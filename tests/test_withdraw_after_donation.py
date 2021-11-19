@@ -12,7 +12,6 @@ def test_withdraw_after_donation_1(
     strategy,
     chain,
     amount,
-    dummy_gas_oracle,
 ):
 
     ## deposit to the vault after approving
@@ -86,7 +85,6 @@ def test_withdraw_after_donation_2(
     strategy,
     chain,
     amount,
-    dummy_gas_oracle,
 ):
 
     ## deposit to the vault after approving
@@ -157,7 +155,6 @@ def test_withdraw_after_donation_3(
     strategy,
     chain,
     amount,
-    dummy_gas_oracle,
 ):
 
     ## deposit to the vault after approving
@@ -228,7 +225,6 @@ def test_withdraw_after_donation_4(
     strategy,
     chain,
     amount,
-    dummy_gas_oracle,
 ):
 
     ## deposit to the vault after approving
@@ -306,7 +302,6 @@ def test_withdraw_after_donation_5(
     strategy,
     chain,
     amount,
-    dummy_gas_oracle,
 ):
 
     ## deposit to the vault after approving
@@ -369,7 +364,6 @@ def test_withdraw_after_donation_6(
     strategy,
     chain,
     amount,
-    dummy_gas_oracle,
 ):
 
     ## deposit to the vault after approving
@@ -433,7 +427,6 @@ def test_withdraw_after_donation_7(
     chain,
     amount,
     rewardsContract,
-    dummy_gas_oracle,
 ):
 
     ## deposit to the vault after approving
@@ -515,7 +508,6 @@ def test_withdraw_after_donation_8(
     chain,
     amount,
     rewardsContract,
-    dummy_gas_oracle,
 ):
 
     ## deposit to the vault after approving

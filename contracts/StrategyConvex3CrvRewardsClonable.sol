@@ -452,61 +452,50 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
             uint256 _debtPayment
         )
     {
-        // if we have anything staked, then harvest CRV and CVX from the rewards contract
-        if (claimableBalance() > 0) {
-            // this claims our CRV, CVX, and any extra tokens like SNX or ANKR. set to false if these tokens don't exist, true if they do.
-            rewardsContract.getReward(address(this), true);
+        // this claims our CRV, CVX, and any extra tokens like SNX or ANKR. no harm leaving this true even if no extra rewards currently.
+        rewardsContract.getReward(address(this), true);
 
-            uint256 crvBalance = crv.balanceOf(address(this));
-            uint256 convexBalance = convexToken.balanceOf(address(this));
+        uint256 crvBalance = crv.balanceOf(address(this));
+        uint256 convexBalance = convexToken.balanceOf(address(this));
 
-            uint256 _sendToVoter = crvBalance.mul(keepCRV).div(FEE_DENOMINATOR);
-            if (_sendToVoter > 0) {
-                crv.safeTransfer(voter, _sendToVoter);
+        uint256 _sendToVoter = crvBalance.mul(keepCRV).div(FEE_DENOMINATOR);
+        if (_sendToVoter > 0) {
+            crv.safeTransfer(voter, _sendToVoter);
+        }
+        uint256 crvRemainder = crvBalance.sub(_sendToVoter);
+
+        if (crvRemainder > 0) {
+            _sellCrv(crvRemainder);
+        }
+
+        if (convexBalance > 0) {
+            _sellConvex(convexBalance);
+        }
+
+        // claim and sell our rewards if we have them
+        if (hasRewards) {
+            uint256 _rewardsBalance =
+                IERC20(rewardsToken).balanceOf(address(this));
+            if (_rewardsBalance > 0) {
+                _sellRewards(_rewardsBalance);
             }
-            uint256 crvRemainder = crvBalance.sub(_sendToVoter);
+        }
 
-            if (crvRemainder > 0) {
-                _sellCrv(crvRemainder);
+        // deposit our balance to Curve if we have any
+        if (optimal == 0) {
+            uint256 _daiBalance = dai.balanceOf(address(this));
+            if (_daiBalance > 0) {
+                zapContract.add_liquidity(curve, [0, _daiBalance, 0, 0], 0);
             }
-
-            if (convexBalance > 0) {
-                _sellConvex(convexBalance);
+        } else if (optimal == 1) {
+            uint256 _usdcBalance = usdc.balanceOf(address(this));
+            if (_usdcBalance > 0) {
+                zapContract.add_liquidity(curve, [0, 0, _usdcBalance, 0], 0);
             }
-
-            // claim and sell our rewards if we have them
-            if (hasRewards) {
-                uint256 _rewardsBalance =
-                    IERC20(rewardsToken).balanceOf(address(this));
-                if (_rewardsBalance > 0) {
-                    _sellRewards(_rewardsBalance);
-                }
-            }
-
-            // deposit our balance to Curve if we have any
-            if (optimal == 0) {
-                uint256 _daiBalance = dai.balanceOf(address(this));
-                if (_daiBalance > 0) {
-                    zapContract.add_liquidity(curve, [0, _daiBalance, 0, 0], 0);
-                }
-            } else if (optimal == 1) {
-                uint256 _usdcBalance = usdc.balanceOf(address(this));
-                if (_usdcBalance > 0) {
-                    zapContract.add_liquidity(
-                        curve,
-                        [0, 0, _usdcBalance, 0],
-                        0
-                    );
-                }
-            } else {
-                uint256 _usdtBalance = usdt.balanceOf(address(this));
-                if (_usdtBalance > 0) {
-                    zapContract.add_liquidity(
-                        curve,
-                        [0, 0, 0, _usdtBalance],
-                        0
-                    );
-                }
+        } else {
+            uint256 _usdtBalance = usdt.balanceOf(address(this));
+            if (_usdtBalance > 0) {
+                zapContract.add_liquidity(curve, [0, 0, 0, _usdtBalance], 0);
             }
         }
 

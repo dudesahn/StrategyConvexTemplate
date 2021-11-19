@@ -12,7 +12,6 @@ def test_change_debt_with_profit(
     strategy,
     chain,
     amount,
-    dummy_gas_oracle,
 ):
 
     ## deposit to the vault after approving

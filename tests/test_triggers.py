@@ -13,7 +13,6 @@ def test_triggers(
     strategy,
     chain,
     amount,
-    dummy_gas_oracle,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -92,7 +91,6 @@ def test_less_useful_triggers(
     strategy,
     chain,
     amount,
-    dummy_gas_oracle,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)

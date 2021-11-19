@@ -13,7 +13,6 @@ def test_setters(
     vault,
     proxy,
     amount,
-    dummy_gas_oracle,
 ):
 
     # test our manual harvest trigger

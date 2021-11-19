@@ -21,7 +21,6 @@ def test_migration(
     amount,
     pool,
     strategy_name,
-    dummy_gas_oracle,
 ):
 
     ## deposit to the vault after approving

@@ -13,7 +13,6 @@ def test_base_strategy(
     strategy,
     chain,
     amount,
-    dummy_gas_oracle,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)

@@ -24,7 +24,6 @@ def test_odds_and_ends(
     amount,
     pool,
     strategy_name,
-    dummy_gas_oracle,
 ):
 
     ## deposit to the vault after approving. turn off health check before each harvest since we're doing weird shit
@@ -437,7 +436,6 @@ def test_odds_and_ends_inactive_strat(
     voter,
     cvxDeposit,
     amount,
-    dummy_gas_oracle,
 ):
     ## deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
@@ -499,7 +497,6 @@ def test_odds_and_ends_weird_amounts(
     strategist_ms,
     voter,
     amount,
-    dummy_gas_oracle,
 ):
 
     ## deposit to the vault after approving
@@ -552,7 +549,6 @@ def test_odds_and_ends_rewards_stuff(
     strategist_ms,
     voter,
     amount,
-    dummy_gas_oracle,
     rewards_token,
     rewards,
     keeper,
