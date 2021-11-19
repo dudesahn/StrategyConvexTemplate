@@ -10,7 +10,7 @@ def isolation(fn_isolation):
 # put our pool's convex pid here; this is the only thing that should need to change up here **************
 @pytest.fixture(scope="module")
 def pid():
-    pid = 51
+    pid = 56
     yield pid
 
 
@@ -18,21 +18,21 @@ def pid():
 def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    whale = accounts.at("0x6512cbdaD4d76ff79d3e96aCE168F2E1315c1ecE", force=True)
+    whale = accounts.at("0xe649EDCB64ea6512A95b150dA18bfD20C84bC549", force=True)
     yield whale
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 2000e18
+    amount = 20_000e18
     yield amount
 
 
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexUSDM"
+    strategy_name = "StrategyConvexOUSD"
     yield strategy_name
 
 
@@ -46,7 +46,7 @@ def rewards_token():
 # this is whether our pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
 @pytest.fixture(scope="module")
 def has_rewards():
-    has_rewards = False
+    has_rewards = True
     yield has_rewards
 
 
@@ -237,6 +237,9 @@ def strategy(
         strategy_name,
     )
     strategy.setKeeper(keeper, {"from": gov})
+    strategy.setGasPrice(125, {"from": gov})
+    strategy.setHarvestProfit(80000e6, 180000e6, {"from": gov})
+    strategy.setMaxReportDelay(86400 * 7, {"from": gov})
     # set our management fee to zero so it doesn't mess with our profit checking
     vault.setManagementFee(0, {"from": gov})
     # add our new strategy

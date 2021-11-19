@@ -18,24 +18,20 @@ def test_setters(
 
     # test our manual harvest trigger
     strategy.setForceHarvestTriggerOnce(True, {"from": gov})
-    strategy.setGasOracle(dummy_gas_oracle, {"from": gov})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be true.", tx)
     assert tx == True
     strategy.setForceHarvestTriggerOnce(False, {"from": gov})
-    strategy.setGasOracle(dummy_gas_oracle, {"from": gov})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be false.", tx)
     assert tx == False
 
     # test our manual harvest trigger, and that a harvest turns it off
     strategy.setForceHarvestTriggerOnce(True, {"from": gov})
-    strategy.setGasOracle(dummy_gas_oracle, {"from": gov})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be true.", tx)
     assert tx == True
     strategy.harvest({"from": gov})
-    strategy.setGasOracle(dummy_gas_oracle, {"from": gov})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be false.", tx)
     assert tx == False

@@ -30,7 +30,6 @@ def test_change_debt_with_profit(
     vault.updateStrategyDebtRatio(strategy, currentDebt / 2, {"from": gov})
     assert vault.strategies(strategy)[2] == 5000
 
-    strategy.setGasOracle(dummy_gas_oracle, {"from": gov})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be true.", tx)
     assert tx == True
