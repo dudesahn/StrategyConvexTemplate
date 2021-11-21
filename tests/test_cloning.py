@@ -12,7 +12,7 @@ def test_cloning(
     keeper,
     rewards,
     chain,
-    StrategyConvex3CrvRewardsClonable,
+    StrategyConvexSBTCRewardsClonable,
     rewardsContract,
     pid,
     amount,
@@ -33,10 +33,10 @@ def test_cloning(
         )
 
     ## clone our strategy
-    tx = strategy.cloneConvex3CrvRewards(
+    tx = strategy.cloneConvexSBTCRewards(
         vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
     )
-    newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)
+    newStrategy = StrategyConvexSBTCRewardsClonable.at(tx.return_value)
 
     # Shouldn't be able to call initialize again
     with brownie.reverts():
@@ -53,7 +53,7 @@ def test_cloning(
 
     ## shouldn't be able to clone a clone
     with brownie.reverts():
-        newStrategy.cloneConvex3CrvRewards(
+        newStrategy.cloneConvexSBTCRewards(
             vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
         )
 
@@ -68,7 +68,7 @@ def test_cloning(
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(1000e18, {"from": whale})
+    vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
     newStrategy.harvest({"from": gov})
