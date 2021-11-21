@@ -373,7 +373,6 @@ contract StrategyConvexSBTCRewardsClonable is StrategyConvexBase {
 
         // want = Curve LP
         want.approve(address(depositContract), type(uint256).max);
-        crv.approve(sushiswap, type(uint256).max);
         convexToken.approve(sushiswap, type(uint256).max);
         crv.approve(uniswapv3, type(uint256).max);
         weth.approve(uniswapv3, type(uint256).max);
