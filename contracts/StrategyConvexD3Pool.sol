@@ -115,7 +115,6 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // Swap stuff
     address internal constant sushiswap =
         0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // default to sushiswap, more CRV and CVX liquidity there
-    address[] internal convexTokenPath; // path to sell CVX
 
     IERC20 internal constant crv =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
