@@ -55,7 +55,7 @@ def test_simple_harvest(
 
     # Display estimated APR
     print(
-        "\nEstimated FEI APR: ",
+        "\nEstimated USDC APR: ",
         "{:.2%}".format(
             ((new_assets - old_assets) * 365) / (strategy.estimatedTotalAssets())
         ),
@@ -85,7 +85,7 @@ def test_simple_harvest(
 
     # Display estimated APR
     print(
-        "\nEstimated FRAX APR: ",
+        "\nEstimated EURS APR: ",
         "{:.2%}".format(
             ((after_usdc_assets - before_usdc_assets) * 365)
             / (strategy.estimatedTotalAssets())
