@@ -414,11 +414,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
             // we only need to approve the new token and turn on rewards if the extra rewards isn't CVX
             if (address(rewardsToken) != address(convexToken)) {
                 rewardsToken.approve(sushiswap, type(uint256).max);
-                rewardsPath = [
-                    address(rewardsToken),
-                    address(weth),
-                    address(dai)
-                ];
+                rewardsPath = [address(rewardsToken), address(weth)];
                 hasRewards = true;
             }
         }
@@ -761,19 +757,10 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
     function setOptimal(uint256 _optimal) external onlyAuthorized {
         if (_optimal == 0) {
             targetStable = address(dai);
-            if (hasRewards) {
-                rewardsPath[2] = address(dai);
-            }
         } else if (_optimal == 1) {
             targetStable = address(usdc);
-            if (hasRewards) {
-                rewardsPath[2] = address(usdc);
-            }
         } else if (_optimal == 2) {
             targetStable = address(usdc);
-            if (hasRewards) {
-                rewardsPath[2] = address(usdt);
-            }
         } else {
             revert("incorrect token");
         }
@@ -791,7 +778,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         // update with our new token, use dai as default to swap into
         rewardsToken = IERC20(_rewardsToken);
         rewardsToken.approve(sushiswap, type(uint256).max);
-        rewardsPath = [address(rewardsToken), address(weth), address(dai)];
+        rewardsPath = [address(rewardsToken), address(weth)];
         hasRewards = true;
     }
 
