@@ -439,7 +439,7 @@ contract StrategyConvexEURSUSDC is StrategyConvexBase {
                         ),
                         address(this),
                         block.timestamp,
-                        _crvAmount,
+                        _wethBalance,
                         uint256(1)
                     )
                 );
@@ -455,7 +455,7 @@ contract StrategyConvexEURSUSDC is StrategyConvexBase {
                         ),
                         address(this),
                         block.timestamp,
-                        _crvAmount,
+                        _wethBalance,
                         uint256(1)
                     )
                 );
