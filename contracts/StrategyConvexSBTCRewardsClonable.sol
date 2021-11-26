@@ -615,12 +615,8 @@ contract StrategyConvexSBTCRewardsClonable is StrategyConvexBase {
             return true;
         }
 
-        // Should not trigger if strategy is not active (no assets and no debtRatio). This means we don't need to adjust keeper job.
-        if (!isActive()) {
-            return false;
-        }
-
-        return super.harvestTrigger(callCostinEth);
+        // otherwise, we don't harvest
+        return false;
     }
 
     // we will need to add rewards token here if we have them
