@@ -14,7 +14,7 @@ import {IUniswapV2Router02} from "./interfaces/uniswap.sol";
 import {BaseStrategy} from "@yearnvaults/contracts/BaseStrategy.sol";
 
 interface IBaseFee {
-    function basefee_global() external view returns (uint256);
+    function isCurrentBaseFeeAcceptable() external view returns (bool);
 }
 
 interface IUniV3 {
@@ -268,7 +268,6 @@ contract StrategyConvexEURSUSDC is StrategyConvexBase {
     // Curve stuff
     ICurveFi public constant curve =
         ICurveFi(0x98a7F18d4E56Cfe84E3D081B40001B3d5bD3eB8B); // This is our pool specific to this vault.
-    uint256 public maxGasPrice; // this is the max gas price we want our keepers to pay for harvests/tends in gwei
     bool public checkEarmark; // this determines if we should check if we need to earmark rewards before harvesting
 
     // we use these to deposit to our curve pool
@@ -298,10 +297,8 @@ contract StrategyConvexEURSUSDC is StrategyConvexBase {
 
         // setup our rewards contract
         pid = _pid; // this is the pool ID on convex, we use this to determine what the reweardsContract address is
-        address lptoken;
-        address _rewardsContract;
-        (lptoken, , , _rewardsContract, , ) = IConvexDeposit(depositContract)
-            .poolInfo(_pid);
+        (address lptoken, , , address _rewardsContract, , ) =
+            IConvexDeposit(depositContract).poolInfo(_pid);
 
         // set up our rewardsContract
         rewardsContract = IConvexRewards(_rewardsContract);
@@ -494,12 +491,13 @@ contract StrategyConvexEURSUSDC is StrategyConvexBase {
         }
 
         // harvest if we have a profit to claim at our upper limit without considering gas price
-        if (claimableProfitInUsdt() > harvestProfitMax) {
+        uint256 claimableProfit = claimableProfitInUsdt();
+        if (claimableProfit > harvestProfitMax) {
             return true;
         }
 
         // check if the base fee gas price is higher than we allow. if it is, block harvests.
-        if (readBaseFee() > maxGasPrice) {
+        if (!isBaseFeeAcceptable()) {
             return false;
         }
 
@@ -509,7 +507,7 @@ contract StrategyConvexEURSUSDC is StrategyConvexBase {
         }
 
         // harvest if we have a sufficient profit to claim, but only if our gas price is acceptable
-        if (claimableProfitInUsdt() > harvestProfitMin) {
+        if (claimableProfit > harvestProfitMin) {
             return true;
         }
 
@@ -571,33 +569,21 @@ contract StrategyConvexEURSUSDC is StrategyConvexBase {
         return crvValue.add(cvxValue);
     }
 
-    // convert our keeper's eth cost into want, pretend that it's something super cheap so profitFactor isn't triggered
+    // convert our keeper's eth cost into want, we don't need this anymore since we don't use baseStrategy harvestTrigger
     function ethToWant(uint256 _ethAmount)
         public
         view
         override
         returns (uint256)
     {
-        return _ethAmount.mul(1e6);
+        return _ethAmount;
     }
 
-    // check the current baseFee
-    function readBaseFee() internal view returns (uint256) {
-        uint256 baseFee;
-        try
-            IBaseFee(0xf8d0Ec04e94296773cE20eFbeeA82e76220cD549)
-                .basefee_global()
-        returns (uint256 currentBaseFee) {
-            baseFee = currentBaseFee;
-        } catch {
-            // Useful for testing until ganache supports london fork
-            // Hard-code current base fee to 100 gwei
-            // This should also help keepers that run in a fork without
-            // baseFee() to avoid reverting and potentially abandoning the job
-            baseFee = 100 * 1e9;
-        }
-
-        return baseFee;
+    // check if the current baseFee is below our external target
+    function isBaseFeeAcceptable() internal view returns (bool) {
+        return
+            IBaseFee(0xb5e1CAcB567d98faaDB60a1fD4820720141f064F)
+                .isCurrentBaseFeeAcceptable();
     }
 
     // check if someone needs to earmark rewards on convex before keepers harvest again
@@ -622,11 +608,6 @@ contract StrategyConvexEURSUSDC is StrategyConvexBase {
         } else {
             revert("incorrect token");
         }
-    }
-
-    // set the maximum gas price we want to pay for a harvest/tend in gwei
-    function setGasPrice(uint256 _maxGasPrice) external onlyAuthorized {
-        maxGasPrice = _maxGasPrice.mul(1e9);
     }
 
     // determine whether we will check if our convex rewards need to be earmarked
