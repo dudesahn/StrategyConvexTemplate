@@ -18,14 +18,14 @@ def pid():
 def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    whale = accounts.at("0x17e33637f6B64E9082Ea499481b6e6EbAE7EEA23", force=True)
+    whale = accounts.at("0x977bAc861722a616487EABFB9909e8f96f461166", force=True)
     yield whale
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 10_000e18
+    amount = 3_000e18
     yield amount
 
 
@@ -147,6 +147,11 @@ def rewardsContract(pid, booster):
     yield Contract(rewardsContract)
 
 
+@pytest.fixture(scope="module")
+def gasOracle():
+    yield Contract("0xb5e1CAcB567d98faaDB60a1fD4820720141f064F")
+
+
 # Define any accounts in this section
 # for live testing, governance is the strategist MS; we will update this before we endorse
 # normal gov is ychad, 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52
@@ -227,6 +232,8 @@ def strategy(
     pid,
     pool,
     strategy_name,
+    gasOracle,
+    strategist_ms,
 ):
     # make sure to include all constructor parameters needed here
     strategy = strategist.deploy(
@@ -236,9 +243,8 @@ def strategy(
         strategy_name,
     )
     strategy.setKeeper(keeper, {"from": gov})
-    strategy.setGasPrice(125, {"from": gov})
+    gasOracle.setMaxAcceptableBaseFee(20000000000000, {"from": strategist_ms})
     strategy.setHarvestProfitNeeded(80000e6, 180000e6, {"from": gov})
-    strategy.setMaxReportDelay(86400 * 7, {"from": gov})
     # set our management fee to zero so it doesn't mess with our profit checking
     vault.setManagementFee(0, {"from": gov})
     # add our new strategy
