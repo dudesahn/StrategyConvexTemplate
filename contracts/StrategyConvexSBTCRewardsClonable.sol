@@ -687,14 +687,14 @@ contract StrategyConvexSBTCRewardsClonable is StrategyConvexBase {
         return crvValue.add(cvxValue).add(rewardsValue);
     }
 
-    // convert our keeper's eth cost into want, pretend that it's something super cheap so profitFactor isn't triggered
+    // convert our keeper's eth cost into want, we don't need this anymore since we don't use baseStrategy harvestTrigger
     function ethToWant(uint256 _ethAmount)
         public
         view
         override
         returns (uint256)
     {
-        return _ethAmount.mul(1e6);
+        return _ethAmount;
     }
 
     // check if the current baseFee is below our external target
@@ -763,12 +763,11 @@ contract StrategyConvexSBTCRewardsClonable is StrategyConvexBase {
     }
 
     // set the fee pool we'd like to swap through for CRV on UniV3 (1% = 10_000)
-    function setUniCrvFee(uint24 _fee) external onlyAuthorized {
-        uniCrvFee = _fee;
-    }
-
-    // set the fee pool we'd like to swap through for WBTC on UniV3 (1% = 10_000)
-    function setUniWbtcFee(uint24 _fee) external onlyAuthorized {
-        uniWbtcFee = _fee;
+    function setUniFees(uint24 _crvFee, uint24 _wbtcFee)
+        external
+        onlyAuthorized
+    {
+        uniCrvFee = _crvFee;
+        uniWbtcFee = _wbtcFee;
     }
 }
