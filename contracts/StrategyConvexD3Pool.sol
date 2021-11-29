@@ -309,6 +309,9 @@ contract StrategyConvexD3pool is StrategyConvexBase {
         // check that our LP token based on our pid matches our want
         require(address(lptoken) == address(want));
 
+        // set our strategy's name
+        stratName = _name;
+
         // these are our approvals and path specific to this contract
         fei.approve(address(curve), type(uint256).max);
         frax.approve(address(curve), type(uint256).max);
