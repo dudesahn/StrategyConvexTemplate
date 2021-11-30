@@ -5,7 +5,14 @@ import math
 
 # test passes as of 21-06-26
 def test_change_debt(
-    gov, token, vault, strategist, whale, strategy, chain, amount,
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    amount,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -28,8 +35,8 @@ def test_change_debt(
 
     assert strategy.estimatedTotalAssets() <= startingStrategy
 
-    # simulate nine days of earnings
-    chain.sleep(86400 * 9)
+    # simulate one day of earnings
+    chain.sleep(86400)
     chain.mine(1)
 
     # set DebtRatio back to 100%

@@ -4,7 +4,14 @@ import math
 
 # test passes as of 21-06-26
 def test_change_debt_with_profit(
-    gov, token, vault, strategist, whale, strategy, chain, amount,
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    amount,
 ):
 
     ## deposit to the vault after approving
@@ -22,12 +29,13 @@ def test_change_debt_with_profit(
     vault.updateStrategyDebtRatio(strategy, currentDebt / 2, {"from": gov})
     assert vault.strategies(strategy)[2] == 5000
 
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be true.", tx)
-    assert tx == True
+    # comment this out since we no longer use harvestTrigger from baseStrategy
+    # tx = strategy.harvestTrigger(0, {"from": gov})
+    # print("\nShould we harvest? Should be true.", tx)
+    # assert tx == True
 
     # our whale donates dust to the vault, what a nice person!
-    donation = amount
+    donation = 1e16
     token.transfer(strategy, donation, {"from": whale})
 
     # turn off health check since we just took big profit

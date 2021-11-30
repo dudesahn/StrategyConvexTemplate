@@ -21,10 +21,19 @@ def test_update_to_zero_then_back(
     strategy_name,
     gauge,
     zero_address,
+    has_rewards,
+    convexToken,
 ):
-    ## clone our strategy, set our rewards to zero address
+    ## clone our strategy, set our rewards to none
     tx = strategy.cloneConvex3CrvRewards(
-        vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov},
+        vault,
+        strategist,
+        rewards,
+        keeper,
+        pid,
+        pool,
+        strategy_name,
+        {"from": gov},
     )
     newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)
 
@@ -91,12 +100,15 @@ def test_update_to_zero_then_back(
     newStrategy.turnOffRewards({"from": gov})
     assert newStrategy.rewardsToken() == zero_address
     assert newStrategy.hasRewards() == False
-    assert (
-        rewards_token.allowance(
-            newStrategy, "0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F"
+    if (
+        has_rewards
+    ):  # if we have a separate reward token (not CVX) check that our allowance is zero
+        assert (
+            rewards_token.allowance(
+                newStrategy, "0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F"
+            )
+            == 0
         )
-        == 0
-    )
 
     # track our new pps and assets
     new_pps = vault.pricePerShare()
@@ -184,10 +196,19 @@ def test_update_from_zero_to_off(
     strategy_name,
     gauge,
     zero_address,
+    convexToken,
+    has_rewards,
 ):
-    ## clone our strategy, set our rewards to zero address
+    ## clone our strategy, set our rewards to none
     tx = strategy.cloneConvex3CrvRewards(
-        vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov},
+        vault,
+        strategist,
+        rewards,
+        keeper,
+        pid,
+        pool,
+        strategy_name,
+        {"from": gov},
     )
     newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)
 
@@ -254,12 +275,15 @@ def test_update_from_zero_to_off(
     newStrategy.turnOffRewards({"from": gov})
     assert newStrategy.rewardsToken() == zero_address
     assert newStrategy.hasRewards() == False
-    assert (
-        rewards_token.allowance(
-            newStrategy, "0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F"
+    if (
+        has_rewards
+    ):  # if we have a separate reward token (not CVX) check that our allowance is zero
+        assert (
+            rewards_token.allowance(
+                newStrategy, "0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F"
+            )
+            == 0
         )
-        == 0
-    )
 
     # track our new pps and assets
     new_pps = vault.pricePerShare()
@@ -284,12 +308,15 @@ def test_update_from_zero_to_off(
     newStrategy.turnOffRewards({"from": gov})
     assert newStrategy.rewardsToken() == zero_address
     assert newStrategy.hasRewards() == False
-    assert (
-        rewards_token.allowance(
-            newStrategy, "0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F"
+    if (
+        has_rewards
+    ):  # if we have a separate reward token (not CVX) check that our allowance is zero
+        assert (
+            rewards_token.allowance(
+                newStrategy, "0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F"
+            )
+            == 0
         )
-        == 0
-    )
 
     # track our new pps and assets
     old_assets_dai = vault.totalAssets()
@@ -339,9 +366,16 @@ def test_change_rewards(
     gauge,
     zero_address,
 ):
-    ## clone our strategy, set our rewards to zero address
+    ## clone our strategy, set our rewards to none
     tx = strategy.cloneConvex3CrvRewards(
-        vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov},
+        vault,
+        strategist,
+        rewards,
+        keeper,
+        pid,
+        pool,
+        strategy_name,
+        {"from": gov},
     )
     newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)
 
@@ -397,3 +431,36 @@ def test_change_rewards(
     )
     assert newStrategy.rewardsToken() == rewards_token
     assert newStrategy.hasRewards() == True
+
+
+def test_check_rewards(
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    keeper,
+    rewards,
+    chain,
+    StrategyConvex3CrvRewardsClonable,
+    voter,
+    proxy,
+    pid,
+    amount,
+    pool,
+    strategy_name,
+    gauge,
+    zero_address,
+    has_rewards,
+    convexToken,
+):
+    # check if our strategy has extra rewards
+    rewards_token = Contract(strategy.rewardsToken())
+    print("\nThis is our rewards token:", rewards_token.name())
+
+    # if we're supposed to have a rewards token, make sure it's not CVX
+    if has_rewards:
+        assert convexToken != rewards_token
+    else:
+        assert zero_address == rewards_token

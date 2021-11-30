@@ -22,7 +22,14 @@ def test_cloning(
     # Shouldn't be able to call initialize again
     with brownie.reverts():
         strategy.initialize(
-            vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov},
+            vault,
+            strategist,
+            rewards,
+            keeper,
+            pid,
+            pool,
+            strategy_name,
+            {"from": gov},
         )
 
     ## clone our strategy
@@ -34,7 +41,20 @@ def test_cloning(
     # Shouldn't be able to call initialize again
     with brownie.reverts():
         newStrategy.initialize(
-            vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov},
+            vault,
+            strategist,
+            rewards,
+            keeper,
+            pid,
+            pool,
+            strategy_name,
+            {"from": gov},
+        )
+
+    ## shouldn't be able to clone a clone
+    with brownie.reverts():
+        newStrategy.cloneConvex3CrvRewards(
+            vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
         )
 
     vault.revokeStrategy(strategy, {"from": gov})

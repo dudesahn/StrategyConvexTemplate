@@ -5,7 +5,13 @@ from brownie import config
 
 # test passes as of 21-06-26
 def test_emergency_exit(
-    gov, token, vault, whale, strategy, chain, amount,
+    gov,
+    token,
+    vault,
+    whale,
+    strategy,
+    chain,
+    amount,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -15,8 +21,8 @@ def test_emergency_exit(
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    # simulate seven days of earnings
-    chain.sleep(86400 * 7)
+    # simulate one day of earnings
+    chain.sleep(86400)
     chain.mine(1)
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -39,7 +45,13 @@ def test_emergency_exit(
 
 
 def test_emergency_exit_with_profit(
-    gov, token, vault, whale, strategy, chain, amount,
+    gov,
+    token,
+    vault,
+    whale,
+    strategy,
+    chain,
+    amount,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -50,8 +62,8 @@ def test_emergency_exit_with_profit(
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    # simulate seven days of earnings
-    chain.sleep(86400 * 7)
+    # simulate one day of earnings
+    chain.sleep(86400)
     chain.mine(1)
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -77,7 +89,16 @@ def test_emergency_exit_with_profit(
 
 
 def test_emergency_exit_with_no_gain_or_loss(
-    gov, token, vault, whale, strategy, chain, gauge, voter, cvxDeposit, amount,
+    gov,
+    token,
+    vault,
+    whale,
+    strategy,
+    chain,
+    gauge,
+    voter,
+    cvxDeposit,
+    amount,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
