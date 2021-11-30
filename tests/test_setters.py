@@ -111,5 +111,3 @@ def test_setters(
 
     # set emergency exit last
     strategy.setEmergencyExit({"from": gov})
-    with brownie.reverts():
-        strategy.setEmergencyExit({"from": gov})

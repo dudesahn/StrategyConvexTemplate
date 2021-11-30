@@ -10,7 +10,7 @@ def isolation(fn_isolation):
 # put our pool's convex pid here; this is the only thing that should need to change up here **************
 @pytest.fixture(scope="module")
 def pid():
-    pid = 56
+    pid = 13
     yield pid
 
 
@@ -18,21 +18,23 @@ def pid():
 def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    whale = accounts.at("0xFe9418C75D061f758446E8e78433deEa86b213f3", force=True)
+    whale = accounts.at(
+        "0xd1b12B00b88915cb68a7faAd1b2142814fF8564b", force=True
+    )  # 0x0FC60765Aa07969027740F2560045cBF4205E776 for USDP
     yield whale
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 5_000e18
+    amount = 10_000e18
     yield amount
 
 
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexOUSD"
+    strategy_name = "StrategyConvexUSDN"
     yield strategy_name
 
 
@@ -46,8 +48,15 @@ def rewards_token():
 # this is whether our pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
 @pytest.fixture(scope="module")
 def has_rewards():
-    has_rewards = True
+    has_rewards = False
     yield has_rewards
+
+
+# curve deposit pool
+@pytest.fixture(scope="module")
+def pool():  # 0x3c8cAee4E09296800f8D29A68Fa3837e2dae4940 for USDP
+    poolAddress = Contract("0x094d12e5b541784701FD8d65F11fc0598FBC6332")
+    yield poolAddress
 
 
 # Only worry about changing things above this line, unless you want to make changes to the vault or strategy.
@@ -121,17 +130,6 @@ def gauge(pid, booster):
     # this should be the address of the convex deposit token
     gauge = booster.poolInfo(pid)[2]
     yield Contract(gauge)
-
-
-# curve deposit pool
-@pytest.fixture(scope="module")
-def pool(token, curve_registry, zero_address):
-    if curve_registry.get_pool_from_lp_token(token) == zero_address:
-        poolAddress = token
-    else:
-        _poolAddress = curve_registry.get_pool_from_lp_token(token)
-        poolAddress = Contract(_poolAddress)
-    yield poolAddress
 
 
 @pytest.fixture(scope="module")
@@ -219,7 +217,7 @@ def vault(pm, gov, rewards, guardian, management, token, chain):
 # replace the first value with the name of your strategy
 @pytest.fixture(scope="function")
 def strategy(
-    StrategyConvex3CrvRewardsClonable,
+    StrategyConvexOldPoolsClonable,
     strategist,
     keeper,
     vault,
@@ -237,7 +235,7 @@ def strategy(
 ):
     # make sure to include all constructor parameters needed here
     strategy = strategist.deploy(
-        StrategyConvex3CrvRewardsClonable,
+        StrategyConvexOldPoolsClonable,
         vault,
         pid,
         pool,

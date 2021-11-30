@@ -12,7 +12,7 @@ def test_cloning(
     keeper,
     rewards,
     chain,
-    StrategyConvex3CrvRewardsClonable,
+    StrategyConvexOldPoolsClonable,
     rewardsContract,
     pid,
     amount,
@@ -36,7 +36,7 @@ def test_cloning(
     tx = strategy.cloneConvex3CrvRewards(
         vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
     )
-    newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)
+    newStrategy = StrategyConvexOldPoolsClonable.at(tx.return_value)
 
     # Shouldn't be able to call initialize again
     with brownie.reverts():
