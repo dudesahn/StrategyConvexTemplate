@@ -514,6 +514,8 @@ def test_odds_and_ends_weird_amounts(
 
     # take 100% of our CRV to the voter
     strategy.setKeepCRV(10000, {"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
     strategy.harvest({"from": gov})
 
     # sleep for a week to get some profit
@@ -538,6 +540,8 @@ def test_odds_and_ends_weird_amounts(
 
     # take 0% of our CRV to the voter
     strategy.setKeepCRV(0, {"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
     strategy.harvest({"from": gov})
 
 
@@ -624,7 +628,11 @@ def test_odds_and_ends_rewards_stuff(
 
     # take 100% of our CRV to the voter
     strategy.setKeepCRV(10000, {"from": gov})
-    strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+    tx = strategy.harvest(
+        {"from": gov}
+    )  # this one seems to randomly fail sometimes, adding sleep/mine before fixed it, likely because of updating the view variable?
 
     # we do this twice to hit both branches of the if statement
     strategy.turnOffRewards({"from": gov})
@@ -692,4 +700,6 @@ def test_odds_and_ends_rewards_stuff(
 
     # take 0% of our CRV to the voter
     strategy.setKeepCRV(0, {"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
     strategy.harvest({"from": gov})
