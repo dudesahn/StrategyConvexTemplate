@@ -103,11 +103,6 @@ def test_odds_and_ends(
     assert vaultAssets_2 >= startingVault
     print("\nAssets after 1 day harvest: ", vaultAssets_2)
 
-    # check our oracle
-    one_eth_in_want = strategy.ethToWant(1000000000000000000)
-    print("This is how much want one ETH buys:", one_eth_in_want)
-    zero_eth_in_want = strategy.ethToWant(0)
-
     # check our views
     strategy.apiVersion()
     strategy.isActive()

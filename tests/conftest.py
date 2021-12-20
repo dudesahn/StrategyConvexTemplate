@@ -19,7 +19,7 @@ def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0xd1b12B00b88915cb68a7faAd1b2142814fF8564b", force=True
+        "0x7779f8144951811c8d7418A6cF4aa58F65e221B3", force=True
     )  # 0x0FC60765Aa07969027740F2560045cBF4205E776 for USDP
     yield whale
 
@@ -252,6 +252,7 @@ def strategy(
     strategy.setHealthCheck(healthCheck, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
     chain.sleep(1)
+    chain.mine(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
     yield strategy
