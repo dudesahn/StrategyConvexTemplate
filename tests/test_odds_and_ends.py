@@ -595,11 +595,6 @@ def test_odds_and_ends_rewards_stuff(
     strategy.updateRewards(rewards_token, {"from": gov})
     strategy.updateRewards(rewards_token, {"from": gov})
 
-    # have our whale send some "rewards" to our strat, turn off health check for this harvest
-    balance = rewards_token.balanceOf(whale)
-    rewards_token.transfer(strategy, balance, {"from": whale})
-    strategy.setDoHealthCheck(False, {"from": gov})
-
     # set our optimal to DAI with rewards on
     strategy.setOptimal(0, {"from": gov})
 

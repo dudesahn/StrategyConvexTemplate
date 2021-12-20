@@ -276,14 +276,15 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
     // we use these to deposit to our curve pool
     address public targetStable;
     address internal constant uniswapv3 =
-        address(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+        0xE592427A0AEce92De3Edee1F18E0157C05861564;
+    ICurveFi internal constant crveth =
+        ICurveFi(0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511); // use curve's new CRV-ETH crypto pool to sell our CRV
     IERC20 internal constant usdt =
         IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
     IERC20 internal constant usdc =
         IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
     IERC20 internal constant dai =
         IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
-    uint24 public uniCrvFee; // this is equal to 1%, can change this later if a different path becomes more optimal
     uint24 public uniStableFee; // this is equal to 0.05%, can change this later if a different path becomes more optimal
 
     // rewards token info. we can have more than 1 reward token but this is rare, so we don't include this in the template
@@ -376,7 +377,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         // want = Curve LP
         want.approve(address(depositContract), type(uint256).max);
         convexToken.approve(sushiswap, type(uint256).max);
-        crv.approve(uniswapv3, type(uint256).max);
+        crv.approve(address(crveth), type(uint256).max);
         weth.approve(uniswapv3, type(uint256).max);
 
         // this is the pool specific to this vault, but we only use it as an address
@@ -428,7 +429,6 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         targetStable = address(dai);
 
         // set our uniswap pool fees
-        uniCrvFee = 10000;
         uniStableFee = 500;
     }
 
@@ -544,21 +544,11 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
                 block.timestamp
             );
         }
+
         if (_crvAmount > 0) {
-            IUniV3(uniswapv3).exactInput(
-                IUniV3.ExactInputParams(
-                    abi.encodePacked(
-                        address(crv),
-                        uint24(uniCrvFee),
-                        address(weth)
-                    ),
-                    address(this),
-                    block.timestamp,
-                    _crvAmount,
-                    uint256(1)
-                )
-            );
+            crveth.exchange(1, 0, _crvAmount, 0, false);
         }
+
         uint256 _wethBalance = weth.balanceOf(address(this));
         IUniV3(uniswapv3).exactInput(
             IUniV3.ExactInputParams(
@@ -779,11 +769,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
     }
 
     // set the fee pool we'd like to swap through for CRV on UniV3 (1% = 10_000)
-    function setUniFees(uint24 _crvFee, uint24 _stableFee)
-        external
-        onlyAuthorized
-    {
-        uniCrvFee = _crvFee;
+    function setUniFees(uint24 _stableFee) external onlyAuthorized {
         uniStableFee = _stableFee;
     }
 }

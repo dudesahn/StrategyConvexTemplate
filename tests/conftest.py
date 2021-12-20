@@ -18,7 +18,7 @@ def pid():
 def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    whale = accounts.at("0xFe9418C75D061f758446E8e78433deEa86b213f3", force=True)
+    whale = accounts.at("0x9726c55B0cB4dcfD3A8aCF3c7DED770AAa22240e", force=True)
     yield whale
 
 
@@ -40,7 +40,7 @@ def strategy_name():
 # this is the address of our rewards token, in this case it's a dummy (ALCX) that our whale happens to hold just used to test stuff
 @pytest.fixture(scope="module")
 def rewards_token():
-    yield Contract("0xdBdb4d16EdA451D0503b854CF79D55697F90c8DF")
+    yield Contract("0x8207c1FfC5B6804F6024322CcF34F29c3541Ae26")
 
 
 # this is whether our pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
