@@ -27,6 +27,9 @@ def test_simple_harvest(
     # this is part of our check into the staking contract balance
     stakingBeforeHarvest = rewardsContract.balanceOf(strategy)
 
+    # change our optimal deposit asset
+    strategy.setOptimal(0, {"from": gov})
+
     # harvest, store asset amount
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -40,8 +43,8 @@ def test_simple_harvest(
     # try and include custom logic here to check that funds are in the staking contract (if needed)
     assert rewardsContract.balanceOf(strategy) > stakingBeforeHarvest
 
-    # simulate 1 day of earnings
-    chain.sleep(86400)
+    # simulate 12 hours of earnings so we don't outrun our convex earmark
+    chain.sleep(43200)
     chain.mine(1)
 
     # harvest, store new asset amount
@@ -57,7 +60,7 @@ def test_simple_harvest(
     print(
         "\nEstimated DAI APR: ",
         "{:.2%}".format(
-            ((new_assets - old_assets) * 365) / (strategy.estimatedTotalAssets())
+            ((new_assets - old_assets) * (365 * 2)) / (strategy.estimatedTotalAssets())
         ),
     )
 
@@ -71,8 +74,8 @@ def test_simple_harvest(
     # try and include custom logic here to check that funds are in the staking contract (if needed)
     assert rewardsContract.balanceOf(strategy) > 0
 
-    # simulate 1 day of earnings
-    chain.sleep(86400)
+    # simulate 12 hours of earnings so we don't outrun our convex earmark
+    chain.sleep(43200)
     chain.mine(1)
 
     # harvest, store new asset amount
@@ -87,7 +90,7 @@ def test_simple_harvest(
     print(
         "\nEstimated USDC APR: ",
         "{:.2%}".format(
-            ((after_usdc_assets - before_usdc_assets) * 365)
+            ((after_usdc_assets - before_usdc_assets) * (365 * 2))
             / (strategy.estimatedTotalAssets())
         ),
     )
@@ -103,8 +106,8 @@ def test_simple_harvest(
     # try and include custom logic here to check that funds are in the staking contract (if needed)
     assert rewardsContract.balanceOf(strategy) > 0
 
-    # simulate 1 day of earnings
-    chain.sleep(86400)
+    # simulate 12 hours of earnings so we don't outrun our convex earmark
+    chain.sleep(43200)
     chain.mine(1)
 
     # harvest, store new asset amount
@@ -119,7 +122,7 @@ def test_simple_harvest(
     print(
         "\nEstimated USDT APR: ",
         "{:.2%}".format(
-            ((after_usdt_assets - before_usdt_assets) * (365))
+            ((after_usdt_assets - before_usdt_assets) * (365 * 2))
             / (strategy.estimatedTotalAssets())
         ),
     )

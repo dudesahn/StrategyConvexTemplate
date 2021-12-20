@@ -426,7 +426,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         usdc.approve(address(zapContract), type(uint256).max);
 
         // start with dai
-        targetStable = address(dai);
+        targetStable = address(usdt);
 
         // set our uniswap pool fees
         uniStableFee = 500;
