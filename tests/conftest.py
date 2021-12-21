@@ -46,7 +46,7 @@ def rewards_token():
 # this is whether our pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
 @pytest.fixture(scope="module")
 def has_rewards():
-    has_rewards = True
+    has_rewards = False
     yield has_rewards
 
 

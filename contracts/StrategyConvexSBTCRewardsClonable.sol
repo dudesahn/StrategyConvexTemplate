@@ -275,12 +275,13 @@ contract StrategyConvexSBTCRewardsClonable is StrategyConvexBase {
 
     // swap stuff
     address internal constant uniswapv3 =
-        address(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+        0xE592427A0AEce92De3Edee1F18E0157C05861564;
+    ICurveFi internal constant crveth =
+        ICurveFi(0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511); // use curve's new CRV-ETH crypto pool to sell our CRV
     IERC20 internal constant usdt =
         IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
     IERC20 internal constant wbtc =
         IERC20(0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599);
-    uint24 public uniCrvFee; // this is equal to 1%, can change this later if a different path becomes more optimal
     uint24 public uniWbtcFee; // this is equal to 0.05%, can change this later if a different path becomes more optimal
 
     // rewards token info. we can have more than 1 reward token but this is rare, so we don't include this in the template
@@ -373,7 +374,7 @@ contract StrategyConvexSBTCRewardsClonable is StrategyConvexBase {
         // want = Curve LP
         want.approve(address(depositContract), type(uint256).max);
         convexToken.approve(sushiswap, type(uint256).max);
-        crv.approve(uniswapv3, type(uint256).max);
+        crv.approve(address(crveth), type(uint256).max);
         weth.approve(uniswapv3, type(uint256).max);
 
         // this is the pool specific to this vault, but we only use it as an address
@@ -420,7 +421,6 @@ contract StrategyConvexSBTCRewardsClonable is StrategyConvexBase {
         wbtc.approve(address(zapContract), type(uint256).max);
 
         // set our uniswap pool fees
-        uniCrvFee = 10000;
         uniWbtcFee = 500;
     }
 
@@ -446,7 +446,6 @@ contract StrategyConvexSBTCRewardsClonable is StrategyConvexBase {
         if (_sendToVoter > 0) {
             crv.safeTransfer(voter, _sendToVoter);
         }
-        uint256 _crvRemainder = _crvBalance.sub(_sendToVoter);
 
         // claim and sell our rewards if we have them. in this case, we only sell them to WETH first, and they are swapped for WBTC in selling of CRV/CVX.
         if (hasRewards) {
@@ -457,8 +456,11 @@ contract StrategyConvexSBTCRewardsClonable is StrategyConvexBase {
             }
         }
 
+        // check our balance again after transferring some crv to our voter
+        _crvBalance = crv.balanceOf(address(this));
+
         // sell the rest of our CRV, CVX, and any extra rewards (already swapped to WETH) for WBTC
-        _sellCrvAndCvx(_crvRemainder, _convexBalance);
+        _sellCrvAndCvx(_crvBalance, _convexBalance);
 
         // deposit our balance to Curve if we have any
         uint256 _wbtcBalance = wbtc.balanceOf(address(this));
@@ -515,7 +517,7 @@ contract StrategyConvexSBTCRewardsClonable is StrategyConvexBase {
         );
     }
 
-    // Sells our CRV -> WETH on UniV3 and CVX -> WETH on Sushi, then WETH -> WBTC together on UniV3
+    // Sells our CRV -> WETH on Curve and CVX -> WETH on Sushi, then WETH -> WBTC together on UniV3
     function _sellCrvAndCvx(uint256 _crvAmount, uint256 _convexAmount)
         internal
     {
@@ -532,21 +534,11 @@ contract StrategyConvexSBTCRewardsClonable is StrategyConvexBase {
                 block.timestamp
             );
         }
+
         if (_crvAmount > 0) {
-            IUniV3(uniswapv3).exactInput(
-                IUniV3.ExactInputParams(
-                    abi.encodePacked(
-                        address(crv),
-                        uint24(uniCrvFee),
-                        address(weth)
-                    ),
-                    address(this),
-                    block.timestamp,
-                    _crvAmount,
-                    uint256(1)
-                )
-            );
+            crveth.exchange(1, 0, _crvAmount, 0, false);
         }
+
         uint256 _wethBalance = weth.balanceOf(address(this));
         if (_wethBalance > 0) {
             IUniV3(uniswapv3).exactInput(
@@ -763,11 +755,7 @@ contract StrategyConvexSBTCRewardsClonable is StrategyConvexBase {
     }
 
     // set the fee pool we'd like to swap through for CRV on UniV3 (1% = 10_000)
-    function setUniFees(uint24 _crvFee, uint24 _wbtcFee)
-        external
-        onlyAuthorized
-    {
-        uniCrvFee = _crvFee;
+    function setUniFees(uint24 _wbtcFee) external onlyAuthorized {
         uniWbtcFee = _wbtcFee;
     }
 }
