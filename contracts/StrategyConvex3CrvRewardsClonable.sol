@@ -115,7 +115,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
 
     // Swap stuff
     address internal constant sushiswap =
-        0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // default to sushiswap, more CRV and CVX liquidity there
+        0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // default to sushiswap, we use this for our harvest profit calcs
 
     IERC20 internal constant crv =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
@@ -273,12 +273,16 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
 
     bool public checkEarmark; // this determines if we should check if we need to earmark rewards before harvesting
 
+    // use Curve to sell our CVX and CRV rewards to WETH
+    ICurveFi internal constant crveth =
+        ICurveFi(0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511); // use curve's new CRV-ETH crypto pool to sell our CRV
+    ICurveFi internal constant cvxeth =
+        ICurveFi(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4); // use curve's new CVX-ETH crypto pool to sell our CVX
+
     // we use these to deposit to our curve pool
     address public targetStable;
     address internal constant uniswapv3 =
         0xE592427A0AEce92De3Edee1F18E0157C05861564;
-    ICurveFi internal constant crveth =
-        ICurveFi(0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511); // use curve's new CRV-ETH crypto pool to sell our CRV
     IERC20 internal constant usdt =
         IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
     IERC20 internal constant usdc =
@@ -376,7 +380,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
 
         // want = Curve LP
         want.approve(address(depositContract), type(uint256).max);
-        convexToken.approve(sushiswap, type(uint256).max);
+        convexToken.approve(address(cvxeth), type(uint256).max);
         crv.approve(address(crveth), type(uint256).max);
         weth.approve(uniswapv3, type(uint256).max);
 
@@ -533,18 +537,8 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
     function _sellCrvAndCvx(uint256 _crvAmount, uint256 _convexAmount)
         internal
     {
-        address[] memory convexTokenPath = new address[](2);
-        convexTokenPath[0] = address(convexToken);
-        convexTokenPath[1] = address(weth);
-
         if (_convexAmount > 0) {
-            IUniswapV2Router02(sushiswap).swapExactTokensForTokens(
-                _convexAmount,
-                uint256(0),
-                convexTokenPath,
-                address(this),
-                block.timestamp
-            );
+            cvxeth.exchange(1, 0, _convexAmount, 0, false);
         }
 
         if (_crvAmount > 0) {

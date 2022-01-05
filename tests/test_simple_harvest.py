@@ -43,8 +43,8 @@ def test_simple_harvest(
     # try and include custom logic here to check that funds are in the staking contract (if needed)
     assert rewardsContract.balanceOf(strategy) > stakingBeforeHarvest
 
-    # simulate 12 hours of earnings so we don't outrun our convex earmark
-    chain.sleep(43200)
+    # simulate 6 hours of earnings so we don't outrun our convex earmark
+    chain.sleep(21600)
     chain.mine(1)
 
     # harvest, store new asset amount
@@ -60,7 +60,7 @@ def test_simple_harvest(
     print(
         "\nEstimated DAI APR: ",
         "{:.2%}".format(
-            ((new_assets - old_assets) * (365 * 2)) / (strategy.estimatedTotalAssets())
+            ((new_assets - old_assets) * (365 * 4)) / (strategy.estimatedTotalAssets())
         ),
     )
 
@@ -74,8 +74,8 @@ def test_simple_harvest(
     # try and include custom logic here to check that funds are in the staking contract (if needed)
     assert rewardsContract.balanceOf(strategy) > 0
 
-    # simulate 12 hours of earnings so we don't outrun our convex earmark
-    chain.sleep(43200)
+    # simulate 6 hours of earnings so we don't outrun our convex earmark
+    chain.sleep(21600)
     chain.mine(1)
 
     # harvest, store new asset amount
@@ -90,7 +90,7 @@ def test_simple_harvest(
     print(
         "\nEstimated USDC APR: ",
         "{:.2%}".format(
-            ((after_usdc_assets - before_usdc_assets) * (365 * 2))
+            ((after_usdc_assets - before_usdc_assets) * (365 * 4))
             / (strategy.estimatedTotalAssets())
         ),
     )
@@ -106,8 +106,8 @@ def test_simple_harvest(
     # try and include custom logic here to check that funds are in the staking contract (if needed)
     assert rewardsContract.balanceOf(strategy) > 0
 
-    # simulate 12 hours of earnings so we don't outrun our convex earmark
-    chain.sleep(43200)
+    # simulate 6 hours of earnings so we don't outrun our convex earmark
+    chain.sleep(21600)
     chain.mine(1)
 
     # harvest, store new asset amount
@@ -122,7 +122,7 @@ def test_simple_harvest(
     print(
         "\nEstimated USDT APR: ",
         "{:.2%}".format(
-            ((after_usdt_assets - before_usdt_assets) * (365 * 2))
+            ((after_usdt_assets - before_usdt_assets) * (365 * 4))
             / (strategy.estimatedTotalAssets())
         ),
     )
