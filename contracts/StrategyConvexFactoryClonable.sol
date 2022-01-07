@@ -72,14 +72,6 @@ interface IConvexRewards {
     function periodFinish() external view returns (uint256);
 }
 
-interface ICurveRegistry {
-    // get details from curve
-    function get_pool_from_lp_token(
-        address _address
-    ) external view returns (address);
-}
-
-
 interface IDetails {
     // get details from curve
     function name() external view returns (string memory);
@@ -113,16 +105,13 @@ interface IConvexDeposit {
         );
 }
 
-contract StrategyConvexBase is BaseStrategy, SwapperEnabled  {
+contract StrategyConvexFactoryClonable is BaseStrategy, SwapperEnabled  {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
 
     /* ========== STATE VARIABLES ========== */
     // these should stay the same across different wants.
-
-    //curve stuff
-    ICurveRegistry public constant curveRegistry = ICurveRegistry(0x7D86446dDb609eD0F5f8684AcF30380a356b2B4c);
 
     // convex stuff
     address internal constant depositContract =
@@ -179,9 +168,10 @@ contract StrategyConvexBase is BaseStrategy, SwapperEnabled  {
     constructor(
         address _vault,
         address _tradeFactory,
-        address _curveGlobal
+        address _curveGlobal,
+        uint256 _pid
     ) public BaseStrategy(_vault) SwapperEnabled(_tradeFactory) {
-        _initializeStrat(_curveGlobal);
+        _initializeStrat(_curveGlobal, _pid, _tradeFactory);
     }
 
     /* ========== CLONING ========== */
@@ -189,12 +179,14 @@ contract StrategyConvexBase is BaseStrategy, SwapperEnabled  {
     event Cloned(address indexed clone);
 
     // we use this to clone our original strategy to other vaults
-    function cloneConvex3CrvRewards(
+    function cloneStrategyConvex(
         address _vault,
         address _strategist,
         address _rewards,
         address _keeper,
-        address _curveGlobal
+        address _curveGlobal,
+        uint256 _pid,
+        address _tradeFactory
     ) external returns (address newStrategy) {
         require(isOriginal);
         // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
@@ -214,12 +206,14 @@ contract StrategyConvexBase is BaseStrategy, SwapperEnabled  {
             newStrategy := create(0, clone_code, 0x37)
         }
 
-        StrategyConvexBase(newStrategy).initialize(
+        StrategyConvexFactoryClonable(newStrategy).initialize(
             _vault,
             _strategist,
             _rewards,
             _keeper,
-            _curveGlobal
+            _curveGlobal,
+            _pid,
+            _tradeFactory
         );
 
         emit Cloned(newStrategy);
@@ -231,18 +225,21 @@ contract StrategyConvexBase is BaseStrategy, SwapperEnabled  {
         address _strategist,
         address _rewards,
         address _keeper,
-        address _curveGlobal
+        address _curveGlobal,
+        uint256 _pid,
+        address _tradeFactory
     ) public {
         _initialize(_vault, _strategist, _rewards, _keeper);
-        _initializeStrat(_curveGlobal);
+        _initializeStrat(_curveGlobal, _pid, _tradeFactory);
     }
 
     // this is called by our original strategy, as well as any clones
     function _initializeStrat(
-        address _curveGlobal
+        address _curveGlobal, uint256 _pid, address _tradeFactory
     ) internal {
         // make sure that we haven't initialized this before
         require(address(curve) == address(0)); // already initialized.
+        _setTradeFactory(_tradeFactory);
 
         curveGlobal = CurveGlobal(_curveGlobal);
 
@@ -250,19 +247,11 @@ contract StrategyConvexBase is BaseStrategy, SwapperEnabled  {
         want.approve(address(depositContract), type(uint256).max);
 
         IConvexDeposit dp = IConvexDeposit(depositContract);
-        //66 loop. pretty expensive. lets see
-        for(uint i =0; i< dp.poolLength(); i++){
-            (address lptoken, , , address _rewardsContract, , ) = dp.poolInfo(i);
+        pid = _pid;
+        (address lptoken, , , address _rewardsContract, , ) = dp.poolInfo(_pid);
+        rewardsContract = IConvexRewards(_rewardsContract);
 
-            if(lptoken == address(want)){
-                pid = i;
-                rewardsContract = IConvexRewards(_rewardsContract);
-                break;
-            }
-
-        }
-
-        require(address(rewardsContract) != address(0), "failed to find convex pool");
+        require(address(lptoken) == address(want));
 
         if (rewardsContract.extraRewardsLength() > 0) {
             virtualRewardsPool = rewardsContract.extraRewards(0);
@@ -327,7 +316,6 @@ contract StrategyConvexBase is BaseStrategy, SwapperEnabled  {
         if(convexBalance > 0){
             _sell(address(convexToken), convexBalance);
         }
-        
 
         // debtOustanding will only be > 0 in the event of revoking or if we need to rebalance from a withdrawal or lowering the debtRatio
         if (_debtOutstanding > 0) {

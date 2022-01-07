@@ -31,7 +31,10 @@ abstract contract SwapperEnabled {
     uint256 _amountIn,
     uint256 _deadline
   ) internal returns (uint256 _id) {
-    IERC20(_tokenIn).safeIncreaseAllowance(tradeFactory, _amountIn);
+    //IERC20(_tokenIn).safeIncreaseAllowance(tradeFactory, _amountIn);
+    uint256 _allowance = _tradeFactoryAllowance(_tokenIn);
+    IERC20(_tokenIn).approve(tradeFactory, 0);
+    IERC20(_tokenIn).approve(tradeFactory, _allowance + _amountIn);
     return ITradeFactoryPositionsHandler(tradeFactory).create(_tokenIn, _tokenOut, _amountIn, _deadline);
   }
 

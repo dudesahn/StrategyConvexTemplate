@@ -18,7 +18,7 @@ def pid():
 def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    whale = accounts.at("0x9726c55B0cB4dcfD3A8aCF3c7DED770AAa22240e", force=True)
+    whale = accounts.at("0x89eBCb7714bd0D2F33ce3a35C12dBEB7b94af169", force=True)
     yield whale
 
 
@@ -107,6 +107,10 @@ def token(pid, booster):
     token_address = booster.poolInfo(pid)[0]
     yield Contract(token_address)
 
+
+@pytest.fixture
+def trade_factory():
+    yield Contract("0xBf26Ff7C7367ee7075443c4F95dEeeE77432614d")
 
 # zero address
 @pytest.fixture(scope="module")
@@ -199,7 +203,22 @@ def strategist(accounts):
 
 # use this if you need to deploy the vault
 @pytest.fixture(scope="function")
-def vault(pm, gov, rewards, guardian, management, token, chain):
+def vault(pm, gov, rewards, guardian, strategy,management, strategist_ms,token, chain):
+    Vault = pm(config["dependencies"][0]).Vault
+    vault = Vault.at(strategy.vault())
+
+    vault.acceptGovernance({"from": strategist_ms})
+    vault.setGovernance(gov, {"from": strategist_ms})
+    vault.acceptGovernance({"from": gov})
+    vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
+    vault.setManagement(management, {"from": gov})
+    chain.sleep(1)
+
+    vault.setManagementFee(0, {"from": gov})
+    yield vault
+
+@pytest.fixture(scope="function")
+def v2(pm, gov, rewards, guardian,management, token, chain):
     Vault = pm(config["dependencies"][0]).Vault
     vault = guardian.deploy(Vault)
     vault.initialize(token, gov, rewards, "", "", guardian)
@@ -208,53 +227,53 @@ def vault(pm, gov, rewards, guardian, management, token, chain):
     chain.sleep(1)
     yield vault
 
-
 # use this if your vault is already deployed
 # @pytest.fixture(scope="function")
 # def vault(pm, gov, rewards, guardian, management, token, chain):
 #     vault = Contract("0x497590d2d57f05cf8B42A36062fA53eBAe283498")
 #     yield vault
-
+@pytest.fixture
+def ymechs_safe():
+    yield Contract("0x2C01B4AD51a67E2d8F02208F54dF9aC4c0B778B6")
 
 # replace the first value with the name of your strategy
 @pytest.fixture(scope="function")
 def strategy(
-    StrategyConvex3CrvRewardsClonable,
+    StrategyConvexFactoryClonable,
     strategist,
     keeper,
-    vault,
+    ymechs_safe,
+    v2,
+    trade_factory,
     gov,
+    CurveGlobal,
     guardian,
     token,
     healthCheck,
     chain,
-    proxy,
     pid,
-    pool,
-    strategy_name,
+    proxy,
     gasOracle,
     strategist_ms,
 ):
+    curveGlobal = strategist.deploy(CurveGlobal)
+    s = strategist.deploy(StrategyConvexFactoryClonable, v2, trade_factory, curveGlobal, pid)
+    curveGlobal.initialise(s)
+    tx = curveGlobal.createNewCurveVaultAndStrat(pid)
+    (vault, strat) = tx.return_value
+
+
     # make sure to include all constructor parameters needed here
-    strategy = strategist.deploy(
-        StrategyConvex3CrvRewardsClonable,
-        vault,
-        pid,
-        pool,
-        strategy_name,
-    )
-    strategy.setKeeper(keeper, {"from": gov})
-    strategy.setHarvestProfitNeeded(80000e6, 180000e6, {"from": gov})
+    strategy = StrategyConvexFactoryClonable.at(strat)
+
+    trade_factory.grantRole(trade_factory.STRATEGY(), strategy, {"from": ymechs_safe, "gas_price": "0 gwei"})
+    strategy.setKeeper(keeper, {"from": strategist_ms})
+    strategy.setHarvestProfitNeeded(80000e6, 180000e6, {"from": strategist_ms})
     gasOracle.setMaxAcceptableBaseFee(20000000000000, {"from": strategist_ms})
     # set our management fee to zero so it doesn't mess with our profit checking
-    vault.setManagementFee(0, {"from": gov})
-    # add our new strategy
-    vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
-    # proxy.approveStrategy(strategy.gauge(), strategy, {"from": gov}), only need this step for curve voter strats
-    strategy.setHealthCheck(healthCheck, {"from": gov})
-    strategy.setDoHealthCheck(True, {"from": gov})
+    
     chain.sleep(1)
-    strategy.harvest({"from": gov})
+    strategy.harvest({"from": strategist_ms})
     chain.sleep(1)
     yield strategy
 
