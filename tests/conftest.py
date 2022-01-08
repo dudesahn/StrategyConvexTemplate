@@ -99,6 +99,13 @@ def farmed():
     # this is the token that we are farming and selling for more of our want.
     yield Contract("0xD533a949740bb3306d119CC777fa900bA034cd52")
 
+@pytest.fixture(scope="module")
+def weth(interface):
+    yield interface.ERC20('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+
+@pytest.fixture(scope="module")
+def uniswap_router(Contract):
+    yield Contract('0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D')
 
 # Define relevant tokens and contracts in this section
 @pytest.fixture(scope="module")
@@ -189,6 +196,13 @@ def guardian(accounts):
 def management(accounts):
     yield accounts[3]
 
+@pytest.fixture
+def ymechs_safe():
+    yield Contract("0x2C01B4AD51a67E2d8F02208F54dF9aC4c0B778B6")
+
+@pytest.fixture(scope="module")
+def multicall_swapper(interface):
+    yield interface.MultiCallOptimizedSwapper('0xceB202F25B50e8fAF212dE3CA6C53512C37a01D2')
 
 @pytest.fixture(scope="module")
 def strategist(accounts):
