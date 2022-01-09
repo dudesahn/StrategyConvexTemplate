@@ -1,7 +1,10 @@
 import brownie
 from brownie import Contract
 import time
-
+import web3
+from eth_abi import encode_single, encode_abi
+from brownie.convert import to_bytes
+import eth_utils
 def test_yswap(
     gov,
     vault,
@@ -43,10 +46,23 @@ def test_yswap(
         #trade_data = encode_abi(["address[]"], [path])
 
         path = [token_in, weth]
-        calldata = uniswap_router.swapExactTokensForTokens.encode_input(amount, 0, path, trade_factory, 2**256-1)
+
         
-        trade_factory.execute["uint256, address, uint, bytes"](id, multicall_swapper.address, 0, calldata, {"from": ymechs_safe})
+        #calldata = to_bytes(uniswap_router.swapExactTokensForTokens.encode_input(amount, 0, path, trade_factory, 2**256-1), bytes)
+        calldata = eth_utils.to_bytes(hexstr = uniswap_router.swapExactTokensForTokens.encode_input(amount, 0, path, trade_factory, 2**256-1))
+        #print(calldata)
+        #print(len(calldata))
+        # callonlynovalue
+        transaction = encode_abi(['uint8', 'address', 'uint256', 'bytes'], [5, uniswap_router.address, len(calldata), calldata])
+        #optimisations = encode_abi([], [5]) # callonlyno value
+        print(transaction)
+        #print(optimisations + transaction)
+
+        #trade_factory.execute["uint256, address, uint, bytes"](id, multicall_swapper.address, 0, calldata, {"from": ymechs_safe})
 
         #path = [toke_token.address, token.address]
         #trade_data = encode_abi(["address[]"], [path])
-        #trade_factory.execute["uint256, address, uint, bytes"](id, sushi_swapper.address, Wei("0.1 ether"), trade_data, {"from": ymechs_safe})
+        trade_factory.execute["uint256, address, uint, bytes"](id, multicall_swapper.address, 1, transaction, {"from": ymechs_safe})
+
+def remove0x(hex):
+    return hex[2:]

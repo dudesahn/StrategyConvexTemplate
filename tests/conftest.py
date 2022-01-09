@@ -1,5 +1,6 @@
 import pytest
 from brownie import config, Wei, Contract
+from brownie import network
 
 # Snapshots the chain before each test and reverts after test completion.
 @pytest.fixture(autouse=True)
@@ -218,6 +219,8 @@ def strategist(accounts):
 # use this if you need to deploy the vault
 @pytest.fixture(scope="function")
 def vault(pm, gov, rewards, guardian, strategy,management, strategist_ms,token, chain):
+    network.gas_price("0 gwei")
+    network.gas_limit(6700000)
     Vault = pm(config["dependencies"][0]).Vault
     vault = Vault.at(strategy.vault())
 
@@ -235,7 +238,7 @@ def vault(pm, gov, rewards, guardian, strategy,management, strategist_ms,token, 
 def v2(pm, gov, rewards, guardian,management, token, chain):
     Vault = pm(config["dependencies"][0]).Vault
     vault = guardian.deploy(Vault)
-    vault.initialize(token, gov, rewards, "", "", guardian)
+    vault.initialize(token, gov, rewards, "", "", guardian, {'from': guardian})
     vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
     vault.setManagement(management, {"from": gov})
     chain.sleep(1)
@@ -272,8 +275,8 @@ def strategy(
 ):
     curveGlobal = strategist.deploy(CurveGlobal)
     s = strategist.deploy(StrategyConvexFactoryClonable, v2, trade_factory, curveGlobal, pid)
-    curveGlobal.initialise(s)
-    tx = curveGlobal.createNewCurveVaultAndStrat(pid)
+    curveGlobal.initialise(s, {'from': strategist})
+    tx = curveGlobal.createNewCurveVaultAndStrat(pid,  {'from': strategist})
     (vault, strat) = tx.return_value
 
 
