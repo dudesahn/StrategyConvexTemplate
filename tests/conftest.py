@@ -73,10 +73,12 @@ def convexToken():
 @pytest.fixture(scope="function")
 def crv():
     yield Contract("0xD533a949740bb3306d119CC777fa900bA034cd52")
-    
+
+
 @pytest.fixture(scope="function")
 def dai():
     yield Contract("0x6B175474E89094C44Da98b954EedeAC495271d0F")
+
 
 @pytest.fixture(scope="module")
 def other_vault_strategy():
@@ -103,22 +105,26 @@ def farmed():
     # this is the token that we are farming and selling for more of our want.
     yield Contract("0xD533a949740bb3306d119CC777fa900bA034cd52")
 
+
 @pytest.fixture(scope="module")
 def weth(interface):
-    yield interface.ERC20('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+    yield interface.ERC20("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
+
 
 @pytest.fixture(scope="module")
 def uniswap_router(Contract):
-    yield Contract('0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D')
+    yield Contract("0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D")
+
 
 @pytest.fixture(scope="module")
 def sushiswap_router(Contract):
-    yield Contract('0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F')
-    
+    yield Contract("0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F")
+
 
 @pytest.fixture(scope="module")
 def curve_zapper(Contract):
-    yield Contract('0xA79828DF1850E8a3A3064576f380D90aECDD3359')
+    yield Contract("0xA79828DF1850E8a3A3064576f380D90aECDD3359")
+
 
 # Define relevant tokens and contracts in this section
 @pytest.fixture(scope="module")
@@ -131,6 +137,7 @@ def token(pid, booster):
 @pytest.fixture
 def trade_factory():
     yield Contract("0xBf26Ff7C7367ee7075443c4F95dEeeE77432614d")
+
 
 # zero address
 @pytest.fixture(scope="module")
@@ -209,13 +216,18 @@ def guardian(accounts):
 def management(accounts):
     yield accounts[3]
 
+
 @pytest.fixture
 def ymechs_safe():
     yield Contract("0x2C01B4AD51a67E2d8F02208F54dF9aC4c0B778B6")
 
+
 @pytest.fixture(scope="module")
 def multicall_swapper(interface):
-    yield interface.MultiCallOptimizedSwapper('0xceB202F25B50e8fAF212dE3CA6C53512C37a01D2')
+    yield interface.MultiCallOptimizedSwapper(
+        "0xceB202F25B50e8fAF212dE3CA6C53512C37a01D2"
+    )
+
 
 @pytest.fixture(scope="module")
 def strategist(accounts):
@@ -230,7 +242,9 @@ def strategist(accounts):
 
 # use this if you need to deploy the vault
 @pytest.fixture(scope="function")
-def vault(pm, gov, rewards, guardian, strategy,management, strategist_ms,token, chain):
+def vault(
+    pm, gov, rewards, guardian, strategy, management, strategist_ms, token, chain
+):
     network.gas_price("0 gwei")
     network.gas_limit(6700000)
     Vault = pm(config["dependencies"][0]).Vault
@@ -246,15 +260,17 @@ def vault(pm, gov, rewards, guardian, strategy,management, strategist_ms,token, 
     vault.setManagementFee(0, {"from": gov})
     yield vault
 
+
 @pytest.fixture(scope="function")
-def v2(pm, gov, rewards, guardian,management, token, chain):
+def v2(pm, gov, rewards, guardian, management, token, chain):
     Vault = pm(config["dependencies"][0]).Vault
     vault = guardian.deploy(Vault)
-    vault.initialize(token, gov, rewards, "", "", guardian, {'from': guardian})
+    vault.initialize(token, gov, rewards, "", "", guardian, {"from": guardian})
     vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
     vault.setManagement(management, {"from": gov})
     chain.sleep(1)
     yield vault
+
 
 # use this if your vault is already deployed
 # @pytest.fixture(scope="function")
@@ -264,6 +280,7 @@ def v2(pm, gov, rewards, guardian,management, token, chain):
 @pytest.fixture
 def ymechs_safe():
     yield Contract("0x2C01B4AD51a67E2d8F02208F54dF9aC4c0B778B6")
+
 
 # replace the first value with the name of your strategy
 @pytest.fixture(scope="function")
@@ -286,21 +303,24 @@ def strategy(
     strategist_ms,
 ):
     curveGlobal = strategist.deploy(CurveGlobal)
-    s = strategist.deploy(StrategyConvexFactoryClonable, v2, trade_factory, curveGlobal, pid)
-    curveGlobal.initialise(s, {'from': strategist})
-    tx = curveGlobal.createNewCurveVaultAndStrat(pid,  {'from': strategist})
+    s = strategist.deploy(
+        StrategyConvexFactoryClonable, v2, trade_factory, curveGlobal, pid
+    )
+    curveGlobal.initialise(s, {"from": strategist})
+    tx = curveGlobal.createNewCurveVaultAndStrat(pid, {"from": strategist})
     (vault, strat) = tx.return_value
-
 
     # make sure to include all constructor parameters needed here
     strategy = StrategyConvexFactoryClonable.at(strat)
 
-    trade_factory.grantRole(trade_factory.STRATEGY(), strategy, {"from": ymechs_safe, "gas_price": "0 gwei"})
+    trade_factory.grantRole(
+        trade_factory.STRATEGY(), strategy, {"from": ymechs_safe, "gas_price": "0 gwei"}
+    )
     strategy.setKeeper(keeper, {"from": strategist_ms})
     strategy.setHarvestProfitNeeded(80000e6, 180000e6, {"from": strategist_ms})
     gasOracle.setMaxAcceptableBaseFee(20000000000000, {"from": strategist_ms})
     # set our management fee to zero so it doesn't mess with our profit checking
-    
+
     chain.sleep(1)
     strategy.harvest({"from": strategist_ms})
     chain.sleep(1)
