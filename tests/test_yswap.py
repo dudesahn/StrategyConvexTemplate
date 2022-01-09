@@ -90,6 +90,7 @@ def test_yswap(
 
         transaction = encode_abi_packed(a, b)
         
+        #min out must be at least 1 to ensure that the tx works correctly
         trade_factory.execute["uint256, address, uint, bytes"](id, multicall_swapper.address, 1, transaction, {"from": ymechs_safe})
 
 
