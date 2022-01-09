@@ -51,9 +51,6 @@ def test_yswap(
         amount_in = trade["_amountIn"]
         print(f"Executing trade {id}, tokenIn: {token_in} -> tokenOut {token_out}")
 
-        # path = [toke_token.address, token.address]
-        # trade_data = encode_abi(["address[]"], [path])
-
         # always start with optimisations. 5 is CallOnlyNoValue
         optimsations = [["uint8"], [5]]
         a = optimsations[0]
