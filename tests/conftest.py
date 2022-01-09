@@ -73,7 +73,10 @@ def convexToken():
 @pytest.fixture(scope="function")
 def crv():
     yield Contract("0xD533a949740bb3306d119CC777fa900bA034cd52")
-
+    
+@pytest.fixture(scope="function")
+def dai():
+    yield Contract("0x6B175474E89094C44Da98b954EedeAC495271d0F")
 
 @pytest.fixture(scope="module")
 def other_vault_strategy():
@@ -107,6 +110,10 @@ def weth(interface):
 @pytest.fixture(scope="module")
 def uniswap_router(Contract):
     yield Contract('0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D')
+
+@pytest.fixture(scope="module")
+def curve_zapper(Contract):
+    yield Contract('0xA79828DF1850E8a3A3064576f380D90aECDD3359')
 
 # Define relevant tokens and contracts in this section
 @pytest.fixture(scope="module")

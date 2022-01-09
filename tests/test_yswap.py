@@ -4,6 +4,7 @@ import time
 import web3
 from eth_abi import encode_single, encode_abi
 from brownie.convert import to_bytes
+from eth_abi.packed import encode_abi_packed
 import eth_utils
 def test_yswap(
     gov,
@@ -11,9 +12,13 @@ def test_yswap(
     strategy,
     strategist,
     token,
+    dai,
     weth,
     amount,
+    Contract,
+    curve_zapper,
     chain,
+    interface,
     uniswap_router,
     whale,
     ymechs_safe,
@@ -38,31 +43,56 @@ def test_yswap(
     for id in trade_factory.pendingTradesIds(strategy):
         trade = trade_factory.pendingTradesById(id).dict()
         print(trade)
-        token_in = trade["_tokenIn"]
-        token_out = trade["_tokenOut"]
+        receiver = trade["_strategy"]
+        token_in = interface.ERC20(trade["_tokenIn"])
+        token_out =  interface.ERC20(trade["_tokenOut"])
+        amount_in = trade["_amountIn"]
         print(f"Executing trade {id}, tokenIn: {token_in} -> tokenOut {token_out}")
 
         #path = [toke_token.address, token.address]
         #trade_data = encode_abi(["address[]"], [path])
 
-        path = [token_in, weth]
+        
 
         
-        #calldata = to_bytes(uniswap_router.swapExactTokensForTokens.encode_input(amount, 0, path, trade_factory, 2**256-1), bytes)
-        calldata = eth_utils.to_bytes(hexstr = uniswap_router.swapExactTokensForTokens.encode_input(amount, 0, path, trade_factory, 2**256-1))
-        #print(calldata)
-        #print(len(calldata))
-        # callonlynovalue
-        transaction = encode_abi(['uint8', 'address', 'uint256', 'bytes'], [5, uniswap_router.address, len(calldata), calldata])
-        #optimisations = encode_abi([], [5]) # callonlyno value
-        print(transaction)
-        #print(optimisations + transaction)
+        #always start with optimisations. 5 is CallOnlyNoValue
+        optimsations = [['uint8'], [5]]
+        a = optimsations[0]
+        b = optimsations[1]
 
-        #trade_factory.execute["uint256, address, uint, bytes"](id, multicall_swapper.address, 0, calldata, {"from": ymechs_safe})
+        calldata = token_in.approve.encode_input(uniswap_router, amount_in)
+        t = createTx(token_in, calldata)
+        a = a + t[0]
+        b = b + t[1]
 
-        #path = [toke_token.address, token.address]
-        #trade_data = encode_abi(["address[]"], [path])
+        path = [token_in.address, weth, dai]
+        calldata = uniswap_router.swapExactTokensForTokens.encode_input(amount_in, 0, path, multicall_swapper, 2**256-1)
+        t = createTx(uniswap_router, calldata)
+        a = a + t[0]
+        b = b + t[1]
+        
+        expectedOut = uniswap_router.getAmountsOut(amount_in, path)[2]
+        calldata = dai.approve.encode_input(curve_zapper, expectedOut)
+        t = createTx(dai, calldata)
+        a = a + t[0]
+        b = b + t[1]
+
+        calldata = curve_zapper.add_liquidity.encode_input(token_out, [0, expectedOut, 0, 0],0)
+        t = createTx(curve_zapper, calldata)
+        a = a + t[0]
+        b = b + t[1]
+
+        expectedOut = curve_zapper.calc_token_amount(token_out, [0, expectedOut, 0, 0], True)*0.98 # less because it doesnt take into account fees
+        calldata =token_out.transfer.encode_input(receiver, expectedOut)
+        t = createTx(token_out, calldata)
+        a = a + t[0]
+        b = b + t[1]
+
+        transaction = encode_abi_packed(a, b)
+        
         trade_factory.execute["uint256, address, uint, bytes"](id, multicall_swapper.address, 1, transaction, {"from": ymechs_safe})
 
-def remove0x(hex):
-    return hex[2:]
+
+def createTx(to, data):
+    inBytes = eth_utils.to_bytes(hexstr = data)
+    return [['address', 'uint256', 'bytes'], [to.address, len(inBytes), inBytes]]
