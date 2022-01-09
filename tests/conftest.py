@@ -112,6 +112,11 @@ def uniswap_router(Contract):
     yield Contract('0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D')
 
 @pytest.fixture(scope="module")
+def sushiswap_router(Contract):
+    yield Contract('0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F')
+    
+
+@pytest.fixture(scope="module")
 def curve_zapper(Contract):
     yield Contract('0xA79828DF1850E8a3A3064576f380D90aECDD3359')
 

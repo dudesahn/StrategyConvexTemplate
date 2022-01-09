@@ -20,6 +20,7 @@ def test_yswap(
     chain,
     interface,
     uniswap_router,
+    sushiswap_router,
     whale,
     ymechs_safe,
     trade_factory,
@@ -60,18 +61,18 @@ def test_yswap(
         a = optimsations[0]
         b = optimsations[1]
 
-        calldata = token_in.approve.encode_input(uniswap_router, amount_in)
+        calldata = token_in.approve.encode_input(sushiswap_router, amount_in)
         t = createTx(token_in, calldata)
         a = a + t[0]
         b = b + t[1]
 
         path = [token_in.address, weth, dai]
-        calldata = uniswap_router.swapExactTokensForTokens.encode_input(amount_in, 0, path, multicall_swapper, 2**256-1)
-        t = createTx(uniswap_router, calldata)
+        calldata = sushiswap_router.swapExactTokensForTokens.encode_input(amount_in, 0, path, multicall_swapper, 2**256-1)
+        t = createTx(sushiswap_router, calldata)
         a = a + t[0]
         b = b + t[1]
         
-        expectedOut = uniswap_router.getAmountsOut(amount_in, path)[2]
+        expectedOut = sushiswap_router.getAmountsOut(amount_in, path)[2]
         calldata = dai.approve.encode_input(curve_zapper, expectedOut)
         t = createTx(dai, calldata)
         a = a + t[0]
