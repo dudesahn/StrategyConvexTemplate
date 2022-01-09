@@ -93,7 +93,9 @@ def test_yswap(
         
         #min out must be at least 1 to ensure that the tx works correctly
         trade_factory.execute["uint256, address, uint, bytes"](id, multicall_swapper.address, 1, transaction, {"from": ymechs_safe})
-
+    tx = strategy.harvest({"from": strategist})
+    print(tx.events)
+    assert tx.events["Harvested"]["profit"] > 0
 
 def createTx(to, data):
     inBytes = eth_utils.to_bytes(hexstr = data)
