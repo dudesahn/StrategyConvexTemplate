@@ -1,6 +1,21 @@
 import pytest
 from brownie import config, Wei, Contract
 from brownie import network
+import time, re, json, requests
+import web3
+from web3 import HTTPProvider
+
+#@pytest.fixture(scope="module", autouse=True)
+def tenderly_fork(web3):
+    fork_base_url = "https://simulate.yearn.network/fork"
+    payload = {"network_id": "1"}
+    resp = requests.post(fork_base_url, headers={}, json=payload)
+    fork_id = resp.json()["simulation_fork"]["id"]
+    fork_rpc_url = f"https://rpc.tenderly.co/fork/{fork_id}"
+    print(fork_rpc_url)
+    tenderly_provider = web3.HTTPProvider(fork_rpc_url, {"timeout": 600})
+    web3.provider = tenderly_provider
+    print(f"https://dashboard.tenderly.co/yearn/yearn-web/fork/{fork_id}")
 
 # Snapshots the chain before each test and reverts after test completion.
 @pytest.fixture(autouse=True)
@@ -188,6 +203,7 @@ def gasOracle():
 # normal gov is ychad, 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52
 @pytest.fixture(scope="module")
 def gov(accounts):
+    
     yield accounts.at("0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52", force=True)
 
 
@@ -297,6 +313,7 @@ def strategy(
     token,
     healthCheck,
     chain,
+    Contract,
     pid,
     proxy,
     gasOracle,
