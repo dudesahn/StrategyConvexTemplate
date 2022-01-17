@@ -318,7 +318,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
     function cloneConvex3CrvRewards(
         address _vault,
         address _strategist,
-        address _rewardsToken,
+        address _rewards,
         address _keeper,
         uint256 _pid,
         address _curvePool,
@@ -345,7 +345,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         StrategyConvex3CrvRewardsClonable(newStrategy).initialize(
             _vault,
             _strategist,
-            _rewardsToken,
+            _rewards,
             _keeper,
             _pid,
             _curvePool,
