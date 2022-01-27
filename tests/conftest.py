@@ -151,7 +151,8 @@ def token(pid, booster):
 
 @pytest.fixture
 def trade_factory():
-    yield Contract("0xBf26Ff7C7367ee7075443c4F95dEeeE77432614d")
+    #yield Contract("0xBf26Ff7C7367ee7075443c4F95dEeeE77432614d")
+    yield Contract("0x99d8679bE15011dEAD893EB4F5df474a4e6a8b29")
 
 
 # zero address
@@ -241,7 +242,8 @@ def ymechs_safe():
 @pytest.fixture(scope="module")
 def multicall_swapper(interface):
     yield interface.MultiCallOptimizedSwapper(
-        "0xceB202F25B50e8fAF212dE3CA6C53512C37a01D2"
+        #"0xceB202F25B50e8fAF212dE3CA6C53512C37a01D2"
+        "0xB2F65F254Ab636C96fb785cc9B4485cbeD39CDAA"
     )
 
 
@@ -324,8 +326,8 @@ def strategy(
         StrategyConvexFactoryClonable, v2, trade_factory, curveGlobal, pid
     )
     curveGlobal.initialise(s, {"from": strategist})
-    tx = curveGlobal.createNewCurveVaultAndStrat(pid, {"from": strategist})
-    (vault, strat) = tx.return_value
+    t11 = curveGlobal.createNewCurveVaultAndStrat(pid, {"from": strategist})
+    (vault, strat) = t11.return_value
 
     # make sure to include all constructor parameters needed here
     strategy = StrategyConvexFactoryClonable.at(strat)

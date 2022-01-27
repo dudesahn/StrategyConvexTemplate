@@ -9,13 +9,15 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/Math.sol";
 
-import "./ySwap/SwapperEnabled.sol";
-
 import "./CurveGlobal.sol";
 
 import "./interfaces/curve.sol";
 import {IUniswapV2Router02} from "./interfaces/uniswap.sol";
 import {BaseStrategy} from "@yearnvaults/contracts/BaseStrategy.sol";
+
+interface ITradeFactory {
+    function enable(address, address) external;
+}
 
 interface IBaseFee {
     function isCurrentBaseFeeAcceptable() external view returns (bool);
@@ -105,7 +107,7 @@ interface IConvexDeposit {
         );
 }
 
-contract StrategyConvexFactoryClonable is BaseStrategy, SwapperEnabled  {
+contract StrategyConvexFactoryClonable is BaseStrategy  {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
@@ -155,6 +157,9 @@ contract StrategyConvexFactoryClonable is BaseStrategy, SwapperEnabled  {
 
     CurveGlobal public curveGlobal;
 
+    bool public tradesEnabled;
+    address public tradeFactory;
+
     // rewards token info. we can have more than 1 reward token but this is rare, so we don't include this in the template
     address public rewardsToken;
     bool public hasRewards;
@@ -170,7 +175,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy, SwapperEnabled  {
         address _tradeFactory,
         address _curveGlobal,
         uint256 _pid
-    ) public BaseStrategy(_vault) SwapperEnabled(_tradeFactory) {
+    ) public BaseStrategy(_vault) {
         _initializeStrat(_curveGlobal, _pid, _tradeFactory);
     }
 
@@ -239,7 +244,6 @@ contract StrategyConvexFactoryClonable is BaseStrategy, SwapperEnabled  {
     ) internal {
         // make sure that we haven't initialized this before
         require(address(curve) == address(0)); // already initialized.
-        _setTradeFactory(_tradeFactory);
 
         curveGlobal = CurveGlobal(_curveGlobal);
 
@@ -272,8 +276,26 @@ contract StrategyConvexFactoryClonable is BaseStrategy, SwapperEnabled  {
             }
         }
 
+        tradeFactory = _tradeFactory;
+
         // set our strategy's name
         stratName = string(abi.encodePacked(IDetails(address(want)).name(), "Convex Strat"));
+    }
+
+    function _setUpTradeFactory() internal{
+        //approve and set up trade factory
+        address _tradeFactory = tradeFactory;
+
+        ITradeFactory tf = ITradeFactory(_tradeFactory);
+        crv.safeApprove(_tradeFactory, type(uint256).max);
+        tf.enable(address(crv), address(want));
+        if(hasRewards){
+            IERC20(rewardsToken).safeApprove(_tradeFactory, type(uint256).max);
+            tf.enable(address(rewardsToken), address(want));
+        } 
+        convexToken.safeApprove(_tradeFactory, type(uint256).max);
+        tf.enable(address(convexToken), address(want));
+        tradesEnabled = true;
     }
 
     /* ========== VARIABLE FUNCTIONS ========== */
@@ -288,33 +310,18 @@ contract StrategyConvexFactoryClonable is BaseStrategy, SwapperEnabled  {
             uint256 _debtPayment
         )
     {
+        if(tradesEnabled == false && tradeFactory != address(0)){
+            _setUpTradeFactory();
+        }
+
         // this claims our CRV, CVX, and any extra tokens like SNX or ANKR. no harm leaving this true even if no extra rewards currently.
         rewardsContract.getReward(address(this), true);
 
         uint256 crvBalance = crv.balanceOf(address(this));
-        uint256 convexBalance = convexToken.balanceOf(address(this));
 
         uint256 _sendToVoter = crvBalance.mul(curveGlobal.keepCRV()).div(FEE_DENOMINATOR);
         if (_sendToVoter > 0) {
             crv.safeTransfer(voter, _sendToVoter);
-        }
-
-        // claim and sell our rewards if we have them
-        if (hasRewards) {
-            uint256 _rewardsBalance =
-                IERC20(rewardsToken).balanceOf(address(this));
-            if (_rewardsBalance > 0) {
-                _sell(rewardsToken, _rewardsBalance);       
-            }
-        }
-
-        // check our balance again after transferring some crv to our voter
-        crvBalance = crv.balanceOf(address(this));
-        if(crvBalance > 0){
-            _sell(address(crv), crvBalance);
-        }
-        if(convexBalance > 0){
-            _sell(address(convexToken), convexBalance);
         }
 
         // debtOustanding will only be > 0 in the event of revoking or if we need to rebalance from a withdrawal or lowering the debtRatio
@@ -363,18 +370,6 @@ contract StrategyConvexFactoryClonable is BaseStrategy, SwapperEnabled  {
         if (_stakedBal > 0) {
             rewardsContract.withdrawAndUnwrap(_stakedBal, claimRewards);
         }
-    }
-
-    function _sell(address inToken, uint256 amount)
-        internal
-    {
-        uint256 _allowance = _tradeFactoryAllowance(inToken);
-            _createTrade(
-                inToken,
-                address(want),
-                amount - _allowance,
-                type(uint256).max
-            );
     }
 
     /* ========== KEEP3RS ========== */
@@ -651,6 +646,38 @@ contract StrategyConvexFactoryClonable is BaseStrategy, SwapperEnabled  {
     ) external onlyAuthorized {
         harvestProfitMin = _harvestProfitMin;
         harvestProfitMax = _harvestProfitMax;
+    }
+
+    function updateTradeFactory(
+        address _newTradeFactory
+    ) external onlyGovernance {
+        if(tradeFactory != address(0))
+        {
+            _removeTradeFactoryPermissions();
+        }
+        
+        tradeFactory = _newTradeFactory;
+        _setUpTradeFactory();
+    }
+
+    function removeTradeFactoryPermissions() external onlyEmergencyAuthorized{
+        _removeTradeFactoryPermissions();
+        
+    }
+    function _removeTradeFactoryPermissions() internal{
+
+        address _tradeFactory = tradeFactory;
+        crv.safeApprove(_tradeFactory, 0);
+        
+        if(hasRewards){
+            IERC20(rewardsToken).safeApprove(_tradeFactory, 0);
+            
+        } 
+        convexToken.safeApprove(_tradeFactory, 0);
+
+        tradeFactory = address(0);
+        tradesEnabled = false;
+        
     }
 
     // This allows us to manually harvest with our keeper as needed

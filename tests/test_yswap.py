@@ -26,6 +26,8 @@ def test_yswap(
     whale,
     ymechs_safe,
     trade_factory,
+    crv,
+    convexToken,
     multicall_swapper,
 ):
     vault_before = token.balanceOf(vault)
@@ -41,15 +43,24 @@ def test_yswap(
     chain.mine(10)
     strategy.harvest({"from": strategist})
 
+    token_out = interface.ERC20(vault.token())
+
+    ins = [crv, convexToken]
+
+    if strategy.hasRewards():
+        ins.append(interface.ERC20(strategy.rewardsToken()))
+
     print(f"Executing trades...")
-    for id in trade_factory.pendingTradesIds(strategy):
-        trade = trade_factory.pendingTradesById(id).dict()
-        print(trade)
-        receiver = trade["_strategy"]
-        token_in = interface.ERC20(trade["_tokenIn"])
-        token_out = interface.ERC20(trade["_tokenOut"])
-        amount_in = trade["_amountIn"]
+    for id in ins:
+        
+        print(id.address)
+        receiver = strategy.address
+        token_in = id
+        
+        amount_in = id.balanceOf(strategy)
         print(f"Executing trade {id}, tokenIn: {token_in} -> tokenOut {token_out}")
+
+        asyncTradeExecutionDetails = [strategy, token_in, token_out, amount_in, 1]
 
         # always start with optimisations. 5 is CallOnlyNoValue
         optimsations = [["uint8"], [5]]
@@ -94,9 +105,13 @@ def test_yswap(
         transaction = encode_abi_packed(a, b)
 
         # min out must be at least 1 to ensure that the tx works correctly
-        trade_factory.execute["uint256, address, uint, bytes"](
-            id, multicall_swapper.address, 1, transaction, {"from": ymechs_safe}
+        #trade_factory.execute["uint256, address, uint, bytes"](
+        #    multicall_swapper.address, 1, transaction, {"from": ymechs_safe}
+        #)
+        trade_factory.execute['tuple,address,bytes'](asyncTradeExecutionDetails, 
+            multicall_swapper.address, transaction, {"from": ymechs_safe}
         )
+        print(token_out.balanceOf(strategy))
     tx = strategy.harvest({"from": strategist})
     print(tx.events)
     assert tx.events["Harvested"]["profit"] > 0

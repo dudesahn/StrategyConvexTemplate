@@ -26,7 +26,7 @@ contract CurveGlobal{
     address public keeper = address(0x736D7e3c5a6CB2CE3B764300140ABF476F6CFCCF);
     address public rewardsStrat = address(0xc491599b9A20c3A2F0A85697Ee6D9434EFa9f503);
     address public healthCheck = address(0xDDCea799fF1699e98EDF118e0629A974Df7DF012);
-    address public tradeFactory = address(0xBf26Ff7C7367ee7075443c4F95dEeeE77432614d);
+    address public tradeFactory = address(0x99d8679bE15011dEAD893EB4F5df474a4e6a8b29);
 
     address public stratImplementation;
 
