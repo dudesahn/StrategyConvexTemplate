@@ -331,6 +331,8 @@ def strategy(
     # make sure to include all constructor parameters needed here
     strategy = StrategyConvexFactoryClonable.at(strat)
     print(strategy.rewards())
+    sharer = Contract(strategy.rewards())
+    print("contributors: ", sharer.viewContributors(strategy))
 
     trade_factory.grantRole(
         trade_factory.STRATEGY(), strategy, {"from": ymechs_safe, "gas_price": "0 gwei"}
