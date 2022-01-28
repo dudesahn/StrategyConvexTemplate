@@ -121,6 +121,8 @@ contract StrategyConvexFactoryClonable is BaseStrategy  {
     IConvexRewards public rewardsContract; // This is unique to each curve pool
     address public virtualRewardsPool; // This is only if we have bonus rewards
     uint256 public pid; // this is unique to each pool
+    bool public uselLocalCRV;
+    uint256 public localKeepCRV;
 
     address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
@@ -318,8 +320,8 @@ contract StrategyConvexFactoryClonable is BaseStrategy  {
         rewardsContract.getReward(address(this), true);
 
         uint256 crvBalance = crv.balanceOf(address(this));
-
-        uint256 _sendToVoter = crvBalance.mul(curveGlobal.keepCRV()).div(FEE_DENOMINATOR);
+        uint256 keep = uselLocalCRV ? localKeepCRV: curveGlobal.keepCRV();
+        uint256 _sendToVoter = crvBalance.mul(keep).div(FEE_DENOMINATOR);
         if (_sendToVoter > 0) {
             crv.safeTransfer(voter, _sendToVoter);
         }
@@ -526,6 +528,14 @@ contract StrategyConvexFactoryClonable is BaseStrategy  {
         // update with our new token
         rewardsToken = _rewardsToken;
         hasRewards = true;
+    }
+
+    function updateLocalKeepcrv(bool _local, uint256 _keep) external onlyGovernance {
+        uselLocalCRV = _local;
+        require(_keep <= 10_000);
+        if(_local){
+            localKeepCRV = _keep;
+        }
     }
 
     // Use to turn off extra rewards claiming and selling. set our allowance to zero on the router and set address to zero address.

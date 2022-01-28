@@ -271,7 +271,6 @@ def vault(
     vault.acceptGovernance({"from": strategist_ms})
     vault.setGovernance(gov, {"from": strategist_ms})
     vault.acceptGovernance({"from": gov})
-    vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
     vault.setManagement(management, {"from": gov})
     chain.sleep(1)
 
@@ -326,11 +325,12 @@ def strategy(
         StrategyConvexFactoryClonable, v2, trade_factory, curveGlobal, pid
     )
     curveGlobal.initialise(s, {"from": strategist})
-    t11 = curveGlobal.createNewCurveVaultAndStrat(pid, {"from": strategist})
+    t11 = curveGlobal.createNewCurveVaultAndStrat(pid, 2**256-1, {"from": strategist})
     (vault, strat) = t11.return_value
 
     # make sure to include all constructor parameters needed here
     strategy = StrategyConvexFactoryClonable.at(strat)
+    print(strategy.rewards())
 
     trade_factory.grantRole(
         trade_factory.STRATEGY(), strategy, {"from": ymechs_safe, "gas_price": "0 gwei"}
