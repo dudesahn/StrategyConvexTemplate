@@ -325,38 +325,31 @@ contract StrategyConvexFactoryClonable is BaseStrategy  {
         if (_sendToVoter > 0) {
             crv.safeTransfer(voter, _sendToVoter);
         }
-
-        // debtOustanding will only be > 0 in the event of revoking or if we need to rebalance from a withdrawal or lowering the debtRatio
-        if (_debtOutstanding > 0) {
-            uint256 _stakedBal = stakedBalance();
-            if (_stakedBal > 0) {
-                rewardsContract.withdrawAndUnwrap(
-                    Math.min(_stakedBal, _debtOutstanding),
-                    claimRewards
-                );
-            }
-            uint256 _withdrawnBal = balanceOfWant();
-            _debtPayment = Math.min(_debtOutstanding, _withdrawnBal);
-        }
+        _debtPayment = _debtOutstanding;
 
         // serious loss should never happen, but if it does (for instance, if Curve is hacked), let's record it accurately
         uint256 assets = estimatedTotalAssets();
         uint256 debt = vault.strategies(address(this)).totalDebt;
 
         // if assets are greater than debt, things are working great!
-        if (assets > debt) {
+        if (assets >= debt) {
             _profit = assets.sub(debt);
-            uint256 _wantBal = balanceOfWant();
-            if (_profit.add(_debtPayment) > _wantBal) {
-                if(_debtPayment > _wantBal){
-                    _debtPayment = _wantBal;
+            
+            uint256 toFree = _profit.add(_debtPayment);
+
+            //freed is math.min(wantBalance, toFree)
+            (uint256 freed, ) = liquidatePosition(toFree);
+            
+            if (_profit.add(_debtPayment) > freed) {
+                if(_debtPayment > freed){
+                    _debtPayment = freed;
                     _profit = 0;
                 }else{
-                    _profit = _wantBal - _debtPayment;
+                    _profit = freed - _debtPayment;
                 }
             }
         }
-        // if assets are less than debt, we are in trouble
+        // if assets are less than debt, we are in trouble. should never happen. dont worry about withdrawing here just report profit
         else {
             _loss = debt.sub(assets);
         }
