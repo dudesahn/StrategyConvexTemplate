@@ -2,10 +2,50 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "./StrategyConvexFactoryClonable.sol";
-
 interface Registry{
     function newExperimentalVault(address token, address governance, address guardian, address rewards, string memory name, string memory symbol) external returns (address);
+}
+
+interface IStrategy{
+     function cloneStrategyConvex(
+        address _vault,
+        address _strategist,
+        address _rewards,
+        address _keeper,
+        address _curveGlobal,
+        uint256 _pid,
+        address _tradeFactory
+    ) external returns (address newStrategy);
+
+    function setHealthCheck(address) external;
+}
+
+interface IConvexDeposit {
+    // deposit into convex, receive a tokenized deposit.  parameter to stake immediately (we always do this).
+    function deposit(
+        uint256 _pid,
+        uint256 _amount,
+        bool _stake
+    ) external returns (bool);
+
+    // burn a tokenized deposit (Convex deposit tokens) to receive curve lp tokens back
+    function withdraw(uint256 _pid, uint256 _amount) external returns (bool);
+    function poolLength() external
+        view
+        returns ( uint256);
+
+    // give us info about a pool based on its pid
+    function poolInfo(uint256)
+        external
+        view
+        returns (
+            address,
+            address,
+            address,
+            address,
+            address,
+            bool
+        );
 }
 
 interface Vault{
@@ -101,15 +141,11 @@ contract CurveGlobal{
         Vault(vault).setGovernance(sms);
         Vault(vault).setDepositLimit(_depositLimit);
         
-        strat = StrategyConvexFactoryClonable(stratImplementation).cloneStrategyConvex(vault, sms, rewardsStrat, keeper,address(this), _pid, tradeFactory);
+        strat = IStrategy(stratImplementation).cloneStrategyConvex(vault, sms, rewardsStrat, keeper,address(this), _pid, tradeFactory);
         ISharerV4(rewardsStrat).setContributors(strat, contributors, numOfShares);
 
-        StrategyConvexFactoryClonable(strat).setHealthCheck(healthCheck);
+        IStrategy(strat).setHealthCheck(healthCheck);
 
         Vault(vault).addStrategy(strat, 10_000, 0, type(uint256).max, performanceFee);
     }
-
-
-
-    
 }

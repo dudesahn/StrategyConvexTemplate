@@ -114,6 +114,13 @@ def curve_registry():
 def healthCheck():
     yield Contract("0xDDCea799fF1699e98EDF118e0629A974Df7DF012")
 
+@pytest.fixture(scope="function")
+def live_spell_strat(trade_factory, ymechs_safe):
+    strategy =  Contract("0xeDB4B647524FC2B9985019190551b197c6AB6C5c")
+    trade_factory.grantRole(
+        trade_factory.STRATEGY(), strategy, {"from": ymechs_safe}
+    )
+    yield strategy
 
 @pytest.fixture(scope="module")
 def farmed():
