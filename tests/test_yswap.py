@@ -58,7 +58,10 @@ def test_yswap(
         token_in = id
         
         amount_in = id.balanceOf(strategy)
-        print(f"Executing trade {id}, tokenIn: {token_in} -> tokenOut {token_out}")
+        print(f"Executing trade {id}, tokenIn: {token_in} -> tokenOut {token_out} amount {amount_in}")
+
+        if amount_in == 0:
+            continue
 
         asyncTradeExecutionDetails = [strategy, token_in, token_out, amount_in, 1]
 
@@ -115,6 +118,11 @@ def test_yswap(
     tx = strategy.harvest({"from": strategist})
     print(tx.events)
     assert tx.events["Harvested"]["profit"] > 0
+
+    vault.updateStrategyDebtRatio(strategy, 0, {'from': gov})
+    strategy.harvest({'from': strategist})
+    assert token.balanceOf(vault) > amount
+    assert strategy.estimatedTotalAssets() == 0
 
 
 def createTx(to, data):

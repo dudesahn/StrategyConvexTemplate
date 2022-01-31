@@ -69,7 +69,7 @@ def test_spell_yswap(
         token_in = id
         
         amount_in = id.balanceOf(strategy)
-        print(f"Executing trade {id}, tokenIn: {token_in} -> tokenOut {token_out}")
+        print(f"Executing trade {id}, tokenIn: {token_in} -> tokenOut {token_out} amount {amount_in}")
 
         asyncTradeExecutionDetails = [strategy, token_in, token_out, amount_in, 1]
 
@@ -131,6 +131,8 @@ def test_spell_yswap(
     strategy.harvest({'from': strategist})
     print(token.balanceOf(vault)/1e18)
     print(strategy.estimatedTotalAssets()/1e18)
+    assert token.balanceOf(vault) > amount
+    assert strategy.estimatedTotalAssets() == 0
 
 
 def createTx(to, data):
