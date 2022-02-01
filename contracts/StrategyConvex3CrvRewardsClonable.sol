@@ -610,7 +610,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         }
 
         // otherwise, we don't harvest
-        return false;
+        return super.harvestTrigger(callCostinEth);
     }
 
     // we will need to add rewards token here if we have them
