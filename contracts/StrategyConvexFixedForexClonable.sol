@@ -10,7 +10,6 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/Math.sol";
 
 import "./interfaces/curve.sol";
-import {IUniswapV2Router02} from "./interfaces/uniswap.sol";
 import {
     BaseStrategy,
     StrategyParams
@@ -25,6 +24,10 @@ interface IBaseFee {
 
 interface IWeth {
     function withdraw(uint256 wad) external;
+}
+
+interface IOracle {
+    function latestAnswer() external view returns (uint256);
 }
 
 interface IUniV3 {
@@ -65,14 +68,14 @@ interface IConvexRewards {
         external
         returns (bool);
 
-    // check if we have rewards on a pool
-    function extraRewardsLength() external view returns (uint256);
-
     // if we have rewards, see what the address is
     function extraRewards(uint256 _reward) external view returns (address);
 
     // read our rewards token
     function rewardToken() external view returns (address);
+
+    // check our reward period finish
+    function periodFinish() external view returns (uint256);
 }
 
 interface IConvexDeposit {
@@ -109,19 +112,18 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // these should stay the same across different wants.
 
     // convex stuff
-    address public constant depositContract =
+    address internal constant depositContract =
         0xF403C135812408BFbE8713b5A23a04b3D48AAE31; // this is the deposit contract that all pools use, aka booster
-    address public rewardsContract; // This is unique to each curve pool
+    IConvexRewards public rewardsContract; // This is unique to each curve pool
     uint256 public pid; // this is unique to each pool
 
     // keepCRV stuff
     uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points)
-    address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
+    address internal constant voter =
+        0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in bips
 
     // Swap stuff
-    address internal constant sushiswap =
-        0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // default to sushiswap
     ICurveFi public curve; // Curve Pool, need this for depositing into our curve pool
 
     IERC20 internal constant crv =
@@ -134,8 +136,9 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // keeper stuff
     uint256 public harvestProfitMin; // minimum size in USDT that we want to harvest
     uint256 public harvestProfitMax; // maximum size in USDT that we want to harvest
+    uint256 public creditThreshold; // amount of credit in underlying tokens that will automatically trigger a harvest
     bool internal forceHarvestTriggerOnce; // only set this to true when we want to trigger our keepers to harvest for us
-    bool public sellRkpr; // bool for selling our rKP3R rewards on uniswap v3
+    bool internal forceTendTriggerOnce; // only set this to true when we want to trigger our keepers to tend for us
 
     string internal stratName; // we use this to be able to adjust our strategy's name
 
@@ -213,7 +216,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // in case we need to exit into the convex deposit token, this will allow us to do that
     // make sure to check claimRewards before this step if needed
     // plan to have gov sweep convex deposit tokens from strategy after this
-    function withdrawToConvexDepositTokens() external onlyAuthorized {
+    function withdrawToConvexDepositTokens() external onlyEmergencyAuthorized {
         uint256 _stakedBal = stakedBalance();
         if (_stakedBal > 0) {
             IConvexRewards(rewardsContract).withdraw(_stakedBal, claimRewards);
@@ -232,23 +235,26 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
     // Set the amount of CRV to be locked in Yearn's veCRV voter from each harvest. Default is 10%.
-    function setKeepCRV(uint256 _keepCRV) external onlyAuthorized {
+    function setKeepCRV(uint256 _keepCRV) external onlyGovernance {
         require(_keepCRV <= 10_000);
         keepCRV = _keepCRV;
     }
 
     // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
-    function setClaimRewards(bool _claimRewards) external onlyAuthorized {
+    function setClaimRewards(bool _claimRewards)
+        external
+        onlyEmergencyAuthorized
+    {
         claimRewards = _claimRewards;
     }
 
-    // This determines when we tell our keepers to start allowing harvests based on profit, and when to sell no matter what. this is how much in USDT we need to make. remember, 6 decimals!
-    function setHarvestProfitNeeded(
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax
-    ) external onlyAuthorized {
-        harvestProfitMin = _harvestProfitMin;
-        harvestProfitMax = _harvestProfitMax;
+    // This allows us to manually harvest or tend with our keeper as needed
+    function setForceTriggerOnce(
+        bool _forceTendTriggerOnce,
+        bool _forceHarvestTriggerOnce
+    ) external onlyEmergencyAuthorized {
+        forceTendTriggerOnce = _forceTendTriggerOnce;
+        forceHarvestTriggerOnce = _forceHarvestTriggerOnce;
     }
 }
 
@@ -277,10 +283,9 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
     address internal constant uniswapv3 =
         address(0xE592427A0AEce92De3Edee1F18E0157C05861564);
     bool internal harvestNow; // this tells us if we're currently harvesting or tending
-    IERC20 internal constant usdt =
-        IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7); // use this to check our pending harvest
 
     uint256 public lastTendTime; // this is the timestamp that our last tend was called
+    bool public checkEarmark; // this determines if we should check if we need to earmark rewards before harvesting
 
     // use Curve to sell our CVX and CRV rewards to WETH
     ICurveFi internal constant crveth =
@@ -290,10 +295,11 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
     ICurveFi internal constant setheth =
         ICurveFi(0xc5424B857f758E906013F3555Dad202e4bdB4567); // use curve's sETH-ETH crypto pool to swap our ETH to sETH
 
-    // addresses for kp3r and rkp3r
+    // kp3r and rkp3r
     IERC20 internal constant rkpr =
         IERC20(0xEdB67Ee1B171c4eC66E6c10EC43EDBbA20FaE8e9);
     address internal constant kpr = 0x1cEB5cB57C4D4E2b2433641b95Dd330A33185A44;
+    bool public sellRkpr; // bool for selling our rKP3R rewards on uniswap v3
 
     // check for cloning
     bool internal isOriginal = true;
@@ -324,7 +330,7 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
         address _curvePool,
         address _sTokenProxy,
         string memory _name
-    ) external returns (address newStrategy) {
+    ) external returns (address payable newStrategy) {
         require(isOriginal);
         // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
         bytes20 addressBytes = bytes20(address(this));
@@ -384,10 +390,6 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
 
         // You can set these parameters on deployment to whatever you want
         maxReportDelay = 21 days; // 21 days in seconds, if we hit this then harvestTrigger = True
-        debtThreshold = 1e30; // in practice, we don't use this so we set to a very high number
-        profitFactor = 1e30; // in practice, we don't use this so we set to a very high number
-        harvestProfitMin = 80_000 * 1e6; // this is how much in USDT we need to make. remember, 6 decimals!
-        harvestProfitMax = 150_000 * 1e6; // this is how much in USDT we need to make. remember, 6 decimals!
         healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; // health.ychad.eth
 
         // these are our standard approvals for swaps. want = Curve LP token
@@ -395,6 +397,7 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
         convexToken.approve(address(cvxeth), type(uint256).max);
         crv.approve(address(crveth), type(uint256).max);
         weth.approve(uniswapv3, type(uint256).max);
+        rkpr.approve(uniswapv3, type(uint256).max);
 
         // set our keepCRV
         keepCRV = 1000;
@@ -404,9 +407,11 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
 
         // setup our rewards contract
         pid = _pid; // this is the pool ID on convex, we use this to determine what the reweardsContract address is
-        address lptoken;
-        (lptoken, , , rewardsContract, , ) = IConvexDeposit(depositContract)
-            .poolInfo(_pid);
+        (address lptoken, , , address _rewardsContract, , ) =
+            IConvexDeposit(depositContract).poolInfo(_pid);
+
+        // set up our rewardsContract
+        rewardsContract = IConvexRewards(_rewardsContract);
 
         // check that our LP token based on our pid matches our want
         require(address(lptoken) == address(want));
@@ -423,10 +428,6 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
         // set our synth currency key
         synthCurrencyKey = ISynth(IReadProxy(_sTokenProxy).target())
             .currencyKey();
-
-        // set our paths
-        crvPath = [address(crv), address(weth)];
-        convexTokenPath = [address(convexToken), address(weth)];
 
         // set our last tend time to the deployment block
         lastTendTime = block.timestamp;
@@ -482,6 +483,9 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
         else {
             _loss = debt.sub(assets);
         }
+
+        // we're done harvesting, so reset our trigger if we used it
+        forceHarvestTriggerOnce = false;
     }
 
     function adjustPosition(uint256 _debtOutstanding) internal override {
@@ -503,6 +507,9 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
 
             // update our variable for tracking last tend time
             lastTendTime = block.timestamp;
+
+            // we're done harvesting, so reset our trigger if we used it
+            forceTendTriggerOnce = false;
         }
     }
 
@@ -527,23 +534,16 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
         );
     }
 
-    // Sells our CRV and CVX to WETH on Curve, unwrap, then ETH -> sETH on Curve
+    // Sells our CRV and CVX to ETH on Curve
     function _sellCrvAndCvx(uint256 _crvAmount, uint256 _convexAmount)
         internal
     {
         if (_convexAmount > 0) {
-            cvxeth.exchange(1, 0, _convexAmount, 0, false);
+            cvxeth.exchange(1, 0, _convexAmount, 0, true);
         }
 
         if (_crvAmount > 0) {
-            crveth.exchange(1, 0, _crvAmount, 0, false);
-        }
-
-        uint256 wethBalance = weth.balanceOf(address(this));
-        if (wethBalance > 0) {
-            IWeth(address(weth)).withdraw(wethBalance);
-            uint256 ethBalance = address(this).balance;
-            setheth.exchange{value: ethBalance}(0, 1, ethBalance, 0);
+            crveth.exchange(1, 0, _crvAmount, 0, true);
         }
     }
 
@@ -564,6 +564,9 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
                 uint256(1)
             )
         );
+
+        uint256 wethBalance = weth.balanceOf(address(this));
+        IWeth(address(weth)).withdraw(wethBalance);
     }
 
     /* ========== KEEP3RS ========== */
@@ -574,24 +577,38 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
         override
         returns (bool)
     {
-        // check if the 5-minute lock has elapsed yet
-        if (!checkWaitingPeriod()) {
-            return false;
-        }
-
-        // check if the base fee gas price is higher than we allow
-        if (readBaseFee() > maxGasPrice) {
-            return false;
-        }
-
         // Should not trigger if strategy is not active (no assets and no debtRatio). This means we don't need to adjust keeper job.
         if (!isActive()) {
             return false;
         }
 
+        // check if the 5-minute lock has elapsed yet
+        if (!checkWaitingPeriod()) {
+            return false;
+        }
+
+        // check if the base fee gas price is higher than we allow. if it is, block harvests.
+        if (!isBaseFeeAcceptable()) {
+            return false;
+        }
+
+        // trigger if we want to manually harvest, but only if our gas price is acceptable
+        if (forceHarvestTriggerOnce) {
+            if (forceTendTriggerOnce) {
+                return false;
+            } else {
+                return true;
+            }
+        }
+
         // harvest our profit if we have tended since our last harvest
         StrategyParams memory params = vault.strategies(address(this));
         if (lastTendTime > params.lastReport) {
+            return true;
+        }
+
+        // harvest our credit if it's above our threshold
+        if (vault.creditAvailable() > creditThreshold) {
             return true;
         }
 
@@ -608,6 +625,14 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
         // Should not trigger if strategy is not active (no assets and no debtRatio). This means we don't need to adjust keeper job.
         if (!isActive()) {
             return false;
+        }
+
+        // only check if we need to earmark on vaults we know are problematic
+        if (checkEarmark) {
+            // don't harvest if we need to earmark convex rewards
+            if (needsEarmarkReward()) {
+                return false;
+            }
         }
 
         // Should not tend if forex markets are closed.
@@ -627,7 +652,7 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
         }
 
         // trigger if we want to manually harvest, but only if our gas price is acceptable
-        if (forceHarvestTriggerOnce) {
+        if (forceTendTriggerOnce) {
             return true;
         }
 
@@ -641,7 +666,7 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
     }
 
     // we will need to add rewards token here if we have them
-    function claimableProfitInUsdt() internal view returns (uint256) {
+    function claimableProfitInUsdt() public view returns (uint256) {
         // calculations pulled directly from CVX's contract for minting CVX per CRV claimed
         uint256 totalCliffs = 1_000;
         uint256 maxSupply = 100 * 1_000_000 * 1e18; // 100mil
@@ -665,35 +690,15 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
             }
         }
 
-        address[] memory crv_usd_path = new address[](3);
-        crv_usd_path[0] = address(crv);
-        crv_usd_path[1] = address(weth);
-        crv_usd_path[2] = address(usdt);
+        // our chainlink oracle returns prices normalized to 8 decimals, we convert it to 6
+        IOracle ethOracle = IOracle(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
+        uint256 ethPrice = ethOracle.latestAnswer().div(1e2); // 1e8 div 1e2 = 1e6
+        uint256 crvPrice = crveth.price_oracle().mul(ethPrice).div(1e18); // 1e18 mul 1e6 div 1e18 = 1e6
+        uint256 cvxPrice = cvxeth.price_oracle().mul(ethPrice).div(1e18); // 1e18 mul 1e6 div 1e18 = 1e6
 
-        address[] memory cvx_usd_path = new address[](3);
-        cvx_usd_path[0] = address(convexToken);
-        cvx_usd_path[1] = address(weth);
-        cvx_usd_path[2] = address(usdt);
+        uint256 crvValue = crvPrice.mul(_claimableBal).div(1e18); // 1e6 mul 1e18 div 1e18 = 1e6
+        uint256 cvxValue = cvxPrice.mul(mintableCvx).div(1e18); // 1e6 mul 1e18 div 1e18 = 1e6
 
-        uint256 crvValue;
-        if (_claimableBal > 0) {
-            uint256[] memory crvSwap =
-                IUniswapV2Router02(sushiswap).getAmountsOut(
-                    _claimableBal,
-                    crv_usd_path
-                );
-            crvValue = crvSwap[crvSwap.length - 1];
-        }
-
-        uint256 cvxValue;
-        if (mintableCvx > 0) {
-            uint256[] memory cvxSwap =
-                IUniswapV2Router02(sushiswap).getAmountsOut(
-                    mintableCvx,
-                    cvx_usd_path
-                );
-            cvxValue = cvxSwap[cvxSwap.length - 1];
-        }
         return crvValue.add(cvxValue);
     }
 
@@ -734,14 +739,20 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
             }
             uint256 _crvRemainder = crv.balanceOf(address(this));
 
+            // sell the rest of our CRV and our CVX for ETH
+            _sellCrvAndCvx(_crvRemainder, _convexBalance);
+
             // sell any rKP3R we may have for WETH if our setter is true
             uint256 rkprBalance = rkpr.balanceOf(address(this));
             if (sellRkpr && rkprBalance > 0) {
                 _sellRkpr(rkprBalance);
             }
 
-            // sell the rest of our CRV  and CVX for sETH if we have any
-            _sellCrvAndCvx(_crvRemainder, _convexBalance);
+            // convert our ETH into sETH
+            uint256 ethBalance = address(this).balance;
+            if (ethBalance > 0) {
+                setheth.exchange{value: ethBalance}(0, 1, ethBalance, 0);
+            }
 
             // check our output balance of sETH
             uint256 _sEthBalance = sethProxy.balanceOf(address(this));
@@ -806,8 +817,35 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
         return tradingSuspended[0];
     }
 
+    // check if someone needs to earmark rewards on convex before keepers harvest again
+    function needsEarmarkReward() public view returns (bool needsEarmark) {
+        // check if there is any CRV we need to earmark
+        uint256 crvExpiry = rewardsContract.periodFinish();
+        if (crvExpiry < block.timestamp) {
+            return true;
+        }
+    }
+
     // include so our contract plays nicely with ether
     receive() external payable {}
 
     /* ========== SETTERS ========== */
+
+    // Min profit to start checking for harvests if gas is good, max will harvest no matter gas (both in USDT, 6 decimals). Credit threshold is in want token, and will trigger a harvest if credit is large enough. check earmark to look at convex's booster.
+    function setHarvestTriggerParams(
+        uint256 _harvestProfitMin,
+        uint256 _harvestProfitMax,
+        uint256 _creditThreshold,
+        bool _checkEarmark
+    ) external onlyEmergencyAuthorized {
+        harvestProfitMin = _harvestProfitMin;
+        harvestProfitMax = _harvestProfitMax;
+        creditThreshold = _creditThreshold;
+        checkEarmark = _checkEarmark;
+    }
+
+    // turn this off if we don't want to automatically sell our rkp3r claimed
+    function setSellRkpr(bool _sellRkpr) external onlyEmergencyAuthorized {
+        sellRkpr = _sellRkpr;
+    }
 }

@@ -26,7 +26,7 @@ def whale(accounts):
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance. Make sure to do no more than half of their balance.
 @pytest.fixture(scope="module")
 def amount():
-    amount = 5_000e18
+    amount = 10_000e18
     yield amount
 
 
@@ -37,8 +37,28 @@ def strategy_name():
     yield strategy_name
 
 
+# use this when we might lose a few wei on conversions between want and another deposit token
+@pytest.fixture(scope="module")
+def is_slippery():
+    is_slippery = False
+    yield is_slippery
+
+
+# use this to test our strategy in case there are no profits
+@pytest.fixture(scope="module")
+def no_profit():
+    no_profit = False
+    yield no_profit
+
+
 # Only worry about changing things above this line, unless you want to make changes to the vault or strategy.
 # ----------------------------------------------------------------------- #
+
+
+@pytest.fixture(scope="module")
+def gasOracle():
+    yield Contract("0xb5e1CAcB567d98faaDB60a1fD4820720141f064F")
+
 
 # all contracts below should be able to stay static based on the pid
 @pytest.fixture(scope="module")
@@ -186,23 +206,23 @@ def strategist(accounts):
 
 
 # use this if you need to deploy the vault
-# @pytest.fixture(scope="function")
-# def vault(pm, gov, rewards, guardian, management, token, chain):
-#     Vault = pm(config["dependencies"][0]).Vault
-#     vault = guardian.deploy(Vault)
-#     vault.initialize(token, gov, rewards, "", "", guardian)
-#     vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
-#     vault.setManagement(management, {"from": gov})
-#     chain.sleep(1)
-#     yield vault
-
-
-# use this if your vault is already deployed
 @pytest.fixture(scope="function")
-def vault(yregistry, token):
-    vault_address = yregistry.latestVault(token)
-    vault = Contract(vault_address)
+def vault(pm, gov, rewards, guardian, management, token, chain):
+    Vault = pm(config["dependencies"][0]).Vault
+    vault = guardian.deploy(Vault)
+    vault.initialize(token, gov, rewards, "", "", guardian)
+    vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
+    vault.setManagement(management, {"from": gov})
+    chain.sleep(1)
     yield vault
+
+
+# # use this if your vault is already deployed
+# @pytest.fixture(scope="function")
+# def vault(yregistry, token):
+#     vault_address = yregistry.latestVault(token)
+#     vault = Contract(vault_address)
+#     yield vault
 
 
 # replace the first value with the name of your strategy
@@ -225,11 +245,11 @@ def strategy(
     accounts,
     pid,
 ):
-    # harvest our live curve vault/strat and remove its funds from voter/gauges; only need this for ibEUR
-    live_strat = Contract("0xB431A88a6cFFfa66dBCf96Ebc89aE72Ff7Fcc34f")
-    live_vault = Contract(live_strat.vault())
-    live_vault.updateStrategyDebtRatio(live_strat, 0, {"from": gov})
-    live_strat.harvest({"from": gov})
+    #     # harvest our live curve vault/strat and remove its funds from voter/gauges; only need this for ibEUR
+    #     live_strat = Contract("0xB431A88a6cFFfa66dBCf96Ebc89aE72Ff7Fcc34f")
+    #     live_vault = Contract(live_strat.vault())
+    #     live_vault.updateStrategyDebtRatio(live_strat, 0, {"from": gov})
+    #     live_strat.harvest({"from": gov})
 
     # force open the markets if they're closed
     _target = sToken.target()
@@ -239,11 +259,11 @@ def strategy(
     synthGod = accounts.at("0xc105ea57eb434fbe44690d7dec2702e4a2fbfcf7", force=True)
     systemStatus.resumeSynthsExchange(currencyKey, {"from": synthGod})
 
-    # set our current strategy to 0 debtRatio
-    live_strat = vault.withdrawalQueue(0)
-    vault.updateStrategyDebtRatio(live_strat, 0, {"from": gov})
+    #     # set our current strategy to 0 debtRatio
+    #     live_strat = vault.withdrawalQueue(0)
+    #     vault.updateStrategyDebtRatio(live_strat, 0, {"from": gov})
 
-    # parameters for this are: strategy, vault, max deposit, minTimePerInvest, slippage protection (10000 = 100% slippage allowed),
+    # deploy and setup our new strat
     strategy = strategist.deploy(
         StrategyConvexFixedForexClonable, vault, pid, pool, sToken, strategy_name
     )
@@ -254,18 +274,11 @@ def strategy(
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
     strategy.setHealthCheck(healthCheck, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
-    strategy.tend({"from": gov})
-    chain.mine(1)
-    chain.sleep(361)
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
+
+    # set up custom params and setters
+    strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
+    strategy.setSellRkpr(True, {"from": gov})
     yield strategy
-
-
-@pytest.fixture(scope="module")
-def dummy_gas_oracle(strategist, dummyBasefee):
-    dummy_gas_oracle = strategist.deploy(dummyBasefee)
-    yield dummy_gas_oracle
 
 
 # use this if your strategy is already deployed
