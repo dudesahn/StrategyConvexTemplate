@@ -299,7 +299,7 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
     IERC20 internal constant rkpr =
         IERC20(0xEdB67Ee1B171c4eC66E6c10EC43EDBbA20FaE8e9);
     address internal constant kpr = 0x1cEB5cB57C4D4E2b2433641b95Dd330A33185A44;
-    bool public sellRkpr; // bool for selling our rKP3R rewards on uniswap v3
+    bool public doSellRkpr; // bool for selling our rKP3R rewards on uniswap v3
 
     // check for cloning
     bool internal isOriginal = true;
@@ -744,7 +744,7 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
 
             // sell any rKP3R we may have for WETH if our setter is true
             uint256 rkprBalance = rkpr.balanceOf(address(this));
-            if (sellRkpr && rkprBalance > 0) {
+            if (doSellRkpr && rkprBalance > 0) {
                 _sellRkpr(rkprBalance);
             }
 
@@ -845,7 +845,7 @@ contract StrategyConvexFixedForexClonable is StrategyConvexBase {
     }
 
     // turn this off if we don't want to automatically sell our rkp3r claimed
-    function setSellRkpr(bool _sellRkpr) external onlyEmergencyAuthorized {
-        sellRkpr = _sellRkpr;
+    function setDoSellRkpr(bool _doSellRkpr) external onlyEmergencyAuthorized {
+        doSellRkpr = _doSellRkpr;
     }
 }

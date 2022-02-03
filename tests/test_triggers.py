@@ -2,10 +2,8 @@ import brownie
 from brownie import Contract
 from brownie import config
 import math
-import pytest
 
 
-@pytest.mark.no_call_coverage
 def test_triggers(
     gov,
     token,
@@ -91,7 +89,6 @@ def test_triggers(
     assert tx == False
 
 
-@pytest.mark.no_call_coverage
 def test_tend_triggers(
     gov,
     token,
@@ -136,6 +133,10 @@ def test_tend_triggers(
     chain.sleep(1)
     chain.mine(1)
     assert strategy.isMarketClosed() == True
+
+    # tending should revert when markets are closed
+    with brownie.reverts():
+        strategy.tend({"from": gov})
 
     # tend should be false if markets are off
     tx = strategy.tendTrigger(0, {"from": gov})

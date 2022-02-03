@@ -97,7 +97,7 @@ def test_simple_harvest_no_rkpr(
     newWhale = token.balanceOf(whale)
 
     # turn off our rkpr selling
-    strategy.setSellRkpr(False, {"from": gov})
+    strategy.setDoSellRkpr(False, {"from": gov})
 
     # this is part of our check into the staking contract balance
     stakingBeforeHarvest = rewardsContract.balanceOf(strategy)

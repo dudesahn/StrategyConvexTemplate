@@ -277,7 +277,7 @@ def strategy(
 
     # set up custom params and setters
     strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
-    strategy.setSellRkpr(True, {"from": gov})
+    strategy.setDoSellRkpr(True, {"from": gov})
     yield strategy
 
 
