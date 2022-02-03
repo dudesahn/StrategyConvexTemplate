@@ -134,10 +134,6 @@ def test_tend_triggers(
     chain.mine(1)
     assert strategy.isMarketClosed() == True
 
-    # tending should revert when markets are closed
-    with brownie.reverts():
-        strategy.tend({"from": gov})
-
     # tend should be false if markets are off
     tx = strategy.tendTrigger(0, {"from": gov})
     print("\nShould we tend? Should be False.", tx)
