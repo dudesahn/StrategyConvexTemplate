@@ -11,7 +11,10 @@ import "@openzeppelin/contracts/math/Math.sol";
 
 import "./interfaces/curve.sol";
 import {IUniswapV2Router02} from "./interfaces/uniswap.sol";
-import {BaseStrategy} from "@yearnvaults/contracts/BaseStrategy.sol";
+import {
+    BaseStrategy,
+    StrategyParams
+} from "@yearnvaults/contracts/BaseStrategy.sol";
 
 interface IBaseFee {
     function isCurrentBaseFeeAcceptable() external view returns (bool);
@@ -110,12 +113,13 @@ abstract contract StrategyConvexBase is BaseStrategy {
 
     // keepCRV stuff
     uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points)
-    address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
+    address internal constant voter =
+        0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
 
     // Swap stuff
     address internal constant sushiswap =
-        0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // default to sushiswap, we use this for our harvest profit calcs
+        0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // we use this for our harvest profit calcs
 
     IERC20 internal constant crv =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
@@ -127,6 +131,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // keeper stuff
     uint256 public harvestProfitMin; // minimum size in USDT that we want to harvest
     uint256 public harvestProfitMax; // maximum size in USDT that we want to harvest
+    uint256 public creditThreshold; // amount of credit in underlying tokens that will automatically trigger a harvest
     bool internal forceHarvestTriggerOnce; // only set this to true when we want to trigger our keepers to harvest for us
 
     string internal stratName; // we use this to be able to adjust our strategy's name
@@ -580,6 +585,11 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         override
         returns (bool)
     {
+        // Should not trigger if strategy is not active (no assets and no debtRatio). This means we don't need to adjust keeper job.
+        if (!isActive()) {
+            return false;
+        }
+
         // only check if we need to earmark on vaults we know are problematic
         if (checkEarmark) {
             // don't harvest if we need to earmark convex rewards
@@ -609,12 +619,23 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
             return true;
         }
 
+        StrategyParams memory params = vault.strategies(address(this));
+        // harvest no matter what once we reach our maxDelay
+        if (block.timestamp.sub(params.lastReport) > maxReportDelay) {
+            return true;
+        }
+
+        // harvest our credit if it's above our threshold
+        if (vault.creditAvailable() > creditThreshold) {
+            return true;
+        }
+
         // otherwise, we don't harvest
-        return super.harvestTrigger(callCostinEth);
+        return false;
     }
 
     // we will need to add rewards token here if we have them
-    function claimableProfitInUsdt() internal view returns (uint256) {
+    function claimableProfitInUsdt() public view returns (uint256) {
         // calculations pulled directly from CVX's contract for minting CVX per CRV claimed
         uint256 totalCliffs = 1_000;
         uint256 maxSupply = 100 * 1_000_000 * 1e18; // 100mil
@@ -759,12 +780,20 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         rewardsToken = IERC20(address(0));
     }
 
-    // determine whether we will check if our convex rewards need to be earmarked
-    function setCheckEarmark(bool _checkEarmark) external onlyAuthorized {
+    // Min profit to start checking for harvests if gas is good, max will harvest no matter gas (both in USDT, 6 decimals). Credit threshold is in want token, and will trigger a harvest if credit is large enough. check earmark to look at convex's booster.
+    function setHarvestTriggerParams(
+        uint256 _harvestProfitMin,
+        uint256 _harvestProfitMax,
+        uint256 _creditThreshold,
+        bool _checkEarmark
+    ) external onlyEmergencyAuthorized {
+        harvestProfitMin = _harvestProfitMin;
+        harvestProfitMax = _harvestProfitMax;
+        creditThreshold = _creditThreshold;
         checkEarmark = _checkEarmark;
     }
 
-    // set the fee pool we'd like to swap through for CRV on UniV3 (1% = 10_000)
+    // set the fee pool we'd like to swap through for our stables on UniV3 (1% = 10_000)
     function setUniFees(uint24 _stableFee) external onlyAuthorized {
         uniStableFee = _stableFee;
     }

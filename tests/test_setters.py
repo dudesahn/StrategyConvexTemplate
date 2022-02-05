@@ -103,13 +103,13 @@ def test_setters(
     strategy.harvest({"from": gov})
     chain.sleep(86400)
 
-    # try a health check with random contract as health check
-    strategy.setHealthCheck(gov, {"from": gov})
-    strategy.setDoHealthCheck(True, {"from": gov})
-    with brownie.reverts():
-        strategy.harvest({"from": gov})
-
-    # set emergency exit last
-    strategy.setEmergencyExit({"from": gov})
-    with brownie.reverts():
-        strategy.setEmergencyExit({"from": gov})
+#     # try a health check with random contract as health check
+#     strategy.setHealthCheck(gov, {"from": gov})
+#     strategy.setDoHealthCheck(True, {"from": gov})
+#     with brownie.reverts():
+#         strategy.harvest({"from": gov})
+# 
+#     # set emergency exit last
+#     strategy.setEmergencyExit({"from": gov})
+#     with brownie.reverts():
+#         strategy.setEmergencyExit({"from": gov})

@@ -18,7 +18,7 @@ def pid():
 def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    whale = accounts.at("0x9726c55B0cB4dcfD3A8aCF3c7DED770AAa22240e", force=True)
+    whale = accounts.at("0x89eBCb7714bd0D2F33ce3a35C12dBEB7b94af169", force=True)
     yield whale
 
 
@@ -48,6 +48,20 @@ def rewards_token():
 def has_rewards():
     has_rewards = True
     yield has_rewards
+
+
+# use this when we might lose a few wei on conversions between want and another deposit token
+@pytest.fixture(scope="module")
+def is_slippery():
+    is_slippery = False
+    yield is_slippery
+
+
+# use this to test our strategy in case there are no profits
+@pytest.fixture(scope="module")
+def no_profit():
+    no_profit = False
+    yield no_profit
 
 
 # Only worry about changing things above this line, unless you want to make changes to the vault or strategy.
