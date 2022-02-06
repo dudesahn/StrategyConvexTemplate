@@ -19,8 +19,8 @@ def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0x7779f8144951811c8d7418A6cF4aa58F65e221B3", force=True
-    )  # 0x0FC60765Aa07969027740F2560045cBF4205E776 for USDP
+        "0x3dBa662d484F73c7ec387376E0e8373f483D04CC", force=True
+    )  # 0x44Bc6e3a8384979DF6673Ac81066c67C83d6d6b2 for USDP
     yield whale
 
 
@@ -34,7 +34,7 @@ def amount():
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexUSDN"
+    strategy_name = "StrategyConvexOldPoolsClonable"
     yield strategy_name
 
 
@@ -52,15 +52,27 @@ def has_rewards():
     yield has_rewards
 
 
-# curve deposit pool
+# use this when we might lose a few wei on conversions between want and another deposit token
 @pytest.fixture(scope="module")
-def pool():  # 0x3c8cAee4E09296800f8D29A68Fa3837e2dae4940 for USDP
-    poolAddress = Contract("0x094d12e5b541784701FD8d65F11fc0598FBC6332")
-    yield poolAddress
+def is_slippery():
+    is_slippery = False
+    yield is_slippery
+
+
+# use this to test our strategy in case there are no profits
+@pytest.fixture(scope="module")
+def no_profit():
+    no_profit = False
+    yield no_profit
 
 
 # Only worry about changing things above this line, unless you want to make changes to the vault or strategy.
 # ----------------------------------------------------------------------- #
+
+@pytest.fixture(scope="module")
+def gasOracle():
+    yield Contract("0xb5e1CAcB567d98faaDB60a1fD4820720141f064F")
+
 
 # all contracts below should be able to stay static based on the pid
 @pytest.fixture(scope="module")
@@ -109,27 +121,44 @@ def farmed():
     yield Contract("0xD533a949740bb3306d119CC777fa900bA034cd52")
 
 
+@pytest.fixture(scope="module")
+def yregistry():
+    # this is yearn's registry, we use it to get our most recent vault for a token
+    yield Contract("0x50c1a2eA0a861A967D9d0FFE2AE4012c2E053804")
+
+
 # Define relevant tokens and contracts in this section
 @pytest.fixture(scope="module")
-def token(pid, booster):
+def token(booster, pid):
     # this should be the address of the ERC-20 used by the strategy/vault
     token_address = booster.poolInfo(pid)[0]
     yield Contract(token_address)
 
 
-# zero address
-@pytest.fixture(scope="module")
-def zero_address():
-    zero_address = "0x0000000000000000000000000000000000000000"
-    yield zero_address
-
-
 # gauge for the curve pool
 @pytest.fixture(scope="module")
-def gauge(pid, booster):
+def gauge(booster, pid):
     # this should be the address of the convex deposit token
     gauge = booster.poolInfo(pid)[2]
     yield Contract(gauge)
+
+
+@pytest.fixture(scope="module")
+def sToken(token):  # this is the token we swap CRV for and then deposit to our LP
+    synth = token.coins(1)
+    yield Contract(synth)
+
+
+# curve deposit pool
+@pytest.fixture(scope="module")
+def pool(token, curve_registry):
+    zero_address = "0x0000000000000000000000000000000000000000"
+    if curve_registry.get_pool_from_lp_token(token) == zero_address:
+        poolAddress = token
+    else:
+        _poolAddress = curve_registry.get_pool_from_lp_token(token)
+        poolAddress = Contract(_poolAddress)
+    yield poolAddress
 
 
 @pytest.fixture(scope="module")
@@ -143,11 +172,6 @@ def cvxDeposit(booster, pid):
 def rewardsContract(pid, booster):
     rewardsContract = booster.poolInfo(pid)[3]
     yield Contract(rewardsContract)
-
-
-@pytest.fixture(scope="module")
-def gasOracle():
-    yield Contract("0xb5e1CAcB567d98faaDB60a1fD4820720141f064F")
 
 
 # Define any accounts in this section
@@ -242,19 +266,15 @@ def strategy(
         strategy_name,
     )
     strategy.setKeeper(keeper, {"from": gov})
-    strategy.setHarvestProfitNeeded(80000e6, 180000e6, {"from": gov})
-    gasOracle.setMaxAcceptableBaseFee(20000000000000, {"from": strategist_ms})
     # set our management fee to zero so it doesn't mess with our profit checking
     vault.setManagementFee(0, {"from": gov})
     # add our new strategy
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
-    # proxy.approveStrategy(strategy.gauge(), strategy, {"from": gov}), only need this step for curve voter strats
     strategy.setHealthCheck(healthCheck, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
-    chain.sleep(1)
-    chain.mine(1)
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
+
+    # set up custom params and setters
+    strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
     yield strategy
 
 
