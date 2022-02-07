@@ -467,15 +467,14 @@ def test_odds_and_ends_inactive_strat(
     # sleep for five days to generate profit
     chain.sleep(86400 * 5)
 
-    # send away all funds so we have profit but no assets
+    # send away all funds so we have profit but no assets. make sure to turn off claimRewards first
+    strategy.setClaimRewards(False)
     strategy.withdrawToConvexDepositTokens({"from": gov})
     to_send = cvxDeposit.balanceOf(strategy)
     print("cvxToken Balance of Strategy", to_send)
     cvxDeposit.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
-
-    # set debtRatio to zero so strategy will return inactive
-    vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
+    assert strategy.claimableBalance() > 0
 
     # we should harvest empty strategies with profit to take, but our current profit is below our limit
     tx = strategy.harvestTrigger(0, {"from": gov})
@@ -483,7 +482,7 @@ def test_odds_and_ends_inactive_strat(
     assert tx == False
 
     # adjust our limit to 0, then check
-    strategy.setHarvestProfitNeeded(0, 0, {"from": gov})
+    strategy.setHarvestTriggerParams(0, 0, 1e24, False, {"from": gov})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be true.", tx)
     assert tx == True

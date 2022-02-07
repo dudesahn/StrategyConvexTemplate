@@ -1,7 +1,7 @@
 import brownie
 from brownie import Wei, accounts, Contract, config
 
-# test passes as of 21-06-26
+
 def test_cloning(
     gov,
     token,

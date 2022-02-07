@@ -3,7 +3,7 @@ import brownie
 from brownie import Contract
 from brownie import config
 
-# test passes as of 21-06-26
+
 def test_emergency_exit(
     gov,
     token,

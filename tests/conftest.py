@@ -258,18 +258,19 @@ def strategy(
         strategy_name,
     )
     strategy.setKeeper(keeper, {"from": gov})
-    strategy.setHarvestProfitNeeded(80000e6, 180000e6, {"from": gov})
-    gasOracle.setMaxAcceptableBaseFee(20000000000000, {"from": strategist_ms})
     # set our management fee to zero so it doesn't mess with our profit checking
     vault.setManagementFee(0, {"from": gov})
     # add our new strategy
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
-    # proxy.approveStrategy(strategy.gauge(), strategy, {"from": gov}), only need this step for curve voter strats
     strategy.setHealthCheck(healthCheck, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
-    chain.sleep(1)
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
+
+    # make all harvests permissive unless we change the value lower
+    gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})
+
+    # set up custom params and setters
+    strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
+    strategy.setMaxReportDelay(86400 * 21)
     yield strategy
 
 
