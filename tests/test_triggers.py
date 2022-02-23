@@ -104,15 +104,17 @@ def test_triggers(
     chain.sleep(86400)
     chain.mine(1)
 
-    # withdraw and confirm we made money
-    vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) >= startingWhale
-
     # harvest should trigger false due to high gas price
     gasOracle.setMaxAcceptableBaseFee(1 * 1e9, {"from": strategist_ms})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be false.", tx)
     assert tx == False
+
+    # withdraw and confirm we made money
+    vault.withdraw({"from": whale})
+    assert token.balanceOf(whale) >= startingWhale
+
+
 
 
 def test_less_useful_triggers(

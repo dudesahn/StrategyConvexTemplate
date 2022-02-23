@@ -4,9 +4,7 @@ pragma experimental ABIEncoderV2;
 
 // These are the core Yearn libraries
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/Math.sol";
 
 import "./interfaces/curve.sol";
@@ -97,9 +95,7 @@ interface IConvexDeposit {
 }
 
 abstract contract StrategyConvexBase is BaseStrategy {
-    using SafeERC20 for IERC20;
     using Address for address;
-    using SafeMath for uint256;
 
     /* ========== STATE VARIABLES ========== */
     // these should stay the same across different wants.
@@ -168,8 +164,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
         return balanceOfWant().add(stakedBalance());
     }
 
-    /* ========== CONSTANT FUNCTIONS ========== */
-    // these should stay the same across different wants.
+    /* ========== MUTATIVE FUNCTIONS ========== */
 
     function adjustPosition(uint256 _debtOutstanding) internal override {
         if (emergencyExit) {
@@ -432,8 +427,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         uniStableFee = 500;
     }
 
-    /* ========== VARIABLE FUNCTIONS ========== */
-    // these will likely change across different wants.
+    /* ========== MUTATIVE FUNCTIONS ========== */
 
     function prepareReturn(uint256 _debtOutstanding)
         internal

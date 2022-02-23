@@ -468,6 +468,7 @@ def test_odds_and_ends_inactive_strat(
     chain.sleep(86400 * 5)
 
     # send away all funds so we have profit but no assets. make sure to turn off claimRewards first
+    # NEED TO ADD A CHECK HERE FOR IF WE NEED TO EARMARK REWARDS!!!!! or probably just earmark rewards as a part of strategy setup
     strategy.setClaimRewards(False)
     strategy.withdrawToConvexDepositTokens({"from": gov})
     to_send = cvxDeposit.balanceOf(strategy)

@@ -1,7 +1,7 @@
 import brownie
 from brownie import Wei, accounts, Contract, config
 
-
+# set our rewards to nothing, then turn them back on
 def test_update_to_zero_then_back(
     gov,
     token,
@@ -47,7 +47,7 @@ def test_update_to_zero_then_back(
     assert vault.withdrawalQueue(1) == newStrategy
     assert vault.strategies(newStrategy)[2] == 10_000
     assert vault.withdrawalQueue(0) == strategy
-    assert vault.strategies(strategy)[2] == 0
+    assert vault.strategies(strategy)["debtRatio"] == 0
 
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
@@ -227,7 +227,7 @@ def test_update_from_zero_to_off(
     assert vault.withdrawalQueue(1) == newStrategy
     assert vault.strategies(newStrategy)[2] == 10_000
     assert vault.withdrawalQueue(0) == strategy
-    assert vault.strategies(strategy)[2] == 0
+    assert vault.strategies(strategy)["debtRatio"] == 0
 
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()

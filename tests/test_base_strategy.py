@@ -20,16 +20,6 @@ def test_base_strategy(
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
 
-    # test our harvestTrigger for when we have a profit (don't normally need this)
-    # our whale donates dust to the vault, what a nice person!
-    donation = 1e16
-    token.transfer(strategy, donation, {"from": whale})
-
-    # comment this out since we no longer use harvestTrigger from baseStrategy
-    # tx = strategy.harvestTrigger(0, {"from": gov})
-    # print("\nShould we harvest? Should be true.", tx)
-    # assert tx == True
-
     # test all of our random shit
     strategy.doHealthCheck()
     strategy.healthCheck()
