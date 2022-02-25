@@ -58,7 +58,7 @@ def test_withdraw_after_donation_1(
     assert profit > 0
 
     # specifically check that our gain is greater than our donation or confirm we're no more than 5 wei off.
-    assert new_params["totalGain"] - prev_params["totalGain"] > donation
+    assert new_params["totalGain"] - prev_params["totalGain"] == donation
 
     # check to make sure that our debtRatio is about half of our previous debt
     assert new_params["debtRatio"] == currentDebt / 2
@@ -131,8 +131,8 @@ def test_withdraw_after_donation_2(
     # check that we've recorded a gain
     assert profit > 0
 
-    # specifically check that our gain is greater than our donation or confirm we're no more than 5 wei off.
-    assert new_params["totalGain"] - prev_params["totalGain"] > donation
+    # specifically check that our gain is equal to our donation. as we are using yswaps there is no natural profit
+    assert new_params["totalGain"] - prev_params["totalGain"] == donation
 
     # check that we didn't add any more loss, or at least no more than 2 wei
     assert new_params["totalLoss"] == prev_params["totalLoss"]
@@ -203,7 +203,7 @@ def test_withdraw_after_donation_3(
     assert profit > 0
 
     # specifically check that our gain is greater than our donation or confirm we're no more than 5 wei off.
-    assert new_params["totalGain"] - prev_params["totalGain"] > donation
+    assert new_params["totalGain"] - prev_params["totalGain"] == donation
 
     # check that we didn't add any more loss, or at least no more than 2 wei
     assert new_params["totalLoss"] == prev_params["totalLoss"]
@@ -343,7 +343,7 @@ def test_withdraw_after_donation_5(
     assert profit > 0
 
     # specifically check that our gain is greater than our donation or confirm we're no more than 5 wei off.
-    assert new_params["totalGain"] - prev_params["totalGain"] > donation
+    assert new_params["totalGain"] - prev_params["totalGain"] == donation
 
     # check that we didn't add any more loss, or at least no more than 2 wei
     assert new_params["totalLoss"] == prev_params["totalLoss"]
@@ -405,7 +405,7 @@ def test_withdraw_after_donation_6(
     assert profit > 0
 
     # specifically check that our gain is greater than our donation or confirm we're no more than 5 wei off.
-    assert new_params["totalGain"] - prev_params["totalGain"] > donation
+    assert new_params["totalGain"] - prev_params["totalGain"] == donation
 
     # check that we didn't add any more loss, or at least no more than 2 wei
     assert new_params["totalLoss"] == prev_params["totalLoss"]
@@ -496,7 +496,7 @@ def test_withdraw_after_donation_7(
     assert profit > 0
 
     # specifically check that our gain is greater than our donation or confirm we're no more than 5 wei off.
-    assert new_params["totalGain"] - prev_params["totalGain"] > donation
+    assert new_params["totalGain"] - prev_params["totalGain"] == donation
 
     # check that we didn't add any more loss, or at least no more than 2 wei
     assert new_params["totalLoss"] == prev_params["totalLoss"]
@@ -578,7 +578,7 @@ def test_withdraw_after_donation_8(
     assert profit > 0
 
     # specifically check that our gain is greater than our donation or confirm we're no more than 5 wei off.
-    assert new_params["totalGain"] - prev_params["totalGain"] > donation
+    assert new_params["totalGain"] - prev_params["totalGain"] == donation
 
     # check that we didn't add any more loss, or at least no more than 2 wei
     assert new_params["totalLoss"] == prev_params["totalLoss"]

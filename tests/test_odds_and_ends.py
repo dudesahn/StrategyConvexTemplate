@@ -24,6 +24,7 @@ def test_odds_and_ends(
     amount,
     pool,
     strategy_name,
+    rewards_token,
 ):
 
     ## deposit to the vault after approving. turn off health check before each harvest since we're doing weird shit
@@ -46,6 +47,8 @@ def test_odds_and_ends(
     crv.transfer(gov, to_send, {"from": strategy})
     to_send = convexToken.balanceOf(strategy)
     convexToken.transfer(gov, to_send, {"from": strategy})
+    to_send = rewards_token.balanceOf(strategy)
+    rewards_token.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
 
     # we want to check when we have a loss
@@ -54,7 +57,7 @@ def test_odds_and_ends(
     # print("\nShould we harvest? Should be true.", tx)
     # assert tx == True
 
-    chain.sleep(86400 * 2)
+    chain.sleep(86400)
     chain.mine(1)
     strategy.setDoHealthCheck(False, {"from": gov})
     strategy.harvest({"from": gov})
@@ -511,6 +514,8 @@ def test_odds_and_ends_weird_amounts(
 
     # take 100% of our CRV to the voter
     strategy.setKeepCRV(10000, {"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
     strategy.harvest({"from": gov})
 
     # sleep for a week to get some profit
@@ -535,6 +540,8 @@ def test_odds_and_ends_weird_amounts(
 
     # take 0% of our CRV to the voter
     strategy.setKeepCRV(0, {"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
     strategy.harvest({"from": gov})
 
 
@@ -595,11 +602,6 @@ def test_odds_and_ends_rewards_stuff(
     strategy.updateRewards(rewards_token, {"from": gov})
     strategy.updateRewards(rewards_token, {"from": gov})
 
-    # have our whale send some "rewards" to our strat, turn off health check for this harvest
-    balance = rewards_token.balanceOf(whale)
-    rewards_token.transfer(strategy, balance, {"from": whale})
-    strategy.setDoHealthCheck(False, {"from": gov})
-
     # set our optimal to DAI with rewards on
     strategy.setOptimal(0, {"from": gov})
 
@@ -626,7 +628,11 @@ def test_odds_and_ends_rewards_stuff(
 
     # take 100% of our CRV to the voter
     strategy.setKeepCRV(10000, {"from": gov})
-    strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+    tx = strategy.harvest(
+        {"from": gov}
+    )  # this one seems to randomly fail sometimes, adding sleep/mine before fixed it, likely because of updating the view variable?
 
     # we do this twice to hit both branches of the if statement
     strategy.turnOffRewards({"from": gov})
@@ -694,4 +700,6 @@ def test_odds_and_ends_rewards_stuff(
 
     # take 0% of our CRV to the voter
     strategy.setKeepCRV(0, {"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
     strategy.harvest({"from": gov})

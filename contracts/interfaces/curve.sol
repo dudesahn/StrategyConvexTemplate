@@ -91,6 +91,14 @@ interface ICurveFi {
         uint256 _min_to_amount
     ) external;
 
+    function exchange(
+        uint256 from,
+        uint256 to,
+        uint256 _from_amount,
+        uint256 _min_to_amount,
+        bool use_eth
+    ) external;
+
     function balances(uint256) external view returns (uint256);
 
     function get_dy(

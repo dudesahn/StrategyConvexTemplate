@@ -9,3 +9,5 @@ reports/
 # Node/npm
 node_modules/
 .DS_Store
+@openzeppelin/
+@yearnvaults/
