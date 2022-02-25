@@ -104,6 +104,10 @@ def other_vault_strategy():
 def proxy():
     yield Contract("0xA420A63BbEFfbda3B147d0585F1852C358e2C152")
 
+@pytest.fixture(scope="function")
+def booster():
+    yield Contract("0xF403C135812408BFbE8713b5A23a04b3D48AAE31")
+
 
 @pytest.fixture(scope="module")
 def curve_registry():
@@ -117,6 +121,20 @@ def healthCheck():
 @pytest.fixture(scope="function")
 def live_spell_strat(trade_factory, ymechs_safe):
     strategy =  Contract("0xeDB4B647524FC2B9985019190551b197c6AB6C5c")
+    trade_factory.grantRole(
+        trade_factory.STRATEGY(), strategy, {"from": ymechs_safe}
+    )
+    yield strategy
+
+@pytest.fixture(scope="function")
+def live_yfi_strat(trade_factory, ymechs_safe):
+    network.gas_limit(6_000_000)
+    #network.gas_price(0)
+    #network.max_fee(0)
+    #network.priority_fee(0)
+    #, "allow_revert": True
+    strategy =  Contract("0xa04947059831783C561e59A43B93dCB5bEE7cab2")
+    
     trade_factory.grantRole(
         trade_factory.STRATEGY(), strategy, {"from": ymechs_safe}
     )

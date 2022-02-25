@@ -132,6 +132,11 @@ contract CurveGlobal{
         numOfShares = _numOfShares;
     }
 
+    function setTradeFactory(address _tradeFactory) external{
+        require(msg.sender == owner || msg.sender == sms);
+        tradeFactory = _tradeFactory;
+    }
+
     function createNewCurveVaultAndStrat(uint256 _pid, uint256 _depositLimit) external returns (address vault, address strat){
             
         (address lptoken, , , , , ) = convexDeposit.poolInfo(_pid);
