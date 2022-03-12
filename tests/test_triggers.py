@@ -15,6 +15,7 @@ def test_triggers(
     amount,
     gasOracle,
     strategist_ms,
+    accounts,
 ):
     # inactive strategy (0 DR and 0 assets) shouldn't be touched by keepers
     gasOracle.setMaxAcceptableBaseFee(10000 * 1e9, {"from": strategist_ms})
@@ -23,6 +24,19 @@ def test_triggers(
     print("\nShould we harvest? Should be false.", tx)
     assert tx == False
     vault.updateStrategyDebtRatio(strategy, 10000, {"from": gov})
+
+    # adjust our waiting period to 1 block so we aren't miserable in testing
+    networkSettings = Contract("0xc1B6057e8232fB509Fc60F9e9297e11E59D4A189")
+    daoSetter = accounts.at("0x42EC642eAa86091059569d8De8aeccf7F2F9B1a2", force=True)
+    path = "network.reth.deposit.delay"
+    networkSettings.setSettingUint(path, 1, {'from': daoSetter})
+    assert networkSettings.getRethDepositDelay() == 1
+    chain.mine(1)
+    
+    # set our minimum deposit to 1 wei
+    depositSettings = Contract("0x781693a15E1fA7c743A299f4F0242cdF5489A0D9")
+    path = "deposit.minimum"
+    depositSettings.setSettingUint(path, 1, {'from': daoSetter})
 
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -98,7 +112,6 @@ def test_tend_triggers(
     strategy,
     chain,
     amount,
-    sToken,
     accounts,
     strategist_ms,
     gasOracle,
@@ -110,6 +123,19 @@ def test_tend_triggers(
     print("\nShould we tend? Should be false.", tx)
     assert tx == False
     vault.updateStrategyDebtRatio(strategy, 10000, {"from": gov})
+
+    # adjust our waiting period to 1 block so we aren't miserable in testing
+    networkSettings = Contract("0xc1B6057e8232fB509Fc60F9e9297e11E59D4A189")
+    daoSetter = accounts.at("0x42EC642eAa86091059569d8De8aeccf7F2F9B1a2", force=True)
+    path = "network.reth.deposit.delay"
+    networkSettings.setSettingUint(path, 1, {'from': daoSetter})
+    assert networkSettings.getRethDepositDelay() == 1
+    chain.mine(1)
+    
+    # set our minimum deposit to 1 wei
+    depositSettings = Contract("0x781693a15E1fA7c743A299f4F0242cdF5489A0D9")
+    path = "deposit.minimum"
+    depositSettings.setSettingUint(path, 1, {'from': daoSetter})
 
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -123,28 +149,14 @@ def test_tend_triggers(
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    # turn off and then back on our markets
-    _target = sToken.target()
-    target = Contract(_target)
-    currencyKey = [target.currencyKey()]
-    systemStatus = Contract("0x1c86B3CDF2a60Ae3a574f7f71d44E2C50BDdB87E")
-    synthGod = accounts.at("0xC105Ea57Eb434Fbe44690d7Dec2702e4a2FBFCf7", force=True)
-    systemStatus.suspendSynthsExchange(currencyKey, 2, {"from": synthGod})
-    chain.sleep(1)
-    chain.mine(1)
-    assert strategy.isMarketClosed() == True
-
     # tend should be false if markets are off
     tx = strategy.tendTrigger(0, {"from": gov})
     print("\nShould we tend? Should be False.", tx)
     assert tx == False
-    systemStatus.resumeSynthsExchange(currencyKey, {"from": synthGod})
 
     # simulate an hour of earnings
     chain.sleep(3600)
     chain.mine(1)
-    assert strategy.isMarketClosed() == False
-    assert strategy.claimableProfitInUsdt() < strategy.harvestProfitMin()
 
     # tend should trigger false; hasn't been long enough
     tx = strategy.tendTrigger(0, {"from": gov})

@@ -48,12 +48,6 @@ def test_odds_and_ends(
     convexToken.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
 
-    # we want to check when we have a loss
-    # comment this out since we no longer use harvestTrigger from baseStrategy
-    # tx = strategy.harvestTrigger(0, {"from": gov})
-    # print("\nShould we harvest? Should be true.", tx)
-    # assert tx == True
-
     chain.sleep(86400 * 2)
     chain.mine(1)
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -106,12 +100,6 @@ def test_odds_and_ends(
     # check our views
     strategy.apiVersion()
     strategy.isActive()
-
-    # tend stuff
-    chain.sleep(1)
-    strategy.tend({"from": gov})
-    chain.sleep(1)
-    strategy.tendTrigger(0, {"from": gov})
 
 
 def test_odds_and_ends_2(
@@ -422,68 +410,6 @@ def test_weird_reverts(
         strategy.withdraw(1e18, {"from": gov})
 
 
-# this one makes sure our harvestTrigger doesn't trigger when we don't have assets, but will trigger if we have profit
-def test_odds_and_ends_inactive_strat(
-    gov,
-    token,
-    vault,
-    strategist,
-    whale,
-    strategy,
-    chain,
-    strategist_ms,
-    voter,
-    cvxDeposit,
-    amount,
-):
-    ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(amount, {"from": whale})
-    chain.sleep(1)
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
-
-    ## move our funds out of the strategy
-    vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
-    # sleep for a day since univ3 is weird
-    chain.sleep(86400)
-    strategy.harvest({"from": gov})
-
-    # we shouldn't harvest empty strategies
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be false.", tx)
-    assert tx == False
-
-    ## move our funds back into the strategy
-    vault.updateStrategyDebtRatio(strategy, 10000, {"from": gov})
-    chain.sleep(1)
-    strategy.harvest({"from": gov})
-
-    # sleep for five days to generate profit
-    chain.sleep(86400 * 5)
-
-    # send away all funds so we have profit but no assets
-    strategy.withdrawToConvexDepositTokens({"from": gov})
-    to_send = cvxDeposit.balanceOf(strategy)
-    print("cvxToken Balance of Strategy", to_send)
-    cvxDeposit.transfer(gov, to_send, {"from": strategy})
-    assert strategy.estimatedTotalAssets() == 0
-
-    # set debtRatio to zero so strategy will return inactive
-    vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
-
-    # we should harvest empty strategies with profit to take, but our current profit is below our limit
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be false.", tx)
-    assert tx == False
-
-    # adjust our limit to 0, then check
-    strategy.setHarvestProfitNeeded(0, 0, {"from": gov})
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be true.", tx)
-    assert tx == True
-
-
 # this one tests if we don't have any CRV to send to voter or any left over after sending
 def test_odds_and_ends_weird_amounts(
     gov,
@@ -496,6 +422,7 @@ def test_odds_and_ends_weird_amounts(
     strategist_ms,
     voter,
     amount,
+    accounts,
 ):
 
     ## deposit to the vault after approving
@@ -503,30 +430,73 @@ def test_odds_and_ends_weird_amounts(
     vault.deposit(amount, {"from": whale})
     strategy.harvest({"from": gov})
 
-    # sleep for a week to get some profit
-    chain.sleep(86400 * 7)
+    # sleep for a day to get some profit
+    chain.sleep(86400)
     chain.mine(1)
 
     # take 100% of our CRV to the voter
     strategy.setKeepCRV(10000, {"from": gov})
     strategy.harvest({"from": gov})
 
-    # sleep for a week to get some profit
-    chain.sleep(86400 * 7)
+    # sleep for a day to get some profit
+    chain.sleep(86400)
     chain.mine(1)
-
-    # switch to USDC, want to not have any profit tho
-    strategy.setOptimal(1, {"from": gov})
-    strategy.harvest({"from": gov})
-
-    # sleep for a week to get some profit
-    chain.sleep(86400 * 7)
-    chain.mine(1)
-
-    # can't set to 4
-    with brownie.reverts():
-        strategy.setOptimal(4, {"from": gov})
 
     # take 0% of our CRV to the voter
     strategy.setKeepCRV(0, {"from": gov})
     strategy.harvest({"from": gov})
+
+    # change our optimal deposit asset
+    strategy.setMintReth(True, {"from": gov})
+
+    # store asset amount
+    before_usdc_assets = vault.totalAssets()
+    assert token.balanceOf(strategy) == 0
+
+    # sleep for a day to get some profit
+    chain.sleep(86400)
+    chain.mine(1)
+    
+    # adjust our waiting period to 1 block so we aren't miserable in testing
+    networkSettings = Contract("0xc1B6057e8232fB509Fc60F9e9297e11E59D4A189")
+    daoSetter = accounts.at("0x42EC642eAa86091059569d8De8aeccf7F2F9B1a2", force=True)
+    path = "network.reth.deposit.delay"
+    networkSettings.setSettingUint(path, 1, {'from': daoSetter})
+    assert networkSettings.getRethDepositDelay() == 1
+    chain.mine(1)
+    
+    # set our minimum deposit to 1 wei
+    depositSettings = Contract("0x781693a15E1fA7c743A299f4F0242cdF5489A0D9")
+    path = "deposit.minimum"
+    depositSettings.setSettingUint(path, 1, {'from': daoSetter})
+
+    # tend, wait a day, store new asset amount
+    chain.sleep(1)
+    strategy.setKeepCRV(10000, {"from": gov})
+    strategy.tend({"from": gov})
+    chain.sleep(1)
+    
+    # harvest, store new asset amount
+    chain.sleep(1)
+    assert strategy.isRethFree()
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+
+    # sleep for a day to get some profit
+    chain.sleep(86400)
+    chain.mine(1)
+    
+    strategy.setKeepCRV(0, {"from": gov})
+    strategy.tend({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+    
+    # harvest, store new asset amount
+    chain.sleep(1)
+    assert strategy.isRethFree()
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+    
+
+    
+    

@@ -259,6 +259,7 @@ def strategy(
     strategy.setKeeper(keeper, {"from": gov})
     gasOracle.setMaxAcceptableBaseFee(20000000000000, {"from": strategist_ms})
     strategy.setHarvestTriggerParams(80000e6, 180000e6, 1e18 * 1000, False, {"from": gov})
+    strategy.setMaxReportDelay(21 * 86400, {"from": gov})
     strategy.setKeepCRV(1000, {"from": gov})
     # set our management fee to zero so it doesn't mess with our profit checking
     vault.setManagementFee(0, {"from": gov})

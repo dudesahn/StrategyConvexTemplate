@@ -69,13 +69,12 @@ def test_setters(
     print("Strategy Name:", name)
 
     # health check stuff
-    chain.sleep(86400)
+    chain.sleep(3600)
     strategy.harvest({"from": gov})
     chain.sleep(1)
     strategy.setDoHealthCheck(False, {"from": gov})
-    chain.sleep(86400)
     strategy.harvest({"from": gov})
-    chain.sleep(86400)
+    chain.sleep(3600)
 
     zero = "0x0000000000000000000000000000000000000000"
 
@@ -99,14 +98,11 @@ def test_setters(
     # try a health check with zero address as health check
     strategy.setHealthCheck(zero, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
+    strategy.tend({"from": gov})
+    chain.mine(1)
+    chain.sleep(361)
     strategy.harvest({"from": gov})
-    chain.sleep(86400)
-
-    # try a health check with random contract as health check
-    strategy.setHealthCheck(gov, {"from": gov})
-    strategy.setDoHealthCheck(True, {"from": gov})
-    with brownie.reverts():
-        strategy.harvest({"from": gov})
+    chain.sleep(3600)
 
     # set emergency exit last
     strategy.setEmergencyExit({"from": gov})

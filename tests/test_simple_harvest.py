@@ -72,11 +72,24 @@ def test_simple_harvest(
     # try and include custom logic here to check that funds are in the staking contract (if needed)
     assert rewardsContract.balanceOf(strategy) > 0
 
-    # simulate 7 days of earnings to clear the minimum deposit amount
-    chain.sleep(86400 * 14)
+    # simulate a day of earnings
+    chain.sleep(86400)
     chain.mine(1)
+    
+    # adjust our waiting period to 1 block so we aren't miserable in testing
+    networkSettings = Contract("0xc1B6057e8232fB509Fc60F9e9297e11E59D4A189")
+    daoSetter = accounts.at("0x42EC642eAa86091059569d8De8aeccf7F2F9B1a2", force=True)
+    path = "network.reth.deposit.delay"
+    networkSettings.setSettingUint(path, 1, {'from': daoSetter})
+    assert networkSettings.getRethDepositDelay() == 1
+    chain.mine(1)
+    
+    # set our minimum deposit to 1 wei
+    depositSettings = Contract("0x781693a15E1fA7c743A299f4F0242cdF5489A0D9")
+    path = "deposit.minimum"
+    depositSettings.setSettingUint(path, 1, {'from': daoSetter})
 
-    # tend, wait a day, store new asset amount
+    # tend
     chain.sleep(1)
     strategy.tend({"from": gov})
     chain.sleep(1)
@@ -85,16 +98,9 @@ def test_simple_harvest(
     reth = Contract("0xae78736Cd615f374D3085123A210448E74Fc6393")
     print("rETH Strategy balance after tend:", reth.balanceOf(strategy)/1e18)
     
-    # adjust our waiting period to 5 blocks so we aren't miserable in testing
-    networkSettings = Contract("0xc1B6057e8232fB509Fc60F9e9297e11E59D4A189")
-    daoSetter = accounts.at("0x42EC642eAa86091059569d8De8aeccf7F2F9B1a2", force=True)
-    path = "network.reth.deposit.delay"
-    networkSettings.setSettingUint(path, 5, {'from': daoSetter})
-    assert networkSettings.getRethDepositDelay() == 5
-    chain.mine(6)
-    
     # harvest, store new asset amount
     chain.sleep(1)
+    chain.mine(1)
     assert strategy.isRethFree()
     strategy.harvest({"from": gov})
     chain.sleep(1)
@@ -111,7 +117,7 @@ def test_simple_harvest(
     print(
         "\nEstimated rETH APR: ",
         "{:.2%}".format(
-            ((after_usdc_assets - before_usdc_assets) * (365 / 14))
+            ((after_usdc_assets - before_usdc_assets) * 365)
             / (strategy.estimatedTotalAssets())
         ),
     )

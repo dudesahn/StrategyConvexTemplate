@@ -320,6 +320,9 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
         wsteth.approve(address(curve), type(uint256).max);
         reth.approve(address(curve), type(uint256).max);
         steth.approve(address(wsteth), type(uint256).max);
+
+        // set our last tend time on deployment
+        lastTendTime = block.timestamp;
     }
 
     /* ========== VARIABLE FUNCTIONS ========== */
@@ -417,8 +420,10 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
             // we're done with our harvest, so we turn our toggle back to false
             harvestNow = false;
         } else {
-            // this is our tend call
-            claimAndMintReth();
+            if (mintReth) {
+                // this is our tend call
+                claimAndMintReth();
+            }
 
             // update our variable for tracking last tend time
             lastTendTime = block.timestamp;
@@ -511,6 +516,9 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
             return false;
         }
 
+        // pull our last harvest
+        StrategyParams memory params = vault.strategies(address(this));
+
         if (!mintReth) {
             // harvest if we have a profit to claim at our upper limit without considering gas price
             uint256 claimableProfit = claimableProfitInUsdt();
@@ -528,8 +536,8 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
                 return true;
             }
 
-            // Should trigger if hasn't been called in a while. Running this based on harvest even though this is a tend call since a harvest should run ~5 mins after every tend.
-            if (block.timestamp.sub(lastTendTime) >= maxReportDelay)
+            // Should trigger if hasn't been called in a while.
+            if (block.timestamp.sub(params.lastReport) >= maxReportDelay)
                 return true;
         }
 
@@ -557,7 +565,6 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
                 }
 
                 // harvest our profit if we have tended since our last harvest
-                StrategyParams memory params = vault.strategies(address(this));
                 if (lastTendTime > params.lastReport) {
                     return true;
                 }
