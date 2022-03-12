@@ -1,16 +1,30 @@
 import pytest
-from brownie import config, Wei, Contract
+from brownie import config, Wei, Contract, chain, web3
+import requests
 
 # Snapshots the chain before each test and reverts after test completion.
 @pytest.fixture(autouse=True)
 def isolation(fn_isolation):
     pass
 
+# change autouse to True if we want to use this fork to help debug tests
+@pytest.fixture(scope="module", autouse=False)
+def tenderly_fork(web3, chain):
+    fork_base_url = "https://simulate.yearn.network/fork"
+    payload = {"network_id": str(chain.id)}
+    resp = requests.post(fork_base_url, headers={}, json=payload)
+    fork_id = resp.json()["simulation_fork"]["id"]
+    fork_rpc_url = f"https://rpc.tenderly.co/fork/{fork_id}"
+    print(fork_rpc_url)
+    tenderly_provider = web3.HTTPProvider(fork_rpc_url, {"timeout": 600})
+    web3.provider = tenderly_provider
+    print(f"https://dashboard.tenderly.co/yearn/yearn-web/fork/{fork_id}")
+
 
 # put our pool's convex pid here; this is the only thing that should need to change up here **************
 @pytest.fixture(scope="module")
 def pid():
-    pid = 54
+    pid = 73
     yield pid
 
 
@@ -18,21 +32,21 @@ def pid():
 def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    whale = accounts.at("0xeCb456EA5365865EbAb8a2661B0c503410e9B347", force=True)
+    whale = accounts.at("0x8f9e6Dd01128cC3c148902eBfA648bFcB68aD1CE", force=True)
     yield whale
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 1_000e18
+    amount = 19e18
     yield amount
 
 
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexEURSUSDC"
+    strategy_name = "StrategyConvexRocketpool"
     yield strategy_name
 
 
@@ -219,7 +233,7 @@ def vault(pm, gov, rewards, guardian, management, token, chain):
 # replace the first value with the name of your strategy
 @pytest.fixture(scope="function")
 def strategy(
-    StrategyConvexEURSUSDC,
+    StrategyConvexRocketpool,
     strategist,
     keeper,
     vault,
@@ -237,14 +251,14 @@ def strategy(
 ):
     # make sure to include all constructor parameters needed here
     strategy = strategist.deploy(
-        StrategyConvexEURSUSDC,
+        StrategyConvexRocketpool,
         vault,
         pid,
         strategy_name,
     )
     strategy.setKeeper(keeper, {"from": gov})
     gasOracle.setMaxAcceptableBaseFee(20000000000000, {"from": strategist_ms})
-    strategy.setHarvestProfitNeeded(80000e6, 180000e6, {"from": gov})
+    strategy.setHarvestTriggerParams(80000e6, 180000e6, 1e18 * 1000, False, {"from": gov})
     strategy.setKeepCRV(1000, {"from": gov})
     # set our management fee to zero so it doesn't mess with our profit checking
     vault.setManagementFee(0, {"from": gov})
