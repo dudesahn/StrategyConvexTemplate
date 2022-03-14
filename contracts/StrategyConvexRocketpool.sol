@@ -249,11 +249,12 @@ abstract contract StrategyConvexBase is BaseStrategy {
         claimRewards = _claimRewards;
     }
 
-    // This allows us to manually harvest with our keeper as needed
-    function setForceHarvestTriggerOnce(bool _forceHarvestTriggerOnce)
-        external
-        onlyAuthorized
-    {
+    // This allows us to manually harvest or tend with our keeper as needed
+    function setForceTriggerOnce(
+        bool _forceTendTriggerOnce,
+        bool _forceHarvestTriggerOnce
+    ) external onlyEmergencyAuthorized {
+        forceTendTriggerOnce = _forceTendTriggerOnce;
         forceHarvestTriggerOnce = _forceHarvestTriggerOnce;
     }
 }
@@ -287,7 +288,7 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
     IRocketPoolHelper public constant rocketPoolHelper =
         IRocketPoolHelper(0x5943910C2e88480584092C7B95A3FD762cAbc699);
 
-    address internal referral; // referral address, use EOA to claim on L2
+    address internal referral = 0xD20Eb2390e675b000ADb8511F62B28404115A1a4; // referral address, use EOA to claim on L2
     uint256 public lastTendTime; // this is the timestamp that our last tend was called
 
     /* ========== CONSTRUCTOR ========== */
@@ -340,13 +341,7 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
         // turn on our toggle for harvests
         harvestNow = true;
 
-        // if we're depositing via rETH, we will have already minted it, but double-check that it's unlocked
-        if (mintReth && isRethFree()) {
-            uint256 rEthBalance = reth.balanceOf(address(this));
-            if (rEthBalance > 0) {
-                curve.add_liquidity([rEthBalance, 0], 0);
-            }
-        } else {
+        if (!mintReth) {
             // go through the claim, sell, and deposit process for wstETH
             rewardsContract.getReward(address(this), true);
 
@@ -369,6 +364,12 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
             if (wstethBalance > 0) {
                 curve.add_liquidity([0, wstethBalance], 0);
             }
+        }
+
+        uint256 rEthBalance = reth.balanceOf(address(this));
+        // if we're depositing via rETH, we will have already minted it, but double-check that it's unlocked
+        if (rEthBalance > 0 && isRethFree()) {
+            curve.add_liquidity([rEthBalance, 0], 0);
         }
 
         // debtOustanding will only be > 0 in the event of revoking or if we need to rebalance from a withdrawal or lowering the debtRatio
@@ -516,10 +517,15 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
             return false;
         }
 
-        // pull our last harvest
-        StrategyParams memory params = vault.strategies(address(this));
-
         if (!mintReth) {
+            // only check if we need to earmark on vaults we know are problematic
+            if (checkEarmark) {
+                // don't harvest if we need to earmark convex rewards
+                if (needsEarmarkReward()) {
+                    return false;
+                }
+            }
+
             // harvest if we have a profit to claim at our upper limit without considering gas price
             uint256 claimableProfit = claimableProfitInUsdt();
             if (claimableProfit > harvestProfitMax) {
@@ -536,6 +542,9 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
                 return true;
             }
 
+            // pull our last harvest
+            StrategyParams memory params = vault.strategies(address(this));
+
             // Should trigger if hasn't been called in a while.
             if (block.timestamp.sub(params.lastReport) >= maxReportDelay)
                 return true;
@@ -543,7 +552,7 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
 
         // check if the base fee gas price is higher than we allow. if it is, block harvests.
         if (isBaseFeeAcceptable()) {
-            // trigger if we want to manually harvest, but only if our gas price is acceptable
+            // trigger if we want to manually harvest, but not if we also triggered a tend (should realistically never happen).
             if (forceHarvestTriggerOnce) {
                 if (forceTendTriggerOnce) {
                     return false;
@@ -552,22 +561,14 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
                 }
             }
 
-            // harvest our credit if it's above our threshold
+            // harvest our strategy's credit if it's above our threshold
             if (vault.creditAvailable() > creditThreshold) {
                 return true;
             }
 
-            // only check if we need to harvest ~24 hours after a tend if we're minting rETH
-            if (mintReth) {
-                // Should not harvest if our rETH is locked.
-                if (!isRethFree()) {
-                    return false;
-                }
-
-                // harvest our profit if we have tended since our last harvest
-                if (lastTendTime > params.lastReport) {
-                    return true;
-                }
+            // if we're minting rETH, then we want to harvest as soon as it's free to deposit into our curve pool
+            if (isRethFree() && reth.balanceOf(address(this)) > 0) {
+                return true;
             }
         }
 
@@ -588,6 +589,14 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
 
         // only check if we need to tend if we're minting rETH
         if (mintReth) {
+            // only check if we need to earmark on vaults we know are problematic
+            if (checkEarmark) {
+                // don't tend if we need to earmark convex rewards
+                if (needsEarmarkReward()) {
+                    return false;
+                }
+            }
+
             // harvest if we have a profit to claim at our upper limit without considering gas price
             uint256 claimableProfit = claimableProfitInUsdt();
             if (claimableProfit > harvestProfitMax) {
@@ -688,6 +697,11 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
 
     // include so our contract plays nicely with ether
     receive() external payable {}
+
+    function sweepETH() public onlyGovernance {
+        (bool success, ) = governance().call{value: address(this).balance}("");
+        require(success, "!FailedETHSweep");
+    }
 
     /* ========== SETTERS ========== */
 

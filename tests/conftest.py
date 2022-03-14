@@ -7,6 +7,7 @@ import requests
 def isolation(fn_isolation):
     pass
 
+
 # change autouse to True if we want to use this fork to help debug tests
 @pytest.fixture(scope="module", autouse=False)
 def tenderly_fork(web3, chain):
@@ -217,7 +218,7 @@ def vault(pm, gov, rewards, guardian, management, token, chain):
     Vault = pm(config["dependencies"][0]).Vault
     vault = guardian.deploy(Vault)
     vault.initialize(token, gov, rewards, "", "", guardian)
-    vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
+    vault.setDepositLimit(2**256 - 1, {"from": gov})
     vault.setManagement(management, {"from": gov})
     chain.sleep(1)
     yield vault
@@ -258,13 +259,13 @@ def strategy(
     )
     strategy.setKeeper(keeper, {"from": gov})
     gasOracle.setMaxAcceptableBaseFee(20000000000000, {"from": strategist_ms})
-    strategy.setHarvestTriggerParams(80000e6, 180000e6, 1e18 * 1000, False, {"from": gov})
+    strategy.setHarvestTriggerParams(80000e6, 180000e6, 1e18 * 10, False, {"from": gov})
     strategy.setMaxReportDelay(21 * 86400, {"from": gov})
     strategy.setKeepCRV(1000, {"from": gov})
     # set our management fee to zero so it doesn't mess with our profit checking
     vault.setManagementFee(0, {"from": gov})
     # add our new strategy
-    vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
     # proxy.approveStrategy(strategy.gauge(), strategy, {"from": gov}), only need this step for curve voter strats
     strategy.setHealthCheck(healthCheck, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})

@@ -21,7 +21,7 @@ def test_simple_harvest(
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
 
@@ -75,42 +75,47 @@ def test_simple_harvest(
     # simulate a day of earnings
     chain.sleep(86400)
     chain.mine(1)
-    
+
     # adjust our waiting period to 1 block so we aren't miserable in testing
     networkSettings = Contract("0xc1B6057e8232fB509Fc60F9e9297e11E59D4A189")
     daoSetter = accounts.at("0x42EC642eAa86091059569d8De8aeccf7F2F9B1a2", force=True)
     path = "network.reth.deposit.delay"
-    networkSettings.setSettingUint(path, 1, {'from': daoSetter})
+    networkSettings.setSettingUint(path, 1, {"from": daoSetter})
     assert networkSettings.getRethDepositDelay() == 1
     chain.mine(1)
-    
+
     # set our minimum deposit to 1 wei
     depositSettings = Contract("0x781693a15E1fA7c743A299f4F0242cdF5489A0D9")
     path = "deposit.minimum"
-    depositSettings.setSettingUint(path, 1, {'from': daoSetter})
+    depositSettings.setSettingUint(path, 1, {"from": daoSetter})
+
+    # read the maximum pool size and add 100 ETH to it
+    new_size = depositSettings.getMaximumDepositPoolSize() + 100e18
+    path = "deposit.pool.maximum"
+    depositSettings.setSettingUint(path, new_size, {"from": daoSetter})
 
     # tend
     chain.sleep(1)
     strategy.tend({"from": gov})
     chain.sleep(1)
-    
+
     # check our rETH balance
     reth = Contract("0xae78736Cd615f374D3085123A210448E74Fc6393")
-    print("rETH Strategy balance after tend:", reth.balanceOf(strategy)/1e18)
-    
+    print("rETH Strategy balance after tend:", reth.balanceOf(strategy) / 1e18)
+
     # harvest, store new asset amount
     chain.sleep(1)
-    chain.mine(1)
+    chain.mine(2)
     assert strategy.isRethFree()
     strategy.harvest({"from": gov})
     chain.sleep(1)
-    
-    print("rETH Strategy balance after harvest:", reth.balanceOf(strategy)/1e18)
-    
+
+    print("rETH Strategy balance after harvest:", reth.balanceOf(strategy) / 1e18)
+
     after_usdc_assets = vault.totalAssets()
     # confirm we made money, or at least that we have about the same
     assert after_usdc_assets >= before_usdc_assets
-    
+
     print("Profit after 14 days:", (after_usdc_assets - before_usdc_assets) / 1e18)
 
     # Display estimated APR

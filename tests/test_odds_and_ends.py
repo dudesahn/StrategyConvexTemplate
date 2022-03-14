@@ -29,7 +29,7 @@ def test_odds_and_ends(
     ## deposit to the vault after approving. turn off health check before each harvest since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -120,7 +120,7 @@ def test_odds_and_ends_2(
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -163,7 +163,7 @@ def test_odds_and_ends_migration(
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -240,7 +240,7 @@ def test_odds_and_ends_liquidatePosition(
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
 
@@ -314,7 +314,7 @@ def test_odds_and_ends_rekt(
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -362,7 +362,7 @@ def test_odds_and_ends_liquidate_rekt(
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -426,7 +426,7 @@ def test_odds_and_ends_weird_amounts(
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     strategy.harvest({"from": gov})
 
@@ -456,26 +456,32 @@ def test_odds_and_ends_weird_amounts(
     # sleep for a day to get some profit
     chain.sleep(86400)
     chain.mine(1)
-    
+
     # adjust our waiting period to 1 block so we aren't miserable in testing
     networkSettings = Contract("0xc1B6057e8232fB509Fc60F9e9297e11E59D4A189")
     daoSetter = accounts.at("0x42EC642eAa86091059569d8De8aeccf7F2F9B1a2", force=True)
     path = "network.reth.deposit.delay"
-    networkSettings.setSettingUint(path, 1, {'from': daoSetter})
+    networkSettings.setSettingUint(path, 1, {"from": daoSetter})
     assert networkSettings.getRethDepositDelay() == 1
     chain.mine(1)
-    
+
     # set our minimum deposit to 1 wei
     depositSettings = Contract("0x781693a15E1fA7c743A299f4F0242cdF5489A0D9")
     path = "deposit.minimum"
-    depositSettings.setSettingUint(path, 1, {'from': daoSetter})
+    depositSettings.setSettingUint(path, 1, {"from": daoSetter})
+
+    # read the maximum pool size and add 100 ETH to it
+    new_size = depositSettings.getMaximumDepositPoolSize() + 100e18
+    path = "deposit.pool.maximum"
+    depositSettings.setSettingUint(path, new_size, {"from": daoSetter})
 
     # tend, wait a day, store new asset amount
     chain.sleep(1)
     strategy.setKeepCRV(10000, {"from": gov})
     strategy.tend({"from": gov})
     chain.sleep(1)
-    
+    chain.mine(2)
+
     # harvest, store new asset amount
     chain.sleep(1)
     assert strategy.isRethFree()
@@ -485,18 +491,14 @@ def test_odds_and_ends_weird_amounts(
     # sleep for a day to get some profit
     chain.sleep(86400)
     chain.mine(1)
-    
+
     strategy.setKeepCRV(0, {"from": gov})
     strategy.tend({"from": gov})
     chain.sleep(1)
-    chain.mine(1)
-    
+    chain.mine(2)
+
     # harvest, store new asset amount
     chain.sleep(1)
     assert strategy.isRethFree()
     strategy.harvest({"from": gov})
     chain.sleep(1)
-    
-
-    
-    
