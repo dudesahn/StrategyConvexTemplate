@@ -41,6 +41,8 @@ contract RocketPoolHelper {
             // Ensure enough blocks have passed
             uint256 depositDelay =
                 rocketStorage.getUint(
+                    // Review: you can move this to a constant so you reduce
+                    // gas cost in the strategy prepareReturn
                     keccak256(
                         abi.encodePacked(
                             keccak256("dao.protocol.setting.network"),
@@ -50,9 +52,10 @@ contract RocketPoolHelper {
                 );
             uint256 blocksPassed = block.number.sub(lastDepositBlock);
             return blocksPassed > depositDelay;
-        } else {
-            return true; // true if we haven't deposited
         }
+
+        return true; // true if we haven't deposited
+
     }
 
     /// @notice
@@ -76,9 +79,7 @@ contract RocketPoolHelper {
         }
 
         // now check that we have enough free space for our deposit
-        uint256 freeSpace = getPoolFreeSpace();
-
-        return freeSpace > _ethAmount;
+        return getPoolFreeSpace() > _ethAmount;
     }
 
     /// @notice The current minimum deposit size into the rETH deposit pool.
@@ -96,6 +97,9 @@ contract RocketPoolHelper {
         IRocketPool rocketDAOProtocolSettingsDeposit =
             IRocketPool(getRPLContract("rocketDAOProtocolSettingsDeposit"));
         IRocketPool rocketDepositPool =
+            // Review: you are using "rocketDepositPool" in several places.
+            // I am not sure if solc is smart enough to use a single instance.
+            // I would move to a constant.
             IRocketPool(getRPLContract("rocketDepositPool"));
 
         // now check the difference between max and current size
