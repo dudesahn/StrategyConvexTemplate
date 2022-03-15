@@ -16,6 +16,7 @@ import {
     StrategyParams
 } from "@yearnvaults/contracts/BaseStrategy.sol";
 
+// Review: nitpick Why these strategies are not in the interface folder?
 interface IBaseFee {
     function isCurrentBaseFeeAcceptable() external view returns (bool);
 }
@@ -128,7 +129,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
 
     // keepCRV stuff
     uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points)
-    address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
+    address internal constant VOTER = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
 
     IERC20 internal constant crv =
@@ -239,12 +240,14 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
     // Set the amount of CRV to be locked in Yearn's veCRV voter from each harvest. Default is 10%.
+    //Review: onlyVaultManagers?
     function setKeepCRV(uint256 _keepCRV) external onlyAuthorized {
         require(_keepCRV <= 10_000);
         keepCRV = _keepCRV;
     }
 
     // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
+    //Review: onlyVaultManagers?
     function setClaimRewards(bool _claimRewards) external onlyAuthorized {
         claimRewards = _claimRewards;
     }
@@ -350,7 +353,7 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
 
             uint256 sendToVoter = crvBalance.mul(keepCRV).div(FEE_DENOMINATOR);
             if (sendToVoter > 0) {
-                crv.safeTransfer(voter, sendToVoter);
+                crv.safeTransfer(VOTER, sendToVoter);
             }
             uint256 crvRemainder = crv.balanceOf(address(this));
 
@@ -447,6 +450,8 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
             crveth.exchange(1, 0, _crvAmount, 0, true);
         }
 
+        // Review, instead of returning it here, should we let the caller
+        // calculate the balance outside of this method?
         ethBalance = address(this).balance;
     }
 
@@ -467,7 +472,7 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
 
         uint256 sendToVoter = crvBalance.mul(keepCRV).div(FEE_DENOMINATOR);
         if (sendToVoter > 0) {
-            crv.safeTransfer(voter, sendToVoter);
+            crv.safeTransfer(VOTER, sendToVoter);
         }
         uint256 crvRemainder = crv.balanceOf(address(this));
 
