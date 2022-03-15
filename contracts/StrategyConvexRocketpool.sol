@@ -121,14 +121,15 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // these should stay the same across different wants.
 
     // convex stuff
-    address public constant depositContract =
-        0xF403C135812408BFbE8713b5A23a04b3D48AAE31; // this is the deposit contract that all pools use, aka booster
+    IConvexDeposit internal constant depositContract =
+        IConvexDeposit(0xF403C135812408BFbE8713b5A23a04b3D48AAE31); // this is the deposit contract that all pools use, aka booster
     IConvexRewards public rewardsContract; // This is unique to each curve pool
     uint256 public pid; // this is unique to each pool
 
     // keepCRV stuff
     uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points)
-    address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
+    address internal constant voter =
+        0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
 
     IERC20 internal constant crv =
@@ -219,7 +220,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // in case we need to exit into the convex deposit token, this will allow us to do that
     // make sure to check claimRewards before this step if needed
     // plan to have gov sweep convex deposit tokens from strategy after this
-    function withdrawToConvexDepositTokens() external onlyAuthorized {
+    function withdrawToConvexDepositTokens() external onlyVaultManagers {
         uint256 _stakedBal = stakedBalance();
         if (_stakedBal > 0) {
             rewardsContract.withdraw(_stakedBal, claimRewards);
@@ -239,13 +240,13 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
     // Set the amount of CRV to be locked in Yearn's veCRV voter from each harvest. Default is 10%.
-    function setKeepCRV(uint256 _keepCRV) external onlyAuthorized {
+    function setKeepCRV(uint256 _keepCRV) external onlyVaultManagers {
         require(_keepCRV <= 10_000);
         keepCRV = _keepCRV;
     }
 
     // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
-    function setClaimRewards(bool _claimRewards) external onlyAuthorized {
+    function setClaimRewards(bool _claimRewards) external onlyVaultManagers {
         claimRewards = _claimRewards;
     }
 
@@ -306,7 +307,7 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
         // setup our rewards contract
         pid = _pid; // this is the pool ID on convex, we use this to determine what the reweardsContract address is
         (address lptoken, , , address _rewardsContract, , ) =
-            IConvexDeposit(depositContract).poolInfo(_pid);
+            depositContract.poolInfo(_pid);
 
         // set up our rewardsContract
         rewardsContract = IConvexRewards(_rewardsContract);
@@ -416,7 +417,7 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
             uint256 _toInvest = balanceOfWant();
             // deposit into convex and stake immediately but only if we have something to invest
             if (_toInvest > 0) {
-                IConvexDeposit(depositContract).deposit(pid, _toInvest, true);
+                depositContract.deposit(pid, _toInvest, true);
             }
             // we're done with our harvest, so we turn our toggle back to false
             harvestNow = false;
@@ -460,7 +461,7 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
     // claim and swap our CRV and CVX for rETH
     function claimAndMintReth() internal {
         // this claims our CRV, CVX, and any extra tokens.
-        IConvexRewards(rewardsContract).getReward(address(this), true);
+        rewardsContract.getReward(address(this), true);
 
         uint256 crvBalance = crv.balanceOf(address(this));
         uint256 convexBalance = convexToken.balanceOf(address(this));
@@ -477,7 +478,7 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
         // deposit our rETH only if there's space, and if it's large enough. this will prevent keepers from tending as well if needed.
         require(
             rocketPoolHelper.rEthCanAcceptDeposit(toDeposit),
-            "Can't accept this deposit!"
+            "Deposit too large."
         );
         require(
             toDeposit > rocketPoolHelper.getMinimumDepositSize(),
@@ -566,7 +567,7 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
                 return true;
             }
 
-            // if we're minting rETH, then we want to harvest as soon as it's free to deposit into our curve pool
+            // if have any rETH, then we want to harvest as soon as it's free to deposit into our curve pool
             if (isRethFree() && reth.balanceOf(address(this)) > 0) {
                 return true;
             }
@@ -707,7 +708,7 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
 
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
     // Set whether we mint rETH or wstETH
-    function setMintReth(bool _mintReth) external onlyEmergencyAuthorized {
+    function setMintReth(bool _mintReth) external onlyVaultManagers {
         mintReth = _mintReth;
     }
 
@@ -717,7 +718,7 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
         uint256 _harvestProfitMax,
         uint256 _creditThreshold,
         bool _checkEarmark
-    ) external onlyEmergencyAuthorized {
+    ) external onlyVaultManagers {
         harvestProfitMin = _harvestProfitMin;
         harvestProfitMax = _harvestProfitMax;
         creditThreshold = _creditThreshold;
@@ -725,7 +726,7 @@ contract StrategyConvexRocketpool is StrategyConvexBase {
     }
 
     // update our referral address as needed
-    function setReferral(address _referral) external onlyEmergencyAuthorized {
+    function setReferral(address _referral) external onlyVaultManagers {
         referral = _referral;
     }
 }
