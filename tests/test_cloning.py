@@ -18,6 +18,7 @@ def test_cloning(
     amount,
     pool,
     strategy_name,
+    sleep_time,
 ):
     # Shouldn't be able to call initialize again
     with brownie.reverts():
@@ -58,7 +59,7 @@ def test_cloning(
         )
 
     vault.revokeStrategy(strategy, {"from": gov})
-    vault.addStrategy(newStrategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
     assert vault.withdrawalQueue(1) == newStrategy
     assert vault.strategies(newStrategy)[2] == 10_000
     assert vault.withdrawalQueue(0) == strategy
@@ -67,8 +68,8 @@ def test_cloning(
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(1000e18, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
+    vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
     newStrategy.harvest({"from": gov})
@@ -80,8 +81,8 @@ def test_cloning(
     print("\nStarting Assets: ", old_assets_dai / 1e18)
     print("\nAssets Staked: ", rewardsContract.balanceOf(newStrategy) / 1e18)
 
-    # simulate 1 day of earnings
-    chain.sleep(86400)
+    # simulate some earnings
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # harvest after a day, store new asset amount
@@ -93,9 +94,9 @@ def test_cloning(
 
     # Display estimated APR based on the two days before the pay out
     print(
-        "\nEstimated DAI APR: ",
+        "\nEstimated APR: ",
         "{:.2%}".format(
-            ((new_assets_dai - old_assets_dai) * (365))
+            ((new_assets_dai - old_assets_dai) * (86400 / sleep_time))
             / (newStrategy.estimatedTotalAssets())
         ),
     )

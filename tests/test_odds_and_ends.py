@@ -30,7 +30,7 @@ def test_odds_and_ends(
     ## deposit to the vault after approving. turn off health check before each harvest since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -50,12 +50,6 @@ def test_odds_and_ends(
     to_send = rewards_token.balanceOf(strategy)
     rewards_token.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
-
-    # we want to check when we have a loss
-    # comment this out since we no longer use harvestTrigger from baseStrategy
-    # tx = strategy.harvestTrigger(0, {"from": gov})
-    # print("\nShould we harvest? Should be true.", tx)
-    # assert tx == True
 
     chain.sleep(86400)
     chain.mine(1)
@@ -136,7 +130,7 @@ def test_odds_and_ends_2(
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -179,7 +173,7 @@ def test_odds_and_ends_migration(
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -257,7 +251,7 @@ def test_odds_and_ends_liquidatePosition(
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
 
@@ -331,7 +325,7 @@ def test_odds_and_ends_rekt(
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -379,7 +373,7 @@ def test_odds_and_ends_liquidate_rekt(
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -427,8 +421,8 @@ def test_weird_reverts(
         strategy.withdraw(1e18, {"from": gov})
 
 
-# this one makes sure our harvestTrigger doesn't trigger when we don't have assets, but will trigger if we have profit
-def test_odds_and_ends_inactive_strat(
+# this test makes sure we can still harvest without any assets but with a profit
+def test_odds_and_ends_empty_strat(
     gov,
     token,
     vault,
@@ -440,9 +434,10 @@ def test_odds_and_ends_inactive_strat(
     voter,
     cvxDeposit,
     amount,
+    sleep_time,
 ):
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -450,25 +445,18 @@ def test_odds_and_ends_inactive_strat(
 
     ## move our funds out of the strategy
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
-    # sleep for a day since univ3 is weird
-    chain.sleep(86400)
+    chain.sleep(sleep_time)
     strategy.harvest({"from": gov})
-
-    # we shouldn't harvest empty strategies
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be false.", tx)
-    assert tx == False
 
     ## move our funds back into the strategy
     vault.updateStrategyDebtRatio(strategy, 10000, {"from": gov})
     chain.sleep(1)
     strategy.harvest({"from": gov})
 
-    # sleep for five days to generate profit
-    chain.sleep(86400 * 5)
+    # sleep to generate some profit
+    chain.sleep(sleep_time)
 
     # send away all funds so we have profit but no assets. make sure to turn off claimRewards first
-    # NEED TO ADD A CHECK HERE FOR IF WE NEED TO EARMARK REWARDS!!!!! or probably just earmark rewards as a part of strategy setup
     strategy.setClaimRewards(False)
     strategy.withdrawToConvexDepositTokens({"from": gov})
     to_send = cvxDeposit.balanceOf(strategy)
@@ -477,16 +465,10 @@ def test_odds_and_ends_inactive_strat(
     assert strategy.estimatedTotalAssets() == 0
     assert strategy.claimableBalance() > 0
 
-    # we should harvest empty strategies with profit to take, but our current profit is below our limit
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be false.", tx)
-    assert tx == False
-
-    # adjust our limit to 0, then check
-    strategy.setHarvestTriggerParams(0, 0, 1e24, False, {"from": gov})
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be true.", tx)
-    assert tx == True
+    # harvest to check that it works okay, turn off health check since we'll have profit without assets lol
+    chain.sleep(1)
+    strategy.setDoHealthCheck(False, {"from": gov})
+    strategy.harvest({"from": gov})
 
 
 # this one tests if we don't have any CRV to send to voter or any left over after sending
@@ -504,7 +486,7 @@ def test_odds_and_ends_weird_amounts(
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     strategy.harvest({"from": gov})
 
@@ -566,7 +548,7 @@ def test_odds_and_ends_rewards_stuff(
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     strategy.harvest({"from": gov})
 

@@ -1,5 +1,6 @@
 import brownie
 from brownie import Wei, accounts, Contract, config
+import pytest
 
 # set our rewards to nothing, then turn them back on
 def test_update_to_zero_then_back(
@@ -23,7 +24,14 @@ def test_update_to_zero_then_back(
     zero_address,
     has_rewards,
     convexToken,
+    is_curve,
+    is_convex,
 ):
+    # skip these tests if not curve or convex strategy
+    if not is_convex and not is_curve:
+        print("Don't need to do these tests if not Curve or Convex strategy")
+        return
+
     ## clone our strategy, set our rewards to none
     tx = strategy.cloneConvex3CrvRewards(
         vault,
@@ -42,7 +50,7 @@ def test_update_to_zero_then_back(
     strategy.harvest({"from": gov})
 
     # attach our new strategy and approve it on the proxy
-    vault.addStrategy(newStrategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
 
     assert vault.withdrawalQueue(1) == newStrategy
     assert vault.strategies(newStrategy)[2] == 10_000
@@ -52,7 +60,7 @@ def test_update_to_zero_then_back(
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
@@ -203,7 +211,14 @@ def test_update_from_zero_to_off(
     zero_address,
     convexToken,
     has_rewards,
+    is_curve,
+    is_convex,
 ):
+    # skip these tests if not curve or convex strategy
+    if not is_convex and not is_curve:
+        print("Don't need to do these tests if not Curve or Convex strategy")
+        return
+
     ## clone our strategy, set our rewards to none
     tx = strategy.cloneConvex3CrvRewards(
         vault,
@@ -222,7 +237,7 @@ def test_update_from_zero_to_off(
     strategy.harvest({"from": gov})
 
     # attach our new strategy and approve it on the proxy
-    vault.addStrategy(newStrategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
 
     assert vault.withdrawalQueue(1) == newStrategy
     assert vault.strategies(newStrategy)[2] == 10_000
@@ -232,7 +247,7 @@ def test_update_from_zero_to_off(
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
@@ -378,7 +393,14 @@ def test_change_rewards(
     strategy_name,
     gauge,
     zero_address,
+    is_curve,
+    is_convex,
 ):
+    # skip these tests if not curve or convex strategy
+    if not is_convex and not is_curve:
+        print("Don't need to do these tests if not Curve or Convex strategy")
+        return
+
     ## clone our strategy, set our rewards to none
     tx = strategy.cloneConvex3CrvRewards(
         vault,
@@ -397,12 +419,12 @@ def test_change_rewards(
     strategy.harvest({"from": gov})
 
     # attach our new strategy and approve it on the proxy
-    vault.addStrategy(newStrategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
 
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
@@ -466,7 +488,14 @@ def test_check_rewards(
     zero_address,
     has_rewards,
     convexToken,
+    is_curve,
+    is_convex,
 ):
+    # skip these tests if not curve or convex strategy
+    if not is_convex and not is_curve:
+        print("Don't need to do these tests if not Curve or Convex strategy")
+        return
+
     # check if our strategy has extra rewards
     rewards_token = Contract(strategy.rewardsToken())
     print("\nThis is our rewards token:", rewards_token.name())
@@ -476,3 +505,235 @@ def test_check_rewards(
         assert convexToken != rewards_token
     else:
         assert zero_address == rewards_token
+
+
+
+
+
+# this one tests if we don't have any CRV to send to voter or any left over after sending
+def test_weird_amounts(
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    voter,
+    amount,
+    is_curve,
+    is_convex,
+):
+    # skip these tests if not curve or convex strategy
+    if not is_convex and not is_curve:
+        print("Don't need to do these tests if not Curve or Convex strategy")
+        return
+
+    ## deposit to the vault after approving
+    token.approve(vault, 2**256 - 1, {"from": whale})
+    vault.deposit(amount, {"from": whale})
+    strategy.harvest({"from": gov})
+
+    # sleep for a week to get some profit
+    chain.sleep(86400 * 7)
+    chain.mine(1)
+
+    # take 100% of our CRV to the voter
+    strategy.setKeepCRV(10000, {"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # sleep for a week to get some profit
+    chain.sleep(86400 * 7)
+    chain.mine(1)
+
+    # switch to USDC, want to not have any profit tho
+    strategy.setOptimal(1, {"from": gov})
+    strategy.harvest({"from": gov})
+
+    # sleep for a week to get some profit
+    chain.sleep(86400 * 7)
+    chain.mine(1)
+
+    # switch to USDT, want to not have any profit tho
+    strategy.setOptimal(2, {"from": gov})
+    strategy.harvest({"from": gov})
+
+    # sleep for a week to get some profit
+    chain.sleep(86400 * 7)
+    chain.mine(1)
+
+    # take 0% of our CRV to the voter
+    strategy.setKeepCRV(0, {"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+
+# this one tests if we don't have any CRV to send to voter or any left over after sending
+def test_more_rewards_stuff(
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    voter,
+    amount,
+    rewards_token,
+    rewards,
+    keeper,
+    pool,
+    gauge,
+    strategy_name,
+    is_curve,
+    is_convex,
+):
+    # skip these tests if not curve or convex strategy
+    if not is_convex and not is_curve:
+        print("Don't need to do these tests if not Curve or Convex strategy")
+        return
+
+    ## deposit to the vault after approving
+    token.approve(vault, 2**256 - 1, {"from": whale})
+    vault.deposit(amount, {"from": whale})
+    strategy.harvest({"from": gov})
+
+    # we do this twice to hit both branches of the if statement
+    strategy.turnOffRewards({"from": gov})
+    strategy.turnOffRewards({"from": gov})
+
+    # set our optimal to DAI without rewards on
+    strategy.setOptimal(0, {"from": gov})
+
+    # sleep for a day to get some profit
+    chain.sleep(86400)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # set our optimal to USDC without rewards on
+    strategy.setOptimal(1, {"from": gov})
+
+    # sleep for a day to get some profit
+    chain.sleep(86400)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # set our optimal to USDT without rewards on
+    strategy.setOptimal(2, {"from": gov})
+
+    # sleep for a day to get some profit
+    chain.sleep(86400)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # we do this twice to hit both branches of the if statement
+    strategy.updateRewards(rewards_token, {"from": gov})
+    strategy.updateRewards(rewards_token, {"from": gov})
+
+    # set our optimal to DAI with rewards on
+    strategy.setOptimal(0, {"from": gov})
+
+    # sleep for a day to get some profit
+    chain.sleep(86400)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # set our optimal to USDC with rewards on
+    strategy.setOptimal(1, {"from": gov})
+
+    # sleep for a day to get some profit
+    chain.sleep(86400)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # set our optimal to USDT with rewards on
+    strategy.setOptimal(2, {"from": gov})
+
+    # sleep for a day to get some profit
+    chain.sleep(86400)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # take 100% of our CRV to the voter
+    strategy.setKeepCRV(10000, {"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+    tx = strategy.harvest(
+        {"from": gov}
+    )  # this one seems to randomly fail sometimes, adding sleep/mine before fixed it, likely because of updating the view variable?
+
+    # we do this twice to hit both branches of the if statement
+    strategy.turnOffRewards({"from": gov})
+    strategy.turnOffRewards({"from": gov})
+
+    # set our optimal to DAI without rewards on
+    strategy.setOptimal(0, {"from": gov})
+
+    # sleep for a day to get some profit
+    chain.sleep(86400)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # set our optimal to USDC without rewards on
+    strategy.setOptimal(1, {"from": gov})
+
+    # sleep for a day to get some profit
+    chain.sleep(86400)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # set our optimal to USDT without rewards on
+    strategy.setOptimal(2, {"from": gov})
+
+    # sleep for a day to get some profit
+    chain.sleep(86400)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # we do this twice to hit both branches of the if statement
+    strategy.updateRewards(rewards_token, {"from": gov})
+    strategy.updateRewards(rewards_token, {"from": gov})
+
+    # set our optimal to DAI with rewards on
+    strategy.setOptimal(0, {"from": gov})
+
+    # sleep for a day to get some profit
+    chain.sleep(86400)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # set our optimal to USDC with rewards on
+    strategy.setOptimal(1, {"from": gov})
+
+    # sleep for a day to get some profit
+    chain.sleep(86400)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # set our optimal to USDT with rewards on
+    strategy.setOptimal(2, {"from": gov})
+
+    # sleep for a day to get some profit
+    chain.sleep(86400)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # sleep for a day to get some profit
+    chain.sleep(86400)
+    chain.mine(1)
+
+    # can't set to 4
+    with brownie.reverts():
+        strategy.setOptimal(4, {"from": gov})
+
+    # take 0% of our CRV to the voter
+    strategy.setKeepCRV(0, {"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+

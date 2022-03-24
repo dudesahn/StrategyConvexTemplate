@@ -12,17 +12,18 @@ def test_emergency_exit(
     strategy,
     chain,
     amount,
+    sleep_time,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate earnings
+    chain.sleep(sleep_time)
     chain.mine(1)
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -52,18 +53,19 @@ def test_emergency_exit_with_profit(
     strategy,
     chain,
     amount,
+    sleep_time,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate earnings
+    chain.sleep(sleep_time)
     chain.mine(1)
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -103,7 +105,7 @@ def test_emergency_exit_with_no_gain_or_loss(
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -149,16 +151,17 @@ def test_emergency_withdraw_method_0(
     rewardsContract,
     cvxDeposit,
     amount,
+    sleep_time,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
-    # simulate a day of earnings
-    chain.sleep(86400)
+    # simulate earnings
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # set emergency exit so no funds will go back to strategy, and we assume that deposit contract is borked so we go through staking contract
@@ -194,16 +197,17 @@ def test_emergency_withdraw_method_1(
     rewardsContract,
     cvxDeposit,
     amount,
+    sleep_time,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
 
-    # simulate a day of earnings
-    chain.sleep(86400)
+    # simulate earnings
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # set emergency exit so no funds will go back to strategy, and we assume that deposit contract is borked so we go through staking contract

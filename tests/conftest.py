@@ -1,10 +1,28 @@
 import pytest
 from brownie import config, Wei, Contract, chain
+import requests
 
 # Snapshots the chain before each test and reverts after test completion.
 @pytest.fixture(autouse=True)
 def isolation(fn_isolation):
     pass
+
+
+################################################## TENDERLY DEBUGGING ##################################################
+
+# change autouse to True if we want to use this fork to help debug tests
+@pytest.fixture(scope="module", autouse=False)
+def tenderly_fork(web3, chain):
+    fork_base_url = "https://simulate.yearn.network/fork"
+    payload = {"network_id": str(chain.id)}
+    resp = requests.post(fork_base_url, headers={}, json=payload)
+    fork_id = resp.json()["simulation_fork"]["id"]
+    fork_rpc_url = f"https://rpc.tenderly.co/fork/{fork_id}"
+    print(fork_rpc_url)
+    tenderly_provider = web3.HTTPProvider(fork_rpc_url, {"timeout": 600})
+    web3.provider = tenderly_provider
+    print(f"https://dashboard.tenderly.co/yearn/yearn-web/fork/{fork_id}")
+
 
 ################################################ UPDATE THINGS BELOW HERE ################################################
 
@@ -88,11 +106,16 @@ def no_profit():
     yield no_profit
 
 
-# use this to set the standard amount of time we sleep when taking profits.
+# use this to set the standard amount of time we sleep between harvests.
 # generally 1 day, but can be less if dealing with smaller windows (oracles) or longer if we need to trigger weekly earnings.
 @pytest.fixture(scope="module")
 def sleep_time():
-    sleep_time = 86400
+    hour = 3600
+
+    # change this one right here
+    hours_to_sleep = 4
+
+    sleep_time = hour * hours_to_sleep
     yield sleep_time
 
 
@@ -101,7 +124,6 @@ def sleep_time():
 # Only worry about changing things above this line, unless you want to make changes to the vault or strategy.
 # ----------------------------------------------------------------------- #
 
-print("Chain ID", chain_used)
 if chain_used == 1:  # mainnet
     # all contracts below should be able to stay static based on the pid
     @pytest.fixture(scope="module")
@@ -198,7 +220,7 @@ if chain_used == 1:  # mainnet
     def strategist_ms(accounts):
         # like governance, but better
         yield accounts.at("0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7", force=True)
-        
+
     # set all of these accounts to SMS as well, just for testing
     @pytest.fixture(scope="module")
     def keeper(accounts):
@@ -219,19 +241,18 @@ if chain_used == 1:  # mainnet
     @pytest.fixture(scope="module")
     def strategist(accounts):
         yield accounts.at("0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7", force=True)
-    
+
     # use this if you need to deploy the vault
     @pytest.fixture(scope="function")
     def vault(pm, gov, rewards, guardian, management, token, chain):
         Vault = pm(config["dependencies"][0]).Vault
         vault = guardian.deploy(Vault)
         vault.initialize(token, gov, rewards, "", "", guardian)
-        vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
+        vault.setDepositLimit(2**256 - 1, {"from": gov})
         vault.setManagement(management, {"from": gov})
         chain.sleep(1)
         yield vault
-    
-    
+
     # replace the first value with the name of your strategy
     @pytest.fixture(scope="function")
     def strategy(
@@ -250,6 +271,8 @@ if chain_used == 1:  # mainnet
         strategy_name,
         gasOracle,
         strategist_ms,
+        is_convex,
+        booster,
     ):
         # make sure to include all constructor parameters needed here
         strategy = strategist.deploy(
@@ -263,20 +286,25 @@ if chain_used == 1:  # mainnet
         # set our management fee to zero so it doesn't mess with our profit checking
         vault.setManagementFee(0, {"from": gov})
         # add our new strategy
-        vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
+        vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
         strategy.setHealthCheck(healthCheck, {"from": gov})
         strategy.setDoHealthCheck(True, {"from": gov})
-    
+
         # make all harvests permissive unless we change the value lower
         gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})
-    
+
+        # earmark rewards if we are using a convex strategy
+        if is_convex:
+            booster.earmarkRewards(pid, {"from": gov})
+            chain.sleep(1)
+            chain.mine(1)
+
         # set up custom params and setters
         strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
         strategy.setMaxReportDelay(86400 * 21)
         yield strategy
 
-
-elif chain_used == 250:  # only fantom so far
+elif chain_used == 250:  # only fantom so far and convex doesn't exist there
 
     @pytest.fixture(scope="function")
     def voter():
@@ -356,15 +384,12 @@ elif chain_used == 250:  # only fantom so far
         yield accounts.at("0xBedf3Cf16ba1FcE6c3B751903Cf77E51d51E05b8", force=True)
 
 
+# commented-out fixtures to be used with live testing
+
 # # list any existing strategies here
 # @pytest.fixture(scope="module")
 # def LiveStrategy_1():
 #     yield Contract("0xC1810aa7F733269C39D640f240555d0A4ebF4264")
-
-
-
-
-
 
 
 # use this if your vault is already deployed
@@ -372,9 +397,6 @@ elif chain_used == 250:  # only fantom so far
 # def vault(pm, gov, rewards, guardian, management, token, chain):
 #     vault = Contract("0x497590d2d57f05cf8B42A36062fA53eBAe283498")
 #     yield vault
-
-
-
 
 
 # use this if your strategy is already deployed

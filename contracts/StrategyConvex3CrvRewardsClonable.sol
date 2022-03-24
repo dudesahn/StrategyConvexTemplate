@@ -18,6 +18,10 @@ interface IBaseFee {
     function isCurrentBaseFeeAcceptable() external view returns (bool);
 }
 
+interface IOracle {
+    function latestAnswer() external view returns (uint256);
+}
+
 interface IUniV3 {
     struct ExactInputParams {
         bytes path;
@@ -115,7 +119,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
 
     // Swap stuff
     address internal constant sushiswap =
-        0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // we use this for our harvest profit calcs
+        0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // we use this to sell our bonus token
 
     IERC20 internal constant crv =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
@@ -644,35 +648,22 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
             }
         }
 
-        address[] memory usd_path = new address[](3);
-        usd_path[0] = address(crv);
-        usd_path[1] = address(weth);
-        usd_path[2] = address(usdt);
+        // our chainlink oracle returns prices normalized to 8 decimals, we convert it to 6
+        IOracle ethOracle = IOracle(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
+        uint256 ethPrice = ethOracle.latestAnswer().div(1e2); // 1e8 div 1e2 = 1e6
+        uint256 crvPrice = crveth.price_oracle().mul(ethPrice).div(1e18); // 1e18 mul 1e6 div 1e18 = 1e6
+        uint256 cvxPrice = cvxeth.price_oracle().mul(ethPrice).div(1e18); // 1e18 mul 1e6 div 1e18 = 1e6
 
-        uint256 crvValue;
-        if (_claimableBal > 0) {
-            uint256[] memory crvSwap =
-                IUniswapV2Router02(sushiswap).getAmountsOut(
-                    _claimableBal,
-                    usd_path
-                );
-            crvValue = crvSwap[crvSwap.length - 1];
-        }
+        uint256 crvValue = crvPrice.mul(_claimableBal).div(1e18); // 1e6 mul 1e18 div 1e18 = 1e6
+        uint256 cvxValue = cvxPrice.mul(mintableCvx).div(1e18); // 1e6 mul 1e18 div 1e18 = 1e6
 
-        usd_path[0] = address(convexToken);
-        uint256 cvxValue;
-        if (mintableCvx > 0) {
-            uint256[] memory cvxSwap =
-                IUniswapV2Router02(sushiswap).getAmountsOut(
-                    mintableCvx,
-                    usd_path
-                );
-            cvxValue = cvxSwap[cvxSwap.length - 1];
-        }
-
+        // get the value of our rewards token if we have one
         uint256 rewardsValue;
         if (hasRewards) {
+            address[] memory usd_path = new address[](3);
             usd_path[0] = address(rewardsToken);
+            usd_path[1] = address(weth);
+            usd_path[2] = address(usdt);
 
             uint256 _claimableBonusBal =
                 IConvexRewards(virtualRewardsPool).earned(address(this));
@@ -695,9 +686,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         view
         override
         returns (uint256)
-    {
-        return _ethAmount;
-    }
+    {}
 
     // check if the current baseFee is below our external target
     function isBaseFeeAcceptable() internal view returns (bool) {

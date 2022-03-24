@@ -17,10 +17,11 @@ def test_simple_harvest(
     voter,
     rewardsContract,
     amount,
+    sleep_time,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
 
@@ -43,8 +44,8 @@ def test_simple_harvest(
     # try and include custom logic here to check that funds are in the staking contract (if needed)
     assert rewardsContract.balanceOf(strategy) > stakingBeforeHarvest
 
-    # simulate 6 hours of earnings so we don't outrun our convex earmark
-    chain.sleep(21600)
+    # simulate profits
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # harvest, store new asset amount
@@ -60,7 +61,8 @@ def test_simple_harvest(
     print(
         "\nEstimated DAI APR: ",
         "{:.2%}".format(
-            ((new_assets - old_assets) * (365 * 4)) / (strategy.estimatedTotalAssets())
+            ((new_assets - old_assets) * (86400 / sleep_time))
+            / (strategy.estimatedTotalAssets())
         ),
     )
 
@@ -74,8 +76,8 @@ def test_simple_harvest(
     # try and include custom logic here to check that funds are in the staking contract (if needed)
     assert rewardsContract.balanceOf(strategy) > 0
 
-    # simulate 6 hours of earnings so we don't outrun our convex earmark
-    chain.sleep(21600)
+    # simulate profits
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # harvest, store new asset amount
@@ -90,7 +92,7 @@ def test_simple_harvest(
     print(
         "\nEstimated USDC APR: ",
         "{:.2%}".format(
-            ((after_usdc_assets - before_usdc_assets) * (365 * 4))
+            ((after_usdc_assets - before_usdc_assets) * (86400 / sleep_time))
             / (strategy.estimatedTotalAssets())
         ),
     )
@@ -106,8 +108,8 @@ def test_simple_harvest(
     # try and include custom logic here to check that funds are in the staking contract (if needed)
     assert rewardsContract.balanceOf(strategy) > 0
 
-    # simulate 6 hours of earnings so we don't outrun our convex earmark
-    chain.sleep(21600)
+    # simulate profits
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # harvest, store new asset amount
@@ -122,7 +124,7 @@ def test_simple_harvest(
     print(
         "\nEstimated USDT APR: ",
         "{:.2%}".format(
-            ((after_usdt_assets - before_usdt_assets) * (365 * 4))
+            ((after_usdt_assets - before_usdt_assets) * (86400 / sleep_time))
             / (strategy.estimatedTotalAssets())
         ),
     )
