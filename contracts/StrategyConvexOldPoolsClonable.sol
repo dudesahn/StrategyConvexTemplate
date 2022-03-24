@@ -104,9 +104,7 @@ interface IConvexDeposit {
 }
 
 abstract contract StrategyConvexBase is BaseStrategy {
-    using SafeERC20 for IERC20;
     using Address for address;
-    using SafeMath for uint256;
 
     /* ========== STATE VARIABLES ========== */
     // these should stay the same across different wants.
@@ -119,7 +117,8 @@ abstract contract StrategyConvexBase is BaseStrategy {
 
     // keepCRV stuff
     uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points)
-    address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
+    address internal constant voter =
+        0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
 
     IERC20 internal constant crv =
@@ -169,8 +168,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
         return balanceOfWant().add(stakedBalance());
     }
 
-    /* ========== CONSTANT FUNCTIONS ========== */
-    // these should stay the same across different wants.
+    /* ========== MUTATIVE FUNCTIONS ========== */
 
     function adjustPosition(uint256 _debtOutstanding) internal override {
         if (emergencyExit) {
@@ -212,10 +210,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
         uint256 _stakedBal = stakedBalance();
         if (_stakedBal > 0) {
             // don't bother withdrawing zero
-            IConvexRewards(rewardsContract).withdrawAndUnwrap(
-                _stakedBal,
-                claimRewards
-            );
+            rewardsContract.withdrawAndUnwrap(_stakedBal, claimRewards);
         }
         return balanceOfWant();
     }
@@ -372,6 +367,9 @@ contract StrategyConvexOldPoolsClonable is StrategyConvexBase {
         // You can set these parameters on deployment to whatever you want
         maxReportDelay = 21 days; // 21 days in seconds, if we hit this then harvestTrigger = True
         healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; // health.ychad.eth
+        harvestProfitMin = 60000e6;
+        harvestProfitMax = 120000e6;
+        creditThreshold = 1e6 * 1e18;
 
         // want = Curve LP
         want.approve(address(depositContract), type(uint256).max);
@@ -570,6 +568,12 @@ contract StrategyConvexOldPoolsClonable is StrategyConvexBase {
             return true;
         }
 
+        StrategyParams memory params = vault.strategies(address(this));
+        // harvest no matter what once we reach our maxDelay
+        if (block.timestamp.sub(params.lastReport) > maxReportDelay) {
+            return true;
+        }
+
         // harvest our credit if it's above our threshold
         if (vault.creditAvailable() > creditThreshold) {
             return true;
@@ -580,7 +584,7 @@ contract StrategyConvexOldPoolsClonable is StrategyConvexBase {
     }
 
     // we will need to add rewards token here if we have them
-    function claimableProfitInUsdt() internal view returns (uint256) {
+    function claimableProfitInUsdt() public view returns (uint256) {
         // calculations pulled directly from CVX's contract for minting CVX per CRV claimed
         uint256 totalCliffs = 1_000;
         uint256 maxSupply = 100 * 1_000_000 * 1e18; // 100mil
@@ -622,9 +626,7 @@ contract StrategyConvexOldPoolsClonable is StrategyConvexBase {
         view
         override
         returns (uint256)
-    {
-        return _ethAmount;
-    }
+    {}
 
     // check if the current baseFee is below our external target
     function isBaseFeeAcceptable() internal view returns (bool) {
@@ -648,7 +650,7 @@ contract StrategyConvexOldPoolsClonable is StrategyConvexBase {
 
     // Set optimal token to sell harvested funds for depositing to Curve.
     // Default is DAI, but can be set to USDC or USDT as needed by strategist or governance.
-    function setOptimal(uint256 _optimal) external onlyAuthorized {
+    function setOptimal(uint256 _optimal) external onlyVaultManagers {
         if (_optimal == 0) {
             targetStable = address(dai);
         } else if (_optimal == 1) {
@@ -661,7 +663,7 @@ contract StrategyConvexOldPoolsClonable is StrategyConvexBase {
     }
 
     // set the fee pool we'd like to swap through on UniV3 (1% = 10_000)
-    function setUniFees(uint24 _stableFee) external onlyAuthorized {
+    function setUniFees(uint24 _stableFee) external onlyVaultManagers {
         uniStableFee = _stableFee;
     }
 
@@ -671,7 +673,7 @@ contract StrategyConvexOldPoolsClonable is StrategyConvexBase {
         uint256 _harvestProfitMax,
         uint256 _creditThreshold,
         bool _checkEarmark
-    ) external onlyEmergencyAuthorized {
+    ) external onlyVaultManagers {
         harvestProfitMin = _harvestProfitMin;
         harvestProfitMax = _harvestProfitMax;
         creditThreshold = _creditThreshold;
