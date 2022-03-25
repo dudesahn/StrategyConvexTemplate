@@ -294,10 +294,12 @@ if chain_used == 1:  # mainnet
         gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})
 
         # earmark rewards if we are using a convex strategy
-        if is_convex:
-            booster.earmarkRewards(pid, {"from": gov})
-            chain.sleep(1)
-            chain.mine(1)
+        booster.earmarkRewards(pid, {"from": gov})
+        chain.sleep(1)
+        chain.mine(1)
+        
+        # for MIM we use index 0
+        strategy.updateRewards(True, 0, {"from": gov})
 
         # set up custom params and setters
         strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
