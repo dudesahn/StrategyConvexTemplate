@@ -57,6 +57,9 @@ def test_update_to_zero_then_back(
     assert vault.withdrawalQueue(0) == strategy
     assert vault.strategies(strategy)["debtRatio"] == 0
 
+    # setup our rewards on our new stategy
+    newStrategy.updateRewards(True, 0, {"from": gov})
+
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
@@ -104,7 +107,7 @@ def test_update_to_zero_then_back(
     )
 
     # turn off our rewards
-    newStrategy.turnOffRewards({"from": gov})
+    newStrategy.updateRewards(False, 0, {"from": gov})
     assert newStrategy.rewardsToken() == zero_address
     assert newStrategy.hasRewards() == False
     if (
@@ -141,7 +144,7 @@ def test_update_to_zero_then_back(
     )
 
     # add our rewards token, harvest to take the profit from it. this should be extra high yield from this harvest
-    newStrategy.updateRewards(_rewards_token, {"from": gov})
+    newStrategy.updateRewards(True, 0, {"from": gov})
 
     # assert that we set things up correctly
     assert newStrategy.rewardsToken() == _rewards_token
@@ -239,6 +242,9 @@ def test_update_from_zero_to_off(
     # attach our new strategy and approve it on the proxy
     vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
 
+    # setup our rewards on our new stategy
+    newStrategy.updateRewards(True, 0, {"from": gov})
+
     assert vault.withdrawalQueue(1) == newStrategy
     assert vault.strategies(newStrategy)[2] == 10_000
     assert vault.withdrawalQueue(0) == strategy
@@ -292,7 +298,7 @@ def test_update_from_zero_to_off(
     )
 
     # turn off our rewards
-    newStrategy.turnOffRewards({"from": gov})
+    newStrategy.updateRewards(False, 0, {"from": gov})
     assert newStrategy.rewardsToken() == zero_address
     assert newStrategy.hasRewards() == False
     if (
@@ -329,7 +335,7 @@ def test_update_from_zero_to_off(
     )
 
     # try turning off our rewards again
-    newStrategy.turnOffRewards({"from": gov})
+    newStrategy.updateRewards(False, 0, {"from": gov})
     assert newStrategy.rewardsToken() == zero_address
     assert newStrategy.hasRewards() == False
     if (
@@ -421,6 +427,9 @@ def test_change_rewards(
     # attach our new strategy and approve it on the proxy
     vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
 
+    # setup our rewards on our new stategy
+    newStrategy.updateRewards(True, 0, {"from": gov})
+
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
@@ -452,19 +461,6 @@ def test_change_rewards(
             / (newStrategy.estimatedTotalAssets())
         ),
     )
-
-    # pretend that we're getting our underlying token as a reward, assert that the approvals worked on sushi router
-    _rewards_token = newStrategy.rewardsToken()
-    rewards_token = Contract(_rewards_token)
-    newStrategy.updateRewards(_rewards_token, {"from": gov})
-    assert (
-        rewards_token.allowance(
-            newStrategy, "0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F"
-        )
-        > 0
-    )
-    assert newStrategy.rewardsToken() == rewards_token
-    assert newStrategy.hasRewards() == True
 
 
 def test_check_rewards(
@@ -505,9 +501,6 @@ def test_check_rewards(
         assert convexToken != rewards_token
     else:
         assert zero_address == rewards_token
-
-
-
 
 
 # this one tests if we don't have any CRV to send to voter or any left over after sending
@@ -604,8 +597,8 @@ def test_more_rewards_stuff(
     strategy.harvest({"from": gov})
 
     # we do this twice to hit both branches of the if statement
-    strategy.turnOffRewards({"from": gov})
-    strategy.turnOffRewards({"from": gov})
+    strategy.updateRewards(False, 0, {"from": gov})
+    strategy.updateRewards(False, 0, {"from": gov})
 
     # set our optimal to DAI without rewards on
     strategy.setOptimal(0, {"from": gov})
@@ -632,8 +625,8 @@ def test_more_rewards_stuff(
     strategy.harvest({"from": gov})
 
     # we do this twice to hit both branches of the if statement
-    strategy.updateRewards(rewards_token, {"from": gov})
-    strategy.updateRewards(rewards_token, {"from": gov})
+    strategy.updateRewards(True, 0, {"from": gov})
+    strategy.updateRewards(True, 0, {"from": gov})
 
     # set our optimal to DAI with rewards on
     strategy.setOptimal(0, {"from": gov})
@@ -668,8 +661,8 @@ def test_more_rewards_stuff(
     )  # this one seems to randomly fail sometimes, adding sleep/mine before fixed it, likely because of updating the view variable?
 
     # we do this twice to hit both branches of the if statement
-    strategy.turnOffRewards({"from": gov})
-    strategy.turnOffRewards({"from": gov})
+    strategy.updateRewards(False, 0, {"from": gov})
+    strategy.updateRewards(False, 0, {"from": gov})
 
     # set our optimal to DAI without rewards on
     strategy.setOptimal(0, {"from": gov})
@@ -696,8 +689,8 @@ def test_more_rewards_stuff(
     strategy.harvest({"from": gov})
 
     # we do this twice to hit both branches of the if statement
-    strategy.updateRewards(rewards_token, {"from": gov})
-    strategy.updateRewards(rewards_token, {"from": gov})
+    strategy.updateRewards(True, 0, {"from": gov})
+    strategy.updateRewards(True, 0, {"from": gov})
 
     # set our optimal to DAI with rewards on
     strategy.setOptimal(0, {"from": gov})
@@ -736,4 +729,3 @@ def test_more_rewards_stuff(
     chain.sleep(1)
     chain.mine(1)
     strategy.harvest({"from": gov})
-

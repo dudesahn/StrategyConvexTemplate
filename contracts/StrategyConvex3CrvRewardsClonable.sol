@@ -728,20 +728,17 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         external
         onlyGovernance
     {
+        if (
+            address(rewardsToken) != address(0) &&
+            address(rewardsToken) != address(convexToken)
+        ) {
+            rewardsToken.approve(sushiswap, uint256(0));
+        }
         if (_hasRewards == false) {
             hasRewards = false;
-            if (address(rewardsToken) != address(0)) {
-                rewardsToken.approve(sushiswap, uint256(0));
-            }
             rewardsToken = IERC20(address(0));
             virtualRewardsPool = address(0);
         } else {
-            if (
-                address(rewardsToken) != address(0) &&
-                address(rewardsToken) != address(convexToken)
-            ) {
-                rewardsToken.approve(sushiswap, uint256(0));
-            }
             // update with our new token. get this via our virtualRewardsPool
             virtualRewardsPool = rewardsContract.extraRewards(_rewardsIndex);
             address _rewardsToken =

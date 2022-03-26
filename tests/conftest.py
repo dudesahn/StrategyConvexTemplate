@@ -297,7 +297,7 @@ if chain_used == 1:  # mainnet
         booster.earmarkRewards(pid, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
-        
+
         # for MIM we use index 0
         strategy.updateRewards(True, 0, {"from": gov})
 
