@@ -503,6 +503,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
     }
 
     // migrate our want token to a new strategy if needed, make sure to check claimRewards first
+    // also send over any CRV or CVX that is claimed; for migrations we definitely want to claim
     function prepareMigration(address _newStrategy) internal override {
         uint256 _stakedBal = stakedBalance();
         if (_stakedBal > 0) {
@@ -695,7 +696,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         uint256 crvExpiry = rewardsContract.periodFinish();
         if (crvExpiry < block.timestamp) {
             return true;
-        } else {
+        } else if (hasRewards) {
             // check if there is any bonus reward we need to earmark
             uint256 rewardsExpiry =
                 IConvexRewards(virtualRewardsPool).periodFinish();
