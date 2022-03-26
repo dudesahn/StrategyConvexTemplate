@@ -219,7 +219,7 @@ def test_withdraw_after_donation_4(
     currentDebt = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, currentDebt / 2, {"from": gov})
     assert vault.strategies(strategy)["debtRatio"] == 5000
-    
+
     # our whale donates dust to the vault, what a nice person!
     donation = amount / 2
     token.transfer(strategy, donation, {"from": whale})

@@ -3,7 +3,7 @@ from brownie import Contract
 from brownie import config
 import math
 
-
+# test revoking a strategy from the vault
 def test_revoke_strategy_from_vault(
     gov,
     token,
@@ -12,6 +12,7 @@ def test_revoke_strategy_from_vault(
     chain,
     strategy,
     amount,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving
@@ -21,8 +22,8 @@ def test_revoke_strategy_from_vault(
     chain.sleep(1)
     strategy.harvest({"from": gov})
 
-    # wait a day
-    chain.sleep(86400)
+    # sleep to collect earnings
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     vaultAssets_starting = vault.totalAssets()
