@@ -17,37 +17,9 @@ def test_setters(
     strategist_ms,
 ):
 
-    # test our manual harvest trigger
-    strategy.setForceHarvestTriggerOnce(True, {"from": gov})
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be true.", tx)
-    assert tx == True
-
-    # shouldn't manually harvest when gas is high
-    gasOracle.setMaxAcceptableBaseFee(1 * 1e9, {"from": strategist_ms})
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be false.", tx)
-    assert tx == False
-    gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})
-
-    strategy.setForceHarvestTriggerOnce(False, {"from": gov})
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be false.", tx)
-    assert tx == False
-
-    # test our manual harvest trigger, and that a harvest turns it off
-    strategy.setForceHarvestTriggerOnce(True, {"from": gov})
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be true.", tx)
-    assert tx == True
-    strategy.harvest({"from": gov})
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be false.", tx)
-    assert tx == False
-
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -62,7 +34,7 @@ def test_setters(
     strategy.setRewards(gov, {"from": strategist})
     strategy.setKeepCRV(10, {"from": gov})
     strategy.setClaimRewards(True, {"from": gov})
-    strategy.setHarvestProfitNeeded(1e18, 100e18, {"from": gov})
+    strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
     strategy.setUniFees(3000, {"from": gov})
 
     strategy.setStrategist(strategist, {"from": gov})

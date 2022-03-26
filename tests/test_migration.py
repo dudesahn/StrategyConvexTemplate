@@ -21,10 +21,11 @@ def test_migration(
     amount,
     pool,
     strategy_name,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -45,8 +46,9 @@ def test_migration(
     print("\nShould we harvest? Should be False.", tx)
     assert tx == False
 
-    # sleep for a week to build up some rewards
-    chain.sleep(86400 * 7)
+    # sleep to collect earnings
+    chain.sleep(sleep_time)
+    chain.mine(1)
 
     # migrate our old strategy
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})
@@ -70,8 +72,8 @@ def test_migration(
     startingVault = vault.totalAssets()
     print("\nVault starting assets with new strategy: ", startingVault)
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # sleep to collect earnings
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # Test out our migrated strategy, confirm we're making a profit

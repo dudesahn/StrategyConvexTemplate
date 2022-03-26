@@ -1,11 +1,30 @@
 import pytest
 from brownie import config, Wei, Contract
+import requests
 
 # Snapshots the chain before each test and reverts after test completion.
 @pytest.fixture(autouse=True)
 def isolation(fn_isolation):
     pass
 
+
+################################################## TENDERLY DEBUGGING ##################################################
+
+# change autouse to True if we want to use this fork to help debug tests
+@pytest.fixture(scope="module", autouse=False)
+def tenderly_fork(web3, chain):
+    fork_base_url = "https://simulate.yearn.network/fork"
+    payload = {"network_id": str(chain.id)}
+    resp = requests.post(fork_base_url, headers={}, json=payload)
+    fork_id = resp.json()["simulation_fork"]["id"]
+    fork_rpc_url = f"https://rpc.tenderly.co/fork/{fork_id}"
+    print(fork_rpc_url)
+    tenderly_provider = web3.HTTPProvider(fork_rpc_url, {"timeout": 600})
+    web3.provider = tenderly_provider
+    print(f"https://dashboard.tenderly.co/yearn/yearn-web/fork/{fork_id}")
+
+
+################################################ UPDATE THINGS BELOW HERE ################################################
 
 # put our pool's convex pid here; this is the only thing that should need to change up here **************
 @pytest.fixture(scope="module")
@@ -19,7 +38,7 @@ def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0x3dBa662d484F73c7ec387376E0e8373f483D04CC", force=True
+        "0x52Ad87832400485DE7E7dC965D8Ad890f4e82699", force=True
     )  # 0x44Bc6e3a8384979DF6673Ac81066c67C83d6d6b2 for USDP
     yield whale
 
@@ -27,7 +46,7 @@ def whale(accounts):
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 10_000e18
+    amount = 100_000e18
     yield amount
 
 
@@ -38,36 +57,29 @@ def strategy_name():
     yield strategy_name
 
 
-# we need these next two fixtures for deploying our curve strategy, but not for convex. for convex we can pull them programmatically.
-# this is the address of our rewards token, in this case it's a dummy (ALCX) that our whale happens to hold just used to test stuff
+# use this to set the standard amount of time we sleep between harvests.
+# generally 1 day, but can be less if dealing with smaller windows (oracles) or longer if we need to trigger weekly earnings.
 @pytest.fixture(scope="module")
-def rewards_token():
-    yield Contract("0xdBdb4d16EdA451D0503b854CF79D55697F90c8DF")
+def sleep_time():
+    hour = 3600
+
+    # change this one right here
+    hours_to_sleep = 4
+
+    sleep_time = hour * hours_to_sleep
+    yield sleep_time
 
 
-# this is whether our pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
+# curve deposit pool, for old curve pools set this manually
 @pytest.fixture(scope="module")
-def has_rewards():
-    has_rewards = False
-    yield has_rewards
-
-
-# use this when we might lose a few wei on conversions between want and another deposit token
-@pytest.fixture(scope="module")
-def is_slippery():
-    is_slippery = False
-    yield is_slippery
-
-
-# use this to test our strategy in case there are no profits
-@pytest.fixture(scope="module")
-def no_profit():
-    no_profit = False
-    yield no_profit
+def pool():
+    poolAddress = Contract("0x094d12e5b541784701FD8d65F11fc0598FBC6332")
+    yield poolAddress
 
 
 # Only worry about changing things above this line, unless you want to make changes to the vault or strategy.
 # ----------------------------------------------------------------------- #
+
 
 @pytest.fixture(scope="module")
 def gasOracle():
@@ -144,24 +156,6 @@ def gauge(booster, pid):
 
 
 @pytest.fixture(scope="module")
-def sToken(token):  # this is the token we swap CRV for and then deposit to our LP
-    synth = token.coins(1)
-    yield Contract(synth)
-
-
-# curve deposit pool
-@pytest.fixture(scope="module")
-def pool(token, curve_registry):
-    zero_address = "0x0000000000000000000000000000000000000000"
-    if curve_registry.get_pool_from_lp_token(token) == zero_address:
-        poolAddress = token
-    else:
-        _poolAddress = curve_registry.get_pool_from_lp_token(token)
-        poolAddress = Contract(_poolAddress)
-    yield poolAddress
-
-
-@pytest.fixture(scope="module")
 def cvxDeposit(booster, pid):
     # this should be the address of the convex deposit token
     cvx_address = booster.poolInfo(pid)[1]
@@ -225,7 +219,7 @@ def vault(pm, gov, rewards, guardian, management, token, chain):
     Vault = pm(config["dependencies"][0]).Vault
     vault = guardian.deploy(Vault)
     vault.initialize(token, gov, rewards, "", "", guardian)
-    vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
+    vault.setDepositLimit(2**256 - 1, {"from": gov})
     vault.setManagement(management, {"from": gov})
     chain.sleep(1)
     yield vault
@@ -256,6 +250,7 @@ def strategy(
     strategy_name,
     gasOracle,
     strategist_ms,
+    booster,
 ):
     # make sure to include all constructor parameters needed here
     strategy = strategist.deploy(
@@ -269,12 +264,15 @@ def strategy(
     # set our management fee to zero so it doesn't mess with our profit checking
     vault.setManagementFee(0, {"from": gov})
     # add our new strategy
-    vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
     strategy.setHealthCheck(healthCheck, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
 
-    # set up custom params and setters
-    strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
+    # earmark rewards if we are using a convex strategy
+    booster.earmarkRewards(pid, {"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
     yield strategy
 
 

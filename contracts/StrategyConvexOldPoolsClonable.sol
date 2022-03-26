@@ -4,9 +4,7 @@ pragma experimental ABIEncoderV2;
 
 // These are the core Yearn libraries
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/Math.sol";
 
 import "./interfaces/curve.sol";
@@ -620,7 +618,7 @@ contract StrategyConvexOldPoolsClonable is StrategyConvexBase {
         return crvValue.add(cvxValue);
     }
 
-    // convert our keeper's eth cost into want.
+    // convert our keeper's eth cost into want, we don't need this anymore since we don't use baseStrategy harvestTrigger
     function ethToWant(uint256 _ethAmount)
         public
         view
