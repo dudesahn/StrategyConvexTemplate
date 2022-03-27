@@ -212,7 +212,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // in case we need to exit into the convex deposit token, this will allow us to do that
     // make sure to check claimRewards before this step if needed
     // plan to have gov sweep convex deposit tokens from strategy after this
-    function withdrawToConvexDepositTokens() external onlyAuthorized {
+    function withdrawToConvexDepositTokens() external onlyVaultManagers {
         uint256 _stakedBal = stakedBalance();
         if (_stakedBal > 0) {
             rewardsContract.withdraw(_stakedBal, claimRewards);
@@ -232,20 +232,20 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
     // Set the amount of CRV to be locked in Yearn's veCRV voter from each harvest. Default is 10%.
-    function setKeepCRV(uint256 _keepCRV) external onlyAuthorized {
+    function setKeepCRV(uint256 _keepCRV) external onlyVaultManagers {
         require(_keepCRV <= 10_000);
         keepCRV = _keepCRV;
     }
 
     // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
-    function setClaimRewards(bool _claimRewards) external onlyAuthorized {
+    function setClaimRewards(bool _claimRewards) external onlyVaultManagers {
         claimRewards = _claimRewards;
     }
 
     // This allows us to manually harvest with our keeper as needed
     function setForceHarvestTriggerOnce(bool _forceHarvestTriggerOnce)
         external
-        onlyAuthorized
+        onlyVaultManagers
     {
         forceHarvestTriggerOnce = _forceHarvestTriggerOnce;
     }
@@ -400,8 +400,7 @@ contract StrategyConvexOldPoolsClonable is StrategyConvexBase {
         uniStableFee = 500;
     }
 
-    /* ========== VARIABLE FUNCTIONS ========== */
-    // these will likely change across different wants.
+    /* ========== MUTATIVE FUNCTIONS ========== */
 
     function prepareReturn(uint256 _debtOutstanding)
         internal
