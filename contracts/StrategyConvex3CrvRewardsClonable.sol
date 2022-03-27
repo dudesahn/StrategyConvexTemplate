@@ -149,18 +149,18 @@ abstract contract StrategyConvexBase is BaseStrategy {
         return stratName;
     }
 
+    /// @notice How much want we have staked in Convex
     function stakedBalance() public view returns (uint256) {
-        // how much want we have staked in Convex
         return rewardsContract.balanceOf(address(this));
     }
 
+    /// @notice Balance of want sitting in our strategy
     function balanceOfWant() public view returns (uint256) {
-        // balance of want sitting in our strategy
         return want.balanceOf(address(this));
     }
 
+    /// @notice How much CRV we can claim from the staking contract
     function claimableBalance() public view returns (uint256) {
-        // how much CRV we can claim from the staking contract
         return rewardsContract.earned(address(this));
     }
 
@@ -612,7 +612,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         return false;
     }
 
-    // we will need to add rewards token here if we have them
+    /// @notice The value in dollars that our claimable rewards are worth, 6 decimals (USDT).
     function claimableProfitInUsdt() public view returns (uint256) {
         // calculations pulled directly from CVX's contract for minting CVX per CRV claimed
         uint256 totalCliffs = 1_000;
@@ -690,7 +690,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
                 .isCurrentBaseFeeAcceptable();
     }
 
-    // check if someone needs to earmark rewards on convex before keepers harvest again
+    /// @notice True if someone needs to earmark rewards on Convex before keepers harvest again
     function needsEarmarkReward() public view returns (bool needsEarmark) {
         // check if there is any CRV we need to earmark
         uint256 crvExpiry = rewardsContract.periodFinish();
@@ -710,8 +710,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
 
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
-    // Set optimal token to sell harvested funds for depositing to Curve.
-    // Default is DAI, but can be set to USDC or USDT as needed by strategist or governance.
+    /// @notice Set optimal token to sell harvested funds for depositing to Curve.
     function setOptimal(uint256 _optimal) external onlyVaultManagers {
         if (_optimal == 0) {
             targetStable = address(dai);
@@ -766,7 +765,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         checkEarmark = _checkEarmark;
     }
 
-    // set the fee pool we'd like to swap through for our stables on UniV3 (1% = 10_000)
+    /// @notice Set the fee pool we'd like to swap through on UniV3 (1% = 10_000)
     function setUniFees(uint24 _stableFee) external onlyVaultManagers {
         uniStableFee = _stableFee;
     }
