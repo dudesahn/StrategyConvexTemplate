@@ -467,3 +467,49 @@ def test_odds_and_ends_empty_strat(
     chain.sleep(1)
     strategy.setDoHealthCheck(False, {"from": gov})
     strategy.harvest({"from": gov})
+
+
+# this test makes sure we can still harvest without any profit and not revert
+def test_odds_and_ends_no_profit(
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    voter,
+    cvxDeposit,
+    amount,
+    sleep_time,
+):
+    ## deposit to the vault after approving
+    startingWhale = token.balanceOf(whale)
+    token.approve(vault, 2**256 - 1, {"from": whale})
+    vault.deposit(amount, {"from": whale})
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+
+    # sleep two weeks into the future so we need to earmark, harvest to clear our profit
+    strategy.setDoHealthCheck(False, {"from": gov})
+    chain.sleep(86400 * 14)
+    tx = strategy.harvest({"from": gov})
+    profit = tx.events["Harvested"]["profit"]
+    print("Harvest profit:", profit)
+    assert profit > 0
+    chain.mine(1)
+    chain.sleep(1)
+    assert strategy.needsEarmarkReward()
+
+    # sleep to try and generate profit, but it shouldn't. we should still be able to harvest though.
+    chain.sleep(1)
+    assert strategy.claimableBalance() == 0
+    tx = strategy.harvest({"from": gov})
+    profit = tx.events["Harvested"]["profit"]
+    assert profit == 0
+
+    # withdraw and confirm we made money, or at least that we have about the same
+    vault.withdraw({"from": whale})
+    assert token.balanceOf(whale) >= startingWhale
