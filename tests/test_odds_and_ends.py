@@ -455,7 +455,7 @@ def test_odds_and_ends_empty_strat(
     chain.sleep(sleep_time)
 
     # send away all funds so we have profit but no assets. make sure to turn off claimRewards first
-    strategy.setClaimRewards(False)
+    strategy.setClaimRewards(False, {"from": gov})
     strategy.withdrawToConvexDepositTokens({"from": gov})
     to_send = cvxDeposit.balanceOf(strategy)
     print("cvxToken Balance of Strategy", to_send)
