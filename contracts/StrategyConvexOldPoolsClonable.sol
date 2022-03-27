@@ -577,7 +577,7 @@ contract StrategyConvexOldPoolsClonable is StrategyConvexBase {
         return false;
     }
 
-    /// @notice The value in dollars that our claimable rewards are worth.
+    /// @notice The value in dollars that our claimable rewards are worth (in USDT, 6 decimals).
     function claimableProfitInUsdt() public view returns (uint256) {
         // calculations pulled directly from CVX's contract for minting CVX per CRV claimed
         uint256 totalCliffs = 1_000;

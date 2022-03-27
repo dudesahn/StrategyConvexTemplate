@@ -11,8 +11,9 @@ def test_withdraw_after_donation_1(
     strategist,
     whale,
     strategy,
-    chain,
     amount,
+    chain,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving
@@ -35,8 +36,8 @@ def test_withdraw_after_donation_1(
     # have our whale withdraw half of his donation, this ensures that we test withdrawing without pulling from the staked balance
     vault.withdraw(donation / 2, {"from": whale})
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate profits
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # turn off health check since we just took big profit
@@ -75,8 +76,9 @@ def test_withdraw_after_donation_2(
     strategist,
     whale,
     strategy,
-    chain,
     amount,
+    chain,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving
@@ -99,8 +101,8 @@ def test_withdraw_after_donation_2(
     # have our whale withdraw half of his donation, this ensures that we test withdrawing without pulling from the staked balance
     vault.withdraw(donation / 2, {"from": whale})
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate profits
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # turn off health check since we just took big profit
@@ -139,8 +141,9 @@ def test_withdraw_after_donation_3(
     strategist,
     whale,
     strategy,
-    chain,
     amount,
+    chain,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving
@@ -163,8 +166,8 @@ def test_withdraw_after_donation_3(
     # have our whale withdraws more than his donation, ensuring we pull from strategy
     vault.withdraw(donation + amount / 2, {"from": whale})
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate profits
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # turn off health check since we just took big profit
@@ -203,8 +206,9 @@ def test_withdraw_after_donation_4(
     strategist,
     whale,
     strategy,
-    chain,
     amount,
+    chain,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving
@@ -227,8 +231,8 @@ def test_withdraw_after_donation_4(
     # have our whale withdraws more than his donation, ensuring we pull from strategy
     vault.withdraw(donation + amount / 2, {"from": whale})
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate profits
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # turn off health check since we just took big profit
@@ -270,8 +274,9 @@ def test_withdraw_after_donation_5(
     strategist,
     whale,
     strategy,
-    chain,
     amount,
+    chain,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving
@@ -290,8 +295,8 @@ def test_withdraw_after_donation_5(
     # have our whale withdraws more than his donation, ensuring we pull from strategy
     vault.withdraw(donation + amount / 2, {"from": whale})
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate profits
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # turn off health check since we just took big profit
@@ -330,8 +335,9 @@ def test_withdraw_after_donation_6(
     strategist,
     whale,
     strategy,
-    chain,
     amount,
+    chain,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving
@@ -350,8 +356,8 @@ def test_withdraw_after_donation_6(
     # have our whale withdraws more than his donation, ensuring we pull from strategy
     vault.withdraw(donation / 2, {"from": whale})
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate profits
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # turn off health check since we just took big profit
@@ -390,8 +396,9 @@ def test_withdraw_after_donation_7(
     strategist,
     whale,
     strategy,
-    chain,
     amount,
+    chain,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving
@@ -416,8 +423,8 @@ def test_withdraw_after_donation_7(
     withdrawal = donation + amount / 2
     vault.withdraw(withdrawal, {"from": whale})
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate profits
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # We harvest twice to take profits and then to send the funds to our strategy. This is for our last check below.
@@ -463,8 +470,9 @@ def test_withdraw_after_donation_8(
     strategist,
     whale,
     strategy,
-    chain,
     amount,
+    chain,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving
@@ -489,8 +497,8 @@ def test_withdraw_after_donation_8(
     withdrawal = donation / 2
     vault.withdraw(withdrawal, {"from": whale})
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate profits
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # We harvest twice to take profits and then to send the funds to our strategy. This is for our last check below.
