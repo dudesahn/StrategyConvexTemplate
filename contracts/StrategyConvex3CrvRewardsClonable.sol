@@ -129,15 +129,15 @@ abstract contract StrategyConvexBase is BaseStrategy {
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
     // keeper stuff
-    uint256 public harvestProfitMin; // minimum size in USDT that we want to harvest
-    uint256 public harvestProfitMax; // maximum size in USDT that we want to harvest
+    uint256 public harvestProfitMin; // minimum size in USD (6 decimals) that we want to harvest
+    uint256 public harvestProfitMax; // maximum size in USD (6 decimals) that we want to harvest
     uint256 public creditThreshold; // amount of credit in underlying tokens that will automatically trigger a harvest
     bool internal forceHarvestTriggerOnce; // only set this to true when we want to trigger our keepers to harvest for us
 
-    string internal stratName; // we use this to be able to adjust our strategy's name
+    string internal stratName;
 
     // convex-specific variables
-    bool public claimRewards; // boolean if we should always claim rewards when withdrawing, usually withdrawAndUnwrap (generally this should be false)
+    bool public claimRewards; // boolean if we should always claim rewards when withdrawing, usually via withdrawAndUnwrap (generally this should be false)
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -176,7 +176,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
         }
         // Send all of our Curve pool tokens to be deposited
         uint256 _toInvest = balanceOfWant();
-        // deposit into convex and stake immediately but only if we have something to invest
+        // deposit into convex and stake immediately (but only if we have something to invest)
         if (_toInvest > 0) {
             IConvexDeposit(depositContract).deposit(pid, _toInvest, true);
         }
@@ -612,7 +612,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         return false;
     }
 
-    /// @notice The value in dollars that our claimable rewards are worth, 6 decimals (USDT).
+    /// @notice The value in dollars that our claimable rewards are worth (in USDT, 6 decimals).
     function claimableProfitInUsdt() public view returns (uint256) {
         // calculations pulled directly from CVX's contract for minting CVX per CRV claimed
         uint256 totalCliffs = 1_000;
@@ -640,17 +640,11 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         // our chainlink oracle returns prices normalized to 8 decimals, we convert it to 6
         IOracle ethOracle = IOracle(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
         uint256 ethPrice = ethOracle.latestAnswer().div(1e2); // 1e8 div 1e2 = 1e6
-        uint256 crvValue =
-            crveth
-                .price_oracle()
-                .mul(ethPrice)
-                .div(1e18)
-                .mul(_claimableBal)
-                .div(1e18);
-        uint256 cvxValue =
-            cvxeth.price_oracle().mul(ethPrice).div(1e18).mul(mintableCvx).div(
-                1e18
-            );
+        uint256 crvPrice = crveth.price_oracle().mul(ethPrice).div(1e18); // 1e18 mul 1e6 div 1e18 = 1e6
+        uint256 cvxPrice = cvxeth.price_oracle().mul(ethPrice).div(1e18); // 1e18 mul 1e6 div 1e18 = 1e6
+
+        uint256 crvValue = crvPrice.mul(_claimableBal).div(1e18); // 1e6 mul 1e18 div 1e18 = 1e6
+        uint256 cvxValue = cvxPrice.mul(mintableCvx).div(1e18); // 1e6 mul 1e18 div 1e18 = 1e6
 
         // get the value of our rewards token if we have one
         uint256 rewardsValue;
