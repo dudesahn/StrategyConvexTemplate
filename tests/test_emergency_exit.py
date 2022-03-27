@@ -3,7 +3,7 @@ import brownie
 from brownie import Contract
 from brownie import config
 
-
+# test that emergency exit works properly
 def test_emergency_exit(
     gov,
     token,
@@ -45,6 +45,7 @@ def test_emergency_exit(
     assert token.balanceOf(whale) >= startingWhale
 
 
+# test emergency exit, but with a donation (profit)
 def test_emergency_exit_with_profit(
     gov,
     token,
@@ -90,6 +91,7 @@ def test_emergency_exit_with_profit(
     assert token.balanceOf(whale) + donation >= startingWhale
 
 
+# test emergency exit, but after somehow losing all of our assets
 def test_emergency_exit_with_no_gain_or_loss(
     gov,
     token,

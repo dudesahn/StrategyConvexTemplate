@@ -3,7 +3,7 @@ from brownie import Contract
 from brownie import config
 import math
 
-
+# test calling emergency shutdown from the vault, harvesting to ensure we can get all assets out
 def test_emergency_shutdown_from_vault(
     gov,
     token,

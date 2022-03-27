@@ -2,7 +2,7 @@ import brownie
 from brownie import Contract
 from brownie import config
 
-
+# test the setters on our strategy
 def test_setters(
     gov,
     strategy,

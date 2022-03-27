@@ -193,6 +193,7 @@ def test_update_to_zero_then_back(
     assert vault.pricePerShare() > new_pps
 
 
+# test updating from on, then off, and still off
 def test_update_from_zero_to_off(
     gov,
     token,
@@ -380,6 +381,7 @@ def test_update_from_zero_to_off(
     assert vault.pricePerShare() > before_pps
 
 
+# test changing our rewards to something else
 def test_change_rewards(
     gov,
     token,
@@ -463,6 +465,7 @@ def test_change_rewards(
     )
 
 
+# basic rewards check
 def test_check_rewards(
     gov,
     token,

@@ -106,11 +106,6 @@ def test_withdraw_after_donation_2(
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
     assert vault.strategies(strategy)["debtRatio"] == 0
 
-    # under our new method of using min and maxDelay, this no longer matters or works
-    # tx = new_strategy.harvestTrigger(0, {"from": gov})
-    # print("\nShould we harvest? Should be true.", tx)
-    # assert tx == True
-
     # our whale donates dust to the vault, what a nice person!
     donation = amount / 2
     token.transfer(strategy, donation, {"from": whale})
@@ -187,11 +182,6 @@ def test_withdraw_after_donation_3(
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
     assert vault.strategies(strategy)["debtRatio"] == 0
 
-    # under our new method of using min and maxDelay, this no longer matters or works
-    # tx = new_strategy.harvestTrigger(0, {"from": gov})
-    # print("\nShould we harvest? Should be true.", tx)
-    # assert tx == True
-
     # our whale donates dust to the vault, what a nice person!
     donation = amount / 2
     token.transfer(strategy, donation, {"from": whale})
@@ -267,11 +257,6 @@ def test_withdraw_after_donation_4(
     currentDebt = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, currentDebt / 2, {"from": gov})
     assert vault.strategies(strategy)["debtRatio"] == 5000
-
-    # under our new method of using min and maxDelay, this no longer matters or works
-    # tx = new_strategy.harvestTrigger(0, {"from": gov})
-    # print("\nShould we harvest? Should be true.", tx)
-    # assert tx == True
 
     # our whale donates dust to the vault, what a nice person!
     donation = amount / 2
@@ -497,11 +482,6 @@ def test_withdraw_after_donation_7(
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
     assert vault.strategies(strategy)["debtRatio"] == 0
 
-    # under our new method of using min and maxDelay, this no longer matters or works
-    # tx = new_strategy.harvestTrigger(0, {"from": gov})
-    # print("\nShould we harvest? Should be true.", tx)
-    # assert tx == True
-
     # our whale donates dust to the vault, what a nice person!
     donation = amount / 2
     token.transfer(strategy, donation, {"from": whale})
@@ -591,11 +571,6 @@ def test_withdraw_after_donation_8(
     currentDebt = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
     assert vault.strategies(strategy)["debtRatio"] == 0
-
-    # under our new method of using min and maxDelay, this no longer matters or works
-    # tx = new_strategy.harvestTrigger(0, {"from": gov})
-    # print("\nShould we harvest? Should be true.", tx)
-    # assert tx == True
 
     # our whale donates dust to the vault, what a nice person!
     donation = amount / 2

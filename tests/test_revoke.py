@@ -3,7 +3,7 @@ from brownie import Contract
 from brownie import config
 import math
 
-
+# test revoking a strategy from the vault
 def test_revoke_strategy_from_vault(
     gov,
     token,
