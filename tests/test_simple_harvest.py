@@ -61,7 +61,7 @@ def test_simple_harvest(
     print(
         "\nEstimated DAI APR: ",
         "{:.2%}".format(
-            ((new_assets - old_assets) * (86400 / sleep_time))
+            ((new_assets - old_assets) * (365 * 86400 / sleep_time))
             / (strategy.estimatedTotalAssets())
         ),
     )
@@ -92,7 +92,7 @@ def test_simple_harvest(
     print(
         "\nEstimated USDC APR: ",
         "{:.2%}".format(
-            ((after_usdc_assets - before_usdc_assets) * (86400 / sleep_time))
+            ((after_usdc_assets - before_usdc_assets) * (365 * 86400 / sleep_time))
             / (strategy.estimatedTotalAssets())
         ),
     )
@@ -124,7 +124,7 @@ def test_simple_harvest(
     print(
         "\nEstimated USDT APR: ",
         "{:.2%}".format(
-            ((after_usdt_assets - before_usdt_assets) * (86400 / sleep_time))
+            ((after_usdt_assets - before_usdt_assets) * (365 * 86400 / sleep_time))
             / (strategy.estimatedTotalAssets())
         ),
     )

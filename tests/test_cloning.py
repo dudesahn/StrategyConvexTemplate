@@ -1,7 +1,7 @@
 import brownie
 from brownie import Wei, accounts, Contract, config
 
-
+# test cloning our strategy, make sure the cloned strategy still works just fine by sending funds to it
 def test_cloning(
     gov,
     token,
@@ -19,44 +19,60 @@ def test_cloning(
     pool,
     strategy_name,
     sleep_time,
+    tests_using_tenderly,
 ):
-    # Shouldn't be able to call initialize again
-    with brownie.reverts():
-        strategy.initialize(
-            vault,
-            strategist,
-            rewards,
-            keeper,
-            pid,
-            pool,
-            strategy_name,
-            {"from": gov},
-        )
-
-    ## clone our strategy
-    tx = strategy.cloneConvex3CrvRewards(
-        vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
-    )
-    newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)
-
-    # Shouldn't be able to call initialize again
-    with brownie.reverts():
-        newStrategy.initialize(
-            vault,
-            strategist,
-            rewards,
-            keeper,
-            pid,
-            pool,
-            strategy_name,
-            {"from": gov},
-        )
-
-    ## shouldn't be able to clone a clone
-    with brownie.reverts():
-        newStrategy.cloneConvex3CrvRewards(
+    # tenderly doesn't work for "with brownie.reverts"
+    if tests_using_tenderly:
+        ## clone our strategy
+        tx = strategy.cloneConvex3CrvRewards(
             vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
         )
+        newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)
+    else:
+        # Shouldn't be able to call initialize again
+        with brownie.reverts():
+            strategy.initialize(
+                vault,
+                strategist,
+                rewards,
+                keeper,
+                pid,
+                pool,
+                strategy_name,
+                {"from": gov},
+            )
+
+        ## clone our strategy
+        tx = strategy.cloneConvex3CrvRewards(
+            vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
+        )
+        newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)
+
+        # Shouldn't be able to call initialize again
+        with brownie.reverts():
+            newStrategy.initialize(
+                vault,
+                strategist,
+                rewards,
+                keeper,
+                pid,
+                pool,
+                strategy_name,
+                {"from": gov},
+            )
+
+        ## shouldn't be able to clone a clone
+        with brownie.reverts():
+            newStrategy.cloneConvex3CrvRewards(
+                vault,
+                strategist,
+                rewards,
+                keeper,
+                pid,
+                pool,
+                strategy_name,
+                {"from": gov},
+            )
 
     vault.revokeStrategy(strategy, {"from": gov})
     vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
@@ -96,7 +112,7 @@ def test_cloning(
     print(
         "\nEstimated APR: ",
         "{:.2%}".format(
-            ((new_assets_dai - old_assets_dai) * (86400 / sleep_time))
+            ((new_assets_dai - old_assets_dai) * (365 * (86400 / sleep_time)))
             / (newStrategy.estimatedTotalAssets())
         ),
     )

@@ -8,10 +8,13 @@ def isolation(fn_isolation):
     pass
 
 
+# set this for if we want to use tenderly or not; mostly helpful because with brownie.reverts fails in tenderly forks.
+use_tenderly = False
+
 ################################################## TENDERLY DEBUGGING ##################################################
 
 # change autouse to True if we want to use this fork to help debug tests
-@pytest.fixture(scope="module", autouse=False)
+@pytest.fixture(scope="module", autouse=use_tenderly)
 def tenderly_fork(web3, chain):
     fork_base_url = "https://simulate.yearn.network/fork"
     payload = {"network_id": str(chain.id)}
@@ -25,6 +28,13 @@ def tenderly_fork(web3, chain):
 
 
 ################################################ UPDATE THINGS BELOW HERE ################################################
+
+
+@pytest.fixture(scope="module")
+def tests_using_tenderly():
+    yes_or_no = use_tenderly
+    yield yes_or_no
+
 
 # use this to set what chain we use. 1 for ETH, 250 for fantom
 chain_used = 1
