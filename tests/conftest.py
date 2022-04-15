@@ -29,7 +29,7 @@ def tenderly_fork(web3, chain):
 # put our pool's convex pid here; this is the only thing that should need to change up here **************
 @pytest.fixture(scope="module")
 def pid():
-    pid = 13
+    pid = 29
     yield pid
 
 
@@ -38,22 +38,22 @@ def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0x9899c2c49f5eF2f37fbA6F9F8E7557E7A945c964", force=True
-    )  # 0x44Bc6e3a8384979DF6673Ac81066c67C83d6d6b2 for USDP
+        "0xABC508DdA7517F195e416d77C822A4861961947a", force=True  # IB
+    )  # 0x310D5C8EE1512D5092ee4377061aE82E48973689 for Aave
     yield whale
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 20_000e18
+    amount = 5_000e18
     yield amount
 
 
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexOldPoolsClonable"
+    strategy_name = "StrategyConvexUnderlying3Clonable"
     yield strategy_name
 
 
@@ -73,7 +73,7 @@ def sleep_time():
 # curve deposit pool, for old curve pools set this manually
 @pytest.fixture(scope="module")
 def pool():
-    poolAddress = Contract("0x094d12e5b541784701FD8d65F11fc0598FBC6332")
+    poolAddress = Contract("0x2dded6Da1BF5DBdF597C45fcFaa3194e53EcfeAF")
     yield poolAddress
 
 
@@ -235,7 +235,7 @@ def vault(pm, gov, rewards, guardian, management, token, chain):
 # replace the first value with the name of your strategy
 @pytest.fixture(scope="function")
 def strategy(
-    StrategyConvexOldPoolsClonable,
+    StrategyConvexUnderlying3Clonable,
     strategist,
     keeper,
     vault,
@@ -254,7 +254,7 @@ def strategy(
 ):
     # make sure to include all constructor parameters needed here
     strategy = strategist.deploy(
-        StrategyConvexOldPoolsClonable,
+        StrategyConvexUnderlying3Clonable,
         vault,
         pid,
         pool,

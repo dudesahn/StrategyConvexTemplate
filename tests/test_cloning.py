@@ -12,7 +12,7 @@ def test_cloning(
     keeper,
     rewards,
     chain,
-    StrategyConvexOldPoolsClonable,
+    StrategyConvexUnderlying3Clonable,
     rewardsContract,
     pid,
     amount,
@@ -34,10 +34,10 @@ def test_cloning(
         )
 
     ## clone our strategy
-    tx = strategy.cloneConvex3CrvRewards(
+    tx = strategy.cloneConvexUnderlying(
         vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
     )
-    newStrategy = StrategyConvexOldPoolsClonable.at(tx.return_value)
+    newStrategy = StrategyConvexUnderlying3Clonable.at(tx.return_value)
 
     # Shouldn't be able to call initialize again
     with brownie.reverts():
@@ -54,7 +54,7 @@ def test_cloning(
 
     ## shouldn't be able to clone a clone
     with brownie.reverts():
-        newStrategy.cloneConvex3CrvRewards(
+        newStrategy.cloneConvexUnderlying(
             vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
         )
 

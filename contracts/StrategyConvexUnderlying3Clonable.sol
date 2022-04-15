@@ -251,7 +251,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     }
 }
 
-contract StrategyConvexOldPoolsClonable is StrategyConvexBase {
+contract StrategyConvexUnderlying3Clonable is StrategyConvexBase {
     /* ========== STATE VARIABLES ========== */
     // these will likely change across different wants.
 
@@ -295,7 +295,7 @@ contract StrategyConvexOldPoolsClonable is StrategyConvexBase {
     event Cloned(address indexed clone);
 
     // we use this to clone our original strategy to other vaults
-    function cloneConvex3CrvRewards(
+    function cloneConvexUnderlying(
         address _vault,
         address _strategist,
         address _rewards,
@@ -322,7 +322,7 @@ contract StrategyConvexOldPoolsClonable is StrategyConvexBase {
             newStrategy := create(0, clone_code, 0x37)
         }
 
-        StrategyConvexOldPoolsClonable(newStrategy).initialize(
+        StrategyConvexUnderlying3Clonable(newStrategy).initialize(
             _vault,
             _strategist,
             _rewards,
@@ -437,8 +437,9 @@ contract StrategyConvexOldPoolsClonable is StrategyConvexBase {
         // deposit our balance to Curve if we have any
         if (_daiBalance > 0 || _usdcBalance > 0 || _usdtBalance > 0) {
             curve.add_liquidity(
-                [0, _daiBalance, _usdcBalance, _usdtBalance],
-                0
+                [_daiBalance, _usdcBalance, _usdtBalance],
+                0,
+                true
             );
         }
 
