@@ -1,7 +1,7 @@
 import brownie
 from brownie import Wei, accounts, Contract, config
 
-# test passes as of 21-06-26
+# test cloning our strategy, make sure the cloned strategy still works just fine by sending funds to it
 def test_cloning(
     gov,
     token,
@@ -18,57 +18,74 @@ def test_cloning(
     amount,
     pool,
     strategy_name,
+    sleep_time,
+    tests_using_tenderly,
 ):
-    # Shouldn't be able to call initialize again
-    with brownie.reverts():
-        strategy.initialize(
-            vault,
-            strategist,
-            rewards,
-            keeper,
-            pid,
-            pool,
-            strategy_name,
-            {"from": gov},
-        )
-
-    ## clone our strategy
-    tx = strategy.cloneConvex3CrvRewards(
-        vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
-    )
-    newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)
-
-    # Shouldn't be able to call initialize again
-    with brownie.reverts():
-        newStrategy.initialize(
-            vault,
-            strategist,
-            rewards,
-            keeper,
-            pid,
-            pool,
-            strategy_name,
-            {"from": gov},
-        )
-
-    ## shouldn't be able to clone a clone
-    with brownie.reverts():
-        newStrategy.cloneConvex3CrvRewards(
+    # tenderly doesn't work for "with brownie.reverts"
+    if tests_using_tenderly:
+        ## clone our strategy
+        tx = strategy.cloneConvex3CrvRewards(
             vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
         )
+        newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)
+    else:
+        # Shouldn't be able to call initialize again
+        with brownie.reverts():
+            strategy.initialize(
+                vault,
+                strategist,
+                rewards,
+                keeper,
+                pid,
+                pool,
+                strategy_name,
+                {"from": gov},
+            )
+
+        ## clone our strategy
+        tx = strategy.cloneConvex3CrvRewards(
+            vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
+        )
+        newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)
+
+        # Shouldn't be able to call initialize again
+        with brownie.reverts():
+            newStrategy.initialize(
+                vault,
+                strategist,
+                rewards,
+                keeper,
+                pid,
+                pool,
+                strategy_name,
+                {"from": gov},
+            )
+
+        ## shouldn't be able to clone a clone
+        with brownie.reverts():
+            newStrategy.cloneConvex3CrvRewards(
+                vault,
+                strategist,
+                rewards,
+                keeper,
+                pid,
+                pool,
+                strategy_name,
+                {"from": gov},
+            )
 
     vault.revokeStrategy(strategy, {"from": gov})
-    vault.addStrategy(newStrategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
     assert vault.withdrawalQueue(1) == newStrategy
     assert vault.strategies(newStrategy)[2] == 10_000
     assert vault.withdrawalQueue(0) == strategy
-    assert vault.strategies(strategy)[2] == 0
+    assert vault.strategies(strategy)["debtRatio"] == 0
 
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(1000e18, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
+    vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
     newStrategy.harvest({"from": gov})
@@ -80,8 +97,8 @@ def test_cloning(
     print("\nStarting Assets: ", old_assets_dai / 1e18)
     print("\nAssets Staked: ", rewardsContract.balanceOf(newStrategy) / 1e18)
 
-    # simulate 1 day of earnings
-    chain.sleep(86400)
+    # simulate some earnings
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # harvest after a day, store new asset amount
@@ -93,9 +110,9 @@ def test_cloning(
 
     # Display estimated APR based on the two days before the pay out
     print(
-        "\nEstimated DAI APR: ",
+        "\nEstimated APR: ",
         "{:.2%}".format(
-            ((new_assets_dai - old_assets_dai) * (365))
+            ((new_assets_dai - old_assets_dai) * (365 * (86400 / sleep_time)))
             / (newStrategy.estimatedTotalAssets())
         ),
     )

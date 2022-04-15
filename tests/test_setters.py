@@ -2,7 +2,7 @@ import brownie
 from brownie import Contract
 from brownie import config
 
-
+# test the setters on our strategy
 def test_setters(
     gov,
     strategy,
@@ -18,6 +18,7 @@ def test_setters(
 ):
 
     # test our manual harvest trigger
+    gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})
     strategy.setForceHarvestTriggerOnce(True, {"from": gov})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be true.", tx)
@@ -47,7 +48,7 @@ def test_setters(
 
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -62,8 +63,8 @@ def test_setters(
     strategy.setRewards(gov, {"from": strategist})
     strategy.setKeepCRV(10, {"from": gov})
     strategy.setClaimRewards(True, {"from": gov})
-    strategy.setHarvestProfitNeeded(1e18, 100e18, {"from": gov})
-    strategy.setUniFees(3000, 3000, {"from": gov})
+    strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
+    strategy.setUniFees(3000, {"from": gov})
 
     strategy.setStrategist(strategist, {"from": gov})
     name = strategy.name()
@@ -103,13 +104,14 @@ def test_setters(
     strategy.harvest({"from": gov})
     chain.sleep(86400)
 
-    # try a health check with random contract as health check
-    strategy.setHealthCheck(gov, {"from": gov})
-    strategy.setDoHealthCheck(True, {"from": gov})
-    with brownie.reverts():
-        strategy.harvest({"from": gov})
 
-    # set emergency exit last
-    strategy.setEmergencyExit({"from": gov})
-    with brownie.reverts():
-        strategy.setEmergencyExit({"from": gov})
+#     # try a health check with random contract as health check
+#     strategy.setHealthCheck(gov, {"from": gov})
+#     strategy.setDoHealthCheck(True, {"from": gov})
+#     with brownie.reverts():
+#         strategy.harvest({"from": gov})
+#
+#     # set emergency exit last
+#     strategy.setEmergencyExit({"from": gov})
+#     with brownie.reverts():
+#         strategy.setEmergencyExit({"from": gov})

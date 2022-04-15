@@ -3,7 +3,7 @@ from brownie import Contract
 from brownie import config
 import math
 
-# test passes as of 21-06-26
+# test calling emergency shutdown from the vault, harvesting to ensure we can get all assets out
 def test_emergency_shutdown_from_vault(
     gov,
     token,
@@ -12,23 +12,24 @@ def test_emergency_shutdown_from_vault(
     strategy,
     chain,
     amount,
+    sleep_time,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate earnings
+    chain.sleep(sleep_time)
 
     chain.mine(1)
     strategy.harvest({"from": gov})
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate earnings
+    chain.sleep(sleep_time)
 
     # set emergency and exit, then confirm that the strategy has no funds
     vault.setEmergencyShutdown(True, {"from": gov})

@@ -3,7 +3,7 @@ from brownie import Contract
 from brownie import config
 import math
 
-
+# test the our strategy's ability to deposit, harvest, and withdraw, with different optimal deposit tokens if we have them
 def test_simple_harvest(
     gov,
     token,
@@ -17,15 +17,19 @@ def test_simple_harvest(
     voter,
     rewardsContract,
     amount,
+    sleep_time,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
 
     # this is part of our check into the staking contract balance
     stakingBeforeHarvest = rewardsContract.balanceOf(strategy)
+
+    # change our optimal deposit asset
+    strategy.setOptimal(0, {"from": gov})
 
     # harvest, store asset amount
     chain.sleep(1)
@@ -40,8 +44,8 @@ def test_simple_harvest(
     # try and include custom logic here to check that funds are in the staking contract (if needed)
     assert rewardsContract.balanceOf(strategy) > stakingBeforeHarvest
 
-    # simulate 1 day of earnings
-    chain.sleep(86400)
+    # simulate profits
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # harvest, store new asset amount
@@ -57,7 +61,8 @@ def test_simple_harvest(
     print(
         "\nEstimated DAI APR: ",
         "{:.2%}".format(
-            ((new_assets - old_assets) * 365) / (strategy.estimatedTotalAssets())
+            ((new_assets - old_assets) * (365 * 86400 / sleep_time))
+            / (strategy.estimatedTotalAssets())
         ),
     )
 
@@ -71,8 +76,8 @@ def test_simple_harvest(
     # try and include custom logic here to check that funds are in the staking contract (if needed)
     assert rewardsContract.balanceOf(strategy) > 0
 
-    # simulate 1 day of earnings
-    chain.sleep(86400)
+    # simulate profits
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # harvest, store new asset amount
@@ -87,7 +92,7 @@ def test_simple_harvest(
     print(
         "\nEstimated USDC APR: ",
         "{:.2%}".format(
-            ((after_usdc_assets - before_usdc_assets) * 365)
+            ((after_usdc_assets - before_usdc_assets) * (365 * 86400 / sleep_time))
             / (strategy.estimatedTotalAssets())
         ),
     )
@@ -103,8 +108,8 @@ def test_simple_harvest(
     # try and include custom logic here to check that funds are in the staking contract (if needed)
     assert rewardsContract.balanceOf(strategy) > 0
 
-    # simulate 1 day of earnings
-    chain.sleep(86400)
+    # simulate profits
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # harvest, store new asset amount
@@ -119,7 +124,7 @@ def test_simple_harvest(
     print(
         "\nEstimated USDT APR: ",
         "{:.2%}".format(
-            ((after_usdt_assets - before_usdt_assets) * (365))
+            ((after_usdt_assets - before_usdt_assets) * (365 * 86400 / sleep_time))
             / (strategy.estimatedTotalAssets())
         ),
     )

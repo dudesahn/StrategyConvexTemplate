@@ -3,7 +3,7 @@ from brownie import Contract
 from brownie import config
 import math
 
-
+# test revoking a strategy from the vault
 def test_revoke_strategy_from_vault(
     gov,
     token,
@@ -16,7 +16,7 @@ def test_revoke_strategy_from_vault(
 
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
