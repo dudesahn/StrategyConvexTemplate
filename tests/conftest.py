@@ -43,14 +43,14 @@ chain_used = 1
 # If testing a Convex strategy, set this equal to your PID
 @pytest.fixture(scope="module")
 def pid():
-    pid = 40  # mim 40, OUSD 56
+    pid = 25  # mim 40, OUSD 56, stETH 25, alETH 49
     yield pid
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 50_000e18
+    amount = 100e18
     yield amount
 
 
@@ -58,8 +58,9 @@ def amount():
 def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    # MIM 0xBA12222222228d8Ba445958a75a0704d566BF2C8, OUSD 0x89eBCb7714bd0D2F33ce3a35C12dBEB7b94af169
-    whale = accounts.at("0xBA12222222228d8Ba445958a75a0704d566BF2C8", force=True)
+    # MIM 0xBA12222222228d8Ba445958a75a0704d566BF2C8, OUSD 0x89eBCb7714bd0D2F33ce3a35C12dBEB7b94af169, stETH 0x56c915758Ad3f76Fd287FFF7563ee313142Fb663
+    # alETH 0x1cb8b056c4D40868152Bf3b6124064244733fDA4
+    whale = accounts.at("0x56c915758Ad3f76Fd287FFF7563ee313142Fb663", force=True)
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -70,15 +71,15 @@ def whale(accounts, amount, token):
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexMIM"
+    strategy_name = "StrategyConvexstETH"
     yield strategy_name
 
 
 # we need these next two fixtures for deploying our curve strategy, but not for convex. for convex we can pull them programmatically.
 # this is the address of our rewards token, in this case it's a dummy (ALCX) that our whale happens to hold just used to test stuff
 @pytest.fixture(scope="module")
-def rewards_token():  # OGN 0x8207c1FfC5B6804F6024322CcF34F29c3541Ae26, SPELL 0x090185f2135308BaD17527004364eBcC2D37e5F6
-    yield Contract("0x090185f2135308BaD17527004364eBcC2D37e5F6")
+def rewards_token():  # OGN 0x8207c1FfC5B6804F6024322CcF34F29c3541Ae26, SPELL 0x090185f2135308BaD17527004364eBcC2D37e5F6, LDO 0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32
+    yield Contract("0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32")
 
 
 # this is whether our pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
@@ -123,7 +124,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 4
+    hours_to_sleep = 8
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
@@ -266,7 +267,7 @@ if chain_used == 1:  # mainnet
     # replace the first value with the name of your strategy
     @pytest.fixture(scope="function")
     def strategy(
-        StrategyConvex3CrvRewardsClonable,
+        StrategyConvexEthPoolsClonable,
         strategist,
         keeper,
         vault,
@@ -283,10 +284,11 @@ if chain_used == 1:  # mainnet
         strategist_ms,
         is_convex,
         booster,
+        has_rewards,
     ):
         # make sure to include all constructor parameters needed here
         strategy = strategist.deploy(
-            StrategyConvex3CrvRewardsClonable,
+            StrategyConvexEthPoolsClonable,
             vault,
             pid,
             pool,
@@ -308,8 +310,9 @@ if chain_used == 1:  # mainnet
         chain.sleep(1)
         chain.mine(1)
 
-        # for MIM we use index 0
-        strategy.updateRewards(True, 0, {"from": gov})
+        # for stETH we use index 0, but only turn this on if we have rewards (stETH)
+        if has_rewards:
+            strategy.updateRewards(True, 0, {"from": gov})
 
         # set up custom params and setters
         strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})

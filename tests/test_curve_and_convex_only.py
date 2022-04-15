@@ -13,7 +13,7 @@ def test_update_to_zero_then_back(
     keeper,
     rewards,
     chain,
-    StrategyConvex3CrvRewardsClonable,
+    StrategyConvexEthPoolsClonable,
     voter,
     proxy,
     pid,
@@ -27,13 +27,17 @@ def test_update_to_zero_then_back(
     is_curve,
     is_convex,
 ):
-    # skip these tests if not curve or convex strategy
+    # skip these tests if not curve or convex strategy or if we don't have rewards
+    if not has_rewards:
+        print("Don't need to do these tests if we don't have rewards")
+        return
+
     if not is_convex and not is_curve:
         print("Don't need to do these tests if not Curve or Convex strategy")
         return
 
     ## clone our strategy, set our rewards to none
-    tx = strategy.cloneConvex3CrvRewards(
+    tx = strategy.cloneConvexOldEth(
         vault,
         strategist,
         rewards,
@@ -43,7 +47,7 @@ def test_update_to_zero_then_back(
         strategy_name,
         {"from": gov},
     )
-    newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)
+    newStrategy = StrategyConvexEthPoolsClonable.at(tx.return_value)
 
     # revoke and send all funds back to vault
     vault.revokeStrategy(strategy, {"from": gov})
@@ -88,7 +92,7 @@ def test_update_to_zero_then_back(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards On): ",
+        "\nEstimated APR (Rewards On): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * 4))
             / (newStrategy.estimatedTotalAssets())
@@ -136,7 +140,7 @@ def test_update_to_zero_then_back(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards Off): ",
+        "\nEstimated APR (Rewards Off): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * 4))
             / (newStrategy.estimatedTotalAssets())
@@ -175,7 +179,7 @@ def test_update_to_zero_then_back(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards Back On, 6 hours of rewards tokens): ",
+        "\nEstimated APR (Rewards Back On, 6 hours of rewards tokens): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * 4))
             / (newStrategy.estimatedTotalAssets())
@@ -204,7 +208,7 @@ def test_update_from_zero_to_off(
     keeper,
     rewards,
     chain,
-    StrategyConvex3CrvRewardsClonable,
+    StrategyConvexEthPoolsClonable,
     voter,
     proxy,
     pid,
@@ -218,13 +222,17 @@ def test_update_from_zero_to_off(
     is_curve,
     is_convex,
 ):
-    # skip these tests if not curve or convex strategy
+    # skip these tests if not curve or convex strategy or if we don't have rewards
+    if not has_rewards:
+        print("Don't need to do these tests if we don't have rewards")
+        return
+
     if not is_convex and not is_curve:
         print("Don't need to do these tests if not Curve or Convex strategy")
         return
 
     ## clone our strategy, set our rewards to none
-    tx = strategy.cloneConvex3CrvRewards(
+    tx = strategy.cloneConvexOldEth(
         vault,
         strategist,
         rewards,
@@ -234,7 +242,7 @@ def test_update_from_zero_to_off(
         strategy_name,
         {"from": gov},
     )
-    newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)
+    newStrategy = StrategyConvexEthPoolsClonable.at(tx.return_value)
 
     # revoke and send all funds back to vault
     vault.revokeStrategy(strategy, {"from": gov})
@@ -280,7 +288,7 @@ def test_update_from_zero_to_off(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards On): ",
+        "\nEstimated APR (Rewards On): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * 4))
             / (newStrategy.estimatedTotalAssets())
@@ -328,7 +336,7 @@ def test_update_from_zero_to_off(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards Off): ",
+        "\nEstimated APR (Rewards Off): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * 4))
             / (newStrategy.estimatedTotalAssets())
@@ -364,7 +372,7 @@ def test_update_from_zero_to_off(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards Off Still): ",
+        "\nEstimated APR (Rewards Off Still): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * 4))
             / (newStrategy.estimatedTotalAssets())
@@ -392,7 +400,7 @@ def test_change_rewards(
     keeper,
     rewards,
     chain,
-    StrategyConvex3CrvRewardsClonable,
+    StrategyConvexEthPoolsClonable,
     voter,
     proxy,
     pid,
@@ -403,14 +411,19 @@ def test_change_rewards(
     zero_address,
     is_curve,
     is_convex,
+    has_rewards,
 ):
-    # skip these tests if not curve or convex strategy
+    # skip these tests if not curve or convex strategy or if we don't have rewards
+    if not has_rewards:
+        print("Don't need to do these tests if we don't have rewards")
+        return
+
     if not is_convex and not is_curve:
         print("Don't need to do these tests if not Curve or Convex strategy")
         return
 
     ## clone our strategy, set our rewards to none
-    tx = strategy.cloneConvex3CrvRewards(
+    tx = strategy.cloneConvexOldEth(
         vault,
         strategist,
         rewards,
@@ -420,7 +433,7 @@ def test_change_rewards(
         strategy_name,
         {"from": gov},
     )
-    newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)
+    newStrategy = StrategyConvexEthPoolsClonable.at(tx.return_value)
 
     # revoke and send all funds back to vault
     vault.revokeStrategy(strategy, {"from": gov})
@@ -457,7 +470,7 @@ def test_change_rewards(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards On): ",
+        "\nEstimated APR (Rewards On): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * 4))
             / (newStrategy.estimatedTotalAssets())
@@ -476,7 +489,7 @@ def test_check_rewards(
     keeper,
     rewards,
     chain,
-    StrategyConvex3CrvRewardsClonable,
+    StrategyConvexEthPoolsClonable,
     voter,
     proxy,
     pid,
@@ -490,7 +503,11 @@ def test_check_rewards(
     is_curve,
     is_convex,
 ):
-    # skip these tests if not curve or convex strategy
+    # skip these tests if not curve or convex strategy or if we don't have rewards
+    if not has_rewards:
+        print("Don't need to do these tests if we don't have rewards")
+        return
+
     if not is_convex and not is_curve:
         print("Don't need to do these tests if not Curve or Convex strategy")
         return
@@ -545,22 +562,6 @@ def test_weird_amounts(
     chain.sleep(86400 * 7)
     chain.mine(1)
 
-    # switch to USDC, want to not have any profit tho
-    strategy.setOptimal(1, {"from": gov})
-    strategy.harvest({"from": gov})
-
-    # sleep for a week to get some profit
-    chain.sleep(86400 * 7)
-    chain.mine(1)
-
-    # switch to USDT, want to not have any profit tho
-    strategy.setOptimal(2, {"from": gov})
-    strategy.harvest({"from": gov})
-
-    # sleep for a week to get some profit
-    chain.sleep(86400 * 7)
-    chain.mine(1)
-
     # take 0% of our CRV to the voter
     strategy.setKeepCRV(0, {"from": gov})
     chain.sleep(1)
@@ -588,12 +589,16 @@ def test_more_rewards_stuff(
     strategy_name,
     is_curve,
     is_convex,
+    has_rewards,
 ):
-    # skip these tests if not curve or convex strategy
+    # skip these tests if not curve or convex strategy or if we don't have rewards
+    if not has_rewards:
+        print("Don't need to do these tests if we don't have rewards")
+        return
+
     if not is_convex and not is_curve:
         print("Don't need to do these tests if not Curve or Convex strategy")
         return
-
     ## deposit to the vault after approving
     token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
@@ -603,25 +608,6 @@ def test_more_rewards_stuff(
     strategy.updateRewards(False, 0, {"from": gov})
     strategy.updateRewards(False, 0, {"from": gov})
 
-    # set our optimal to DAI without rewards on
-    strategy.setOptimal(0, {"from": gov})
-
-    # sleep for a day to get some profit
-    chain.sleep(86400)
-    chain.mine(1)
-    strategy.harvest({"from": gov})
-
-    # set our optimal to USDC without rewards on
-    strategy.setOptimal(1, {"from": gov})
-
-    # sleep for a day to get some profit
-    chain.sleep(86400)
-    chain.mine(1)
-    strategy.harvest({"from": gov})
-
-    # set our optimal to USDT without rewards on
-    strategy.setOptimal(2, {"from": gov})
-
     # sleep for a day to get some profit
     chain.sleep(86400)
     chain.mine(1)
@@ -630,25 +616,6 @@ def test_more_rewards_stuff(
     # we do this twice to hit both branches of the if statement
     strategy.updateRewards(True, 0, {"from": gov})
     strategy.updateRewards(True, 0, {"from": gov})
-
-    # set our optimal to DAI with rewards on
-    strategy.setOptimal(0, {"from": gov})
-
-    # sleep for a day to get some profit
-    chain.sleep(86400)
-    chain.mine(1)
-    strategy.harvest({"from": gov})
-
-    # set our optimal to USDC with rewards on
-    strategy.setOptimal(1, {"from": gov})
-
-    # sleep for a day to get some profit
-    chain.sleep(86400)
-    chain.mine(1)
-    strategy.harvest({"from": gov})
-
-    # set our optimal to USDT with rewards on
-    strategy.setOptimal(2, {"from": gov})
 
     # sleep for a day to get some profit
     chain.sleep(86400)
@@ -667,25 +634,6 @@ def test_more_rewards_stuff(
     strategy.updateRewards(False, 0, {"from": gov})
     strategy.updateRewards(False, 0, {"from": gov})
 
-    # set our optimal to DAI without rewards on
-    strategy.setOptimal(0, {"from": gov})
-
-    # sleep for a day to get some profit
-    chain.sleep(86400)
-    chain.mine(1)
-    strategy.harvest({"from": gov})
-
-    # set our optimal to USDC without rewards on
-    strategy.setOptimal(1, {"from": gov})
-
-    # sleep for a day to get some profit
-    chain.sleep(86400)
-    chain.mine(1)
-    strategy.harvest({"from": gov})
-
-    # set our optimal to USDT without rewards on
-    strategy.setOptimal(2, {"from": gov})
-
     # sleep for a day to get some profit
     chain.sleep(86400)
     chain.mine(1)
@@ -695,25 +643,6 @@ def test_more_rewards_stuff(
     strategy.updateRewards(True, 0, {"from": gov})
     strategy.updateRewards(True, 0, {"from": gov})
 
-    # set our optimal to DAI with rewards on
-    strategy.setOptimal(0, {"from": gov})
-
-    # sleep for a day to get some profit
-    chain.sleep(86400)
-    chain.mine(1)
-    strategy.harvest({"from": gov})
-
-    # set our optimal to USDC with rewards on
-    strategy.setOptimal(1, {"from": gov})
-
-    # sleep for a day to get some profit
-    chain.sleep(86400)
-    chain.mine(1)
-    strategy.harvest({"from": gov})
-
-    # set our optimal to USDT with rewards on
-    strategy.setOptimal(2, {"from": gov})
-
     # sleep for a day to get some profit
     chain.sleep(86400)
     chain.mine(1)
@@ -722,10 +651,6 @@ def test_more_rewards_stuff(
     # sleep for a day to get some profit
     chain.sleep(86400)
     chain.mine(1)
-
-    # can't set to 4
-    with brownie.reverts():
-        strategy.setOptimal(4, {"from": gov})
 
     # take 0% of our CRV to the voter
     strategy.setKeepCRV(0, {"from": gov})

@@ -12,7 +12,7 @@ def test_cloning(
     keeper,
     rewards,
     chain,
-    StrategyConvex3CrvRewardsClonable,
+    StrategyConvexEthPoolsClonable,
     rewardsContract,
     pid,
     amount,
@@ -24,10 +24,10 @@ def test_cloning(
     # tenderly doesn't work for "with brownie.reverts"
     if tests_using_tenderly:
         ## clone our strategy
-        tx = strategy.cloneConvex3CrvRewards(
+        tx = strategy.cloneConvexOldEth(
             vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
         )
-        newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)
+        newStrategy = StrategyConvexEthPoolsClonable.at(tx.return_value)
     else:
         # Shouldn't be able to call initialize again
         with brownie.reverts():
@@ -43,10 +43,10 @@ def test_cloning(
             )
 
         ## clone our strategy
-        tx = strategy.cloneConvex3CrvRewards(
+        tx = strategy.cloneConvexOldEth(
             vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
         )
-        newStrategy = StrategyConvex3CrvRewardsClonable.at(tx.return_value)
+        newStrategy = StrategyConvexEthPoolsClonable.at(tx.return_value)
 
         # Shouldn't be able to call initialize again
         with brownie.reverts():
@@ -63,7 +63,7 @@ def test_cloning(
 
         ## shouldn't be able to clone a clone
         with brownie.reverts():
-            newStrategy.cloneConvex3CrvRewards(
+            newStrategy.cloneConvexOldEth(
                 vault,
                 strategist,
                 rewards,

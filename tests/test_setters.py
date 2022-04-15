@@ -64,7 +64,6 @@ def test_setters(
     strategy.setKeepCRV(10, {"from": gov})
     strategy.setClaimRewards(True, {"from": gov})
     strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
-    strategy.setUniFees(3000, {"from": gov})
 
     strategy.setStrategist(strategist, {"from": gov})
     name = strategy.name()
