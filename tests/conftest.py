@@ -29,7 +29,7 @@ def tenderly_fork(web3, chain):
 # put our pool's convex pid here; this is the only thing that should need to change up here **************
 @pytest.fixture(scope="module")
 def pid():
-    pid = 29
+    pid = 75  # BTRFLY 75, T 67
     yield pid
 
 
@@ -38,22 +38,23 @@ def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0xABC508DdA7517F195e416d77C822A4861961947a", force=True  # IB
-    )  # 0x310D5C8EE1512D5092ee4377061aE82E48973689 for Aave
+        "0x5b9b338646317E8BD7E3f2FcB45d793f3363AD1B", force=True
+    )  # 0x6f9BB7e454f5B3eb2310343f0E99269dC2BB8A1d for T-ETH (253 total)
+    # 0x5b9b338646317E8BD7E3f2FcB45d793f3363AD1B for btrfly-eth (0.69 total)
     yield whale
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 5_000e18
+    amount = 0.3e18
     yield amount
 
 
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexUnderlying3Clonable"
+    strategy_name = "StrategyConvexEthVolatilePairsClonable"
     yield strategy_name
 
 
@@ -64,7 +65,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 4
+    hours_to_sleep = 6
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
@@ -73,7 +74,9 @@ def sleep_time():
 # curve deposit pool, for old curve pools set this manually
 @pytest.fixture(scope="module")
 def pool():
-    poolAddress = Contract("0x2dded6Da1BF5DBdF597C45fcFaa3194e53EcfeAF")
+    poolAddress = Contract("0x752eBeb79963cf0732E9c0fec72a49FD1DEfAEAC")
+    # 0x752eBeb79963cf0732E9c0fec72a49FD1DEfAEAC for T-ETH
+    # 0xF43b15Ab692fDe1F9c24a9FCE700AdCC809D5391 BTRFLY-ETH
     yield poolAddress
 
 
@@ -235,7 +238,7 @@ def vault(pm, gov, rewards, guardian, management, token, chain):
 # replace the first value with the name of your strategy
 @pytest.fixture(scope="function")
 def strategy(
-    StrategyConvexUnderlying3Clonable,
+    StrategyConvexEthVolatilePairsClonable,
     strategist,
     keeper,
     vault,
@@ -254,7 +257,7 @@ def strategy(
 ):
     # make sure to include all constructor parameters needed here
     strategy = strategist.deploy(
-        StrategyConvexUnderlying3Clonable,
+        StrategyConvexEthVolatilePairsClonable,
         vault,
         pid,
         pool,

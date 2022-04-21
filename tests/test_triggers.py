@@ -75,13 +75,13 @@ def test_triggers(
     strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
 
     # update our minProfit so our harvest triggers true
-    strategy.setHarvestTriggerParams(1e6, 1000000e6, 1e24, False, {"from": gov})
+    strategy.setHarvestTriggerParams(1, 1000000e6, 1e24, False, {"from": gov})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be true.", tx)
     assert tx == True
 
     # update our maxProfit so harvest triggers true
-    strategy.setHarvestTriggerParams(1000000e6, 1e6, 1e24, False, {"from": gov})
+    strategy.setHarvestTriggerParams(1000000e6, 1, 1e24, False, {"from": gov})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be true.", tx)
     assert tx == True
