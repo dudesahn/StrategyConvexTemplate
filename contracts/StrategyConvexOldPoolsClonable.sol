@@ -363,7 +363,7 @@ contract StrategyConvexOldPoolsClonable is StrategyConvexBase {
         healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; // health.ychad.eth
         harvestProfitMin = 60000e6;
         harvestProfitMax = 120000e6;
-        creditThreshold = 1e6 * 1e18;
+        keepCRV = 1000; // default of 10%
 
         // want = Curve LP
         want.approve(address(depositContract), type(uint256).max);
@@ -567,8 +567,8 @@ contract StrategyConvexOldPoolsClonable is StrategyConvexBase {
             return true;
         }
 
-        // harvest our credit if it's above our threshold
-        if (vault.creditAvailable() > creditThreshold) {
+        // harvest our credit if it's above our threshold, but only if we've set it
+        if (creditThreshold > 0 && vault.creditAvailable() > creditThreshold) {
             return true;
         }
 
