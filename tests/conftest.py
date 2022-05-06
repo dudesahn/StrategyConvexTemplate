@@ -64,7 +64,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 4
+    hours_to_sleep = 2
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
