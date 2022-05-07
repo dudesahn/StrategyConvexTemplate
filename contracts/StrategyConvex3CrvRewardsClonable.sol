@@ -379,6 +379,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         harvestProfitMin = 60000e6;
         harvestProfitMax = 120000e6;
         creditThreshold = 1e6 * 1e18;
+        keepCRV = 1000; // default of 10%
 
         // want = Curve LP
         want.approve(address(depositContract), type(uint256).max);

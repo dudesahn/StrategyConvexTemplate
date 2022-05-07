@@ -50,7 +50,7 @@ def pid():
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 50_000e18
+    amount = 35_000e18
     yield amount
 
 
@@ -58,8 +58,8 @@ def amount():
 def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    # MIM 0xBA12222222228d8Ba445958a75a0704d566BF2C8, OUSD 0x89eBCb7714bd0D2F33ce3a35C12dBEB7b94af169
-    whale = accounts.at("0xBA12222222228d8Ba445958a75a0704d566BF2C8", force=True)
+    # MIM 0xe896e539e557BC751860a7763C8dD589aF1698Ce, OUSD 0x89eBCb7714bd0D2F33ce3a35C12dBEB7b94af169
+    whale = accounts.at("0xe896e539e557BC751860a7763C8dD589aF1698Ce", force=True)
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -123,7 +123,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 4
+    hours_to_sleep = 2
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
