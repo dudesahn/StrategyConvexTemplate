@@ -43,14 +43,14 @@ chain_used = 1
 # If testing a Convex strategy, set this equal to your PID
 @pytest.fixture(scope="module")
 def pid():
-    pid = 49  # stETH 25, alETH 49
+    pid = 25  # stETH 25, alETH 49
     yield pid
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 20e18  # stETH 100e18, alETH 20e18
+    amount = 100e18 # stETH 100e18, alETH 20e18
     yield amount
 
 
@@ -60,7 +60,7 @@ def whale(accounts, amount, token):
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     # stETH 0x56c915758Ad3f76Fd287FFF7563ee313142Fb663
     # alETH 0x3da4b6ff177122c30CE8F0236709232289D31DF1
-    whale = accounts.at("0x3da4b6ff177122c30CE8F0236709232289D31DF1", force=True)
+    whale = accounts.at("0x56c915758Ad3f76Fd287FFF7563ee313142Fb663", force=True)
     if token.balanceOf(whale) < 2 * amount:
         print("Token address:", token.address, "Whale:", whale)
         raise ValueError(
@@ -72,7 +72,7 @@ def whale(accounts, amount, token):
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexstETH"
+    strategy_name = "StrategyConvexstETH" # StrategyConvexstETH, StrategyConvexalETH
     yield strategy_name
 
 
@@ -86,7 +86,7 @@ def rewards_token():  # LDO 0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32
 # this is whether our pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
 @pytest.fixture(scope="module")
 def has_rewards():
-    has_rewards = False
+    has_rewards = True # stETH true, alETH false
     yield has_rewards
 
 
