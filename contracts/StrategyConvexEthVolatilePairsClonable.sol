@@ -266,10 +266,6 @@ contract StrategyConvexEthVolatilePairsClonable is StrategyConvexBase {
     ICurveFi internal constant cvxeth =
         ICurveFi(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4); // use curve's new CVX-ETH crypto pool to sell our CVX
 
-    // use this to check on our claimable profit
-    IERC20 internal constant usdt =
-        IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
-
     // check for cloning
     bool internal isOriginal = true;
 
