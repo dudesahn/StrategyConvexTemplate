@@ -34,19 +34,23 @@ def pid():
 
 
 @pytest.fixture(scope="module")
-def whale(accounts):
+def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0xABC508DdA7517F195e416d77C822A4861961947a", force=True  # IB
+        "0x1a6525E4a4aB2E3aEa7ED3CF813e8ed07fA3446D", force=True  # IB 0x1a6525E4a4aB2E3aEa7ED3CF813e8ed07fA3446D
     )  # 0x310D5C8EE1512D5092ee4377061aE82E48973689 for Aave
+    if token.balanceOf(whale) < 2 * amount:
+        raise ValueError(
+            "Our whale needs more funds. Find another whale or reduce your amount variable."
+        )
     yield whale
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 5_000e18
+    amount = 50_000e18
     yield amount
 
 
@@ -64,7 +68,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 4
+    hours_to_sleep = 2
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
@@ -74,6 +78,7 @@ def sleep_time():
 @pytest.fixture(scope="module")
 def pool():
     poolAddress = Contract("0x2dded6Da1BF5DBdF597C45fcFaa3194e53EcfeAF")
+    # IB 0x2dded6Da1BF5DBdF597C45fcFaa3194e53EcfeAF
     yield poolAddress
 
 
