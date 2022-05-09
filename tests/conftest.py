@@ -29,7 +29,7 @@ def tenderly_fork(web3, chain):
 # put our pool's convex pid here; this is the only thing that should need to change up here **************
 @pytest.fixture(scope="module")
 def pid():
-    pid = 75  # BTRFLY 75, T 67
+    pid = 79  # CAD 79
     yield pid
 
 
@@ -38,16 +38,15 @@ def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0xeCb456EA5365865EbAb8a2661B0c503410e9B347", force=True
-    )  # 0x6f9BB7e454f5B3eb2310343f0E99269dC2BB8A1d for T-ETH (253 total)
-    # 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 for btrfly-eth (5.6 total)
+        "0x26f539A0fE189A7f228D7982BF10Bc294FA9070c", force=True
+    )  # 0x26f539A0fE189A7f228D7982BF10Bc294FA9070c for CAD-USDC (270k total)
     yield whale
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 2e18
+    amount = 100_000e18
     yield amount
 
 
@@ -71,12 +70,11 @@ def sleep_time():
     yield sleep_time
 
 
-# curve deposit pool, for old curve pools set this manually
+# curve deposit pool, for old curve pools and crypto LPs set this manually
 @pytest.fixture(scope="module")
 def pool():
-    poolAddress = Contract("0xF43b15Ab692fDe1F9c24a9FCE700AdCC809D5391")
-    # 0x752eBeb79963cf0732E9c0fec72a49FD1DEfAEAC for T-ETH
-    # 0xF43b15Ab692fDe1F9c24a9FCE700AdCC809D5391 BTRFLY-ETH
+    poolAddress = Contract("0xE07BDe9Eb53DEFfa979daE36882014B758111a78")
+    # 0xE07BDe9Eb53DEFfa979daE36882014B758111a78 for CAD-USDC
     yield poolAddress
 
 
@@ -238,7 +236,7 @@ def vault(pm, gov, rewards, guardian, management, token, chain):
 # replace the first value with the name of your strategy
 @pytest.fixture(scope="function")
 def strategy(
-    StrategyConvexEthVolatilePairsClonable,
+    StrategyConvexUsdcPairsClonable,
     strategist,
     keeper,
     vault,
@@ -257,7 +255,7 @@ def strategy(
 ):
     # make sure to include all constructor parameters needed here
     strategy = strategist.deploy(
-        StrategyConvexEthVolatilePairsClonable,
+        StrategyConvexUsdcPairsClonable,
         vault,
         pid,
         pool,

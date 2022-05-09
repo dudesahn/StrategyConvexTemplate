@@ -266,6 +266,13 @@ contract StrategyConvexUsdcPairsClonable is StrategyConvexBase {
     ICurveFi internal constant cvxeth =
         ICurveFi(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4); // use curve's new CVX-ETH crypto pool to sell our CVX
 
+    // sell our weth to usdc on uniV3
+    IERC20 internal constant usdc =
+        IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+    address internal constant uniswapv3 =
+        0xE592427A0AEce92De3Edee1F18E0157C05861564;
+    uint24 public uniStableFee; // this is equal to 0.05%, can change this later if a different path becomes more optimal
+
     // check for cloning
     bool internal isOriginal = true;
 
@@ -360,6 +367,7 @@ contract StrategyConvexUsdcPairsClonable is StrategyConvexBase {
         want.approve(address(depositContract), type(uint256).max);
         convexToken.approve(address(cvxeth), type(uint256).max);
         crv.approve(address(crveth), type(uint256).max);
+        weth.approve(uniswapv3, type(uint256).max);
 
         // this is the pool specific to this vault, but we only use it as an address
         curve = ICurveFi(_curvePool);
@@ -375,8 +383,14 @@ contract StrategyConvexUsdcPairsClonable is StrategyConvexBase {
         // check that our LP token based on our pid matches our want
         require(address(lptoken) == address(want));
 
+        // set our needed curve approvals
+        usdc.approve(address(curve), type(uint256).max);
+
         // set our strategy's name
         stratName = _name;
+
+        // set our uniswap pool fees
+        uniStableFee = 500;
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
@@ -461,32 +475,34 @@ contract StrategyConvexUsdcPairsClonable is StrategyConvexBase {
         );
     }
 
-    // Sells our CRV and CVX for ETH on Curve
+    // Sells our CRV and CVX for WETH on Curve, then sell WETH to USDC on UniV3
     function _sellCrvAndCvx(uint256 _crvAmount, uint256 _convexAmount)
         internal
     {
         if (_convexAmount > 0) {
-            cvxeth.exchange(1, 0, _convexAmount, 0, true);
+            cvxeth.exchange(1, 0, _convexAmount, 0, false);
         }
 
         if (_crvAmount > 0) {
-            crveth.exchange(1, 0, _crvAmount, 0, true);
+            crveth.exchange(1, 0, _crvAmount, 0, false);
         }
 
         uint256 _wethBalance = weth.balanceOf(address(this));
-        IUniV3(uniswapv3).exactInput(
-            IUniV3.ExactInputParams(
-                abi.encodePacked(
-                    address(weth),
-                    uint24(uniStableFee),
-                    address(usdc)
-                ),
-                address(this),
-                block.timestamp,
-                _wethBalance,
-                uint256(1)
-            )
-        );
+        if (_wethBalance > 0) {
+            IUniV3(uniswapv3).exactInput(
+                IUniV3.ExactInputParams(
+                    abi.encodePacked(
+                        address(weth),
+                        uint24(uniStableFee),
+                        address(usdc)
+                    ),
+                    address(this),
+                    block.timestamp,
+                    _wethBalance,
+                    uint256(1)
+                )
+            );
+        }
     }
 
     /* ========== KEEP3RS ========== */

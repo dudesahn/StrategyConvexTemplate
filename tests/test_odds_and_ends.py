@@ -15,7 +15,7 @@ def test_odds_and_ends(
     strategist_ms,
     voter,
     gauge,
-    StrategyConvexEthVolatilePairsClonable,
+    StrategyConvexUsdcPairsClonable,
     cvxDeposit,
     rewardsContract,
     pid,
@@ -63,7 +63,7 @@ def test_odds_and_ends(
     # we can try to migrate too, lol
     # deploy our new strategy
     new_strategy = strategist.deploy(
-        StrategyConvexEthVolatilePairsClonable,
+        StrategyConvexUsdcPairsClonable,
         vault,
         pid,
         pool,
@@ -155,7 +155,7 @@ def test_odds_and_ends_2(
 
 
 def test_odds_and_ends_migration(
-    StrategyConvexEthVolatilePairsClonable,
+    StrategyConvexUsdcPairsClonable,
     gov,
     token,
     vault,
@@ -182,7 +182,7 @@ def test_odds_and_ends_migration(
 
     # deploy our new strategy
     new_strategy = strategist.deploy(
-        StrategyConvexEthVolatilePairsClonable,
+        StrategyConvexUsdcPairsClonable,
         vault,
         pid,
         pool,
