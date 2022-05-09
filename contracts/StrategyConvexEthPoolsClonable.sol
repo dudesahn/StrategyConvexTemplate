@@ -372,7 +372,8 @@ contract StrategyConvexEthPoolsClonable is StrategyConvexBase {
         healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; // health.ychad.eth
         harvestProfitMin = 60000e6;
         harvestProfitMax = 120000e6;
-        creditThreshold = 1e6 * 1e18;
+        creditThreshold = 4000 * 1e18; // roughly $1m in ETH
+        keepCRV = 1000; // default of 10%
 
         // want = Curve LP
         want.approve(address(depositContract), type(uint256).max);
