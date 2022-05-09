@@ -54,7 +54,7 @@ def amount():
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexEthVolatilePairsClonable"
+    strategy_name = "StrategyConvexUsdcPairsClonable"
     yield strategy_name
 
 

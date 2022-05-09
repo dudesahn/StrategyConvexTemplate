@@ -251,7 +251,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     }
 }
 
-contract StrategyConvexEthVolatilePairsClonable is StrategyConvexBase {
+contract StrategyConvexUsdcPairsClonable is StrategyConvexBase {
     /* ========== STATE VARIABLES ========== */
     // these will likely change across different wants.
 
@@ -265,10 +265,6 @@ contract StrategyConvexEthVolatilePairsClonable is StrategyConvexBase {
         ICurveFi(0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511); // use curve's new CRV-ETH crypto pool to sell our CRV
     ICurveFi internal constant cvxeth =
         ICurveFi(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4); // use curve's new CVX-ETH crypto pool to sell our CVX
-
-    // use this to check on our claimable profit
-    IERC20 internal constant usdt =
-        IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
 
     // check for cloning
     bool internal isOriginal = true;
@@ -289,7 +285,7 @@ contract StrategyConvexEthVolatilePairsClonable is StrategyConvexBase {
     event Cloned(address indexed clone);
 
     // we use this to clone our original strategy to other vaults
-    function cloneConvexEthPairs(
+    function cloneConvexUsdcPairs(
         address _vault,
         address _strategist,
         address _rewards,
@@ -297,7 +293,7 @@ contract StrategyConvexEthVolatilePairsClonable is StrategyConvexBase {
         uint256 _pid,
         address _curvePool,
         string memory _name
-    ) external returns (address payable newStrategy) {
+    ) external returns (address newStrategy) {
         require(isOriginal);
         // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
         bytes20 addressBytes = bytes20(address(this));
@@ -316,7 +312,7 @@ contract StrategyConvexEthVolatilePairsClonable is StrategyConvexBase {
             newStrategy := create(0, clone_code, 0x37)
         }
 
-        StrategyConvexEthVolatilePairsClonable(newStrategy).initialize(
+        StrategyConvexUsdcPairsClonable(newStrategy).initialize(
             _vault,
             _strategist,
             _rewards,
@@ -358,6 +354,7 @@ contract StrategyConvexEthVolatilePairsClonable is StrategyConvexBase {
         harvestProfitMin = 60000e6;
         harvestProfitMax = 120000e6;
         creditThreshold = 1e6 * 1e18;
+        keepCRV = 1000; // default of 10%
 
         // want = Curve LP
         want.approve(address(depositContract), type(uint256).max);
@@ -409,10 +406,10 @@ contract StrategyConvexEthVolatilePairsClonable is StrategyConvexBase {
 
         _sellCrvAndCvx(crvBalance, convexBalance);
 
-        // deposit our ETH to the pool
-        uint256 ethBalance = address(this).balance;
-        if (ethBalance > 0) {
-            curve.add_liquidity{value: ethBalance}([ethBalance, 0], 0, true);
+        // deposit our USDC to the pool
+        uint256 usdcBalance = usdc.balanceOf(address(this));
+        if (usdcBalance > 0) {
+            curve.add_liquidity([0, usdcBalance], 0);
         }
 
         // debtOustanding will only be > 0 in the event of revoking or if we need to rebalance from a withdrawal or lowering the debtRatio
@@ -475,6 +472,21 @@ contract StrategyConvexEthVolatilePairsClonable is StrategyConvexBase {
         if (_crvAmount > 0) {
             crveth.exchange(1, 0, _crvAmount, 0, true);
         }
+
+        uint256 _wethBalance = weth.balanceOf(address(this));
+        IUniV3(uniswapv3).exactInput(
+            IUniV3.ExactInputParams(
+                abi.encodePacked(
+                    address(weth),
+                    uint24(uniStableFee),
+                    address(usdc)
+                ),
+                address(this),
+                block.timestamp,
+                _wethBalance,
+                uint256(1)
+            )
+        );
     }
 
     /* ========== KEEP3RS ========== */
@@ -595,14 +607,11 @@ contract StrategyConvexEthVolatilePairsClonable is StrategyConvexBase {
         }
     }
 
-    // include so our contract plays nicely with ether
-    receive() external payable {}
-
     /* ========== SETTERS ========== */
 
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
-    // Min profit to start checking for harvests if gas is good, max will harvest no matter gas (both in USDT, 6 decimals).
+    // Min profit to start checking for harvests if gas is good, max will harvest no matter gas (both in USDC, 6 decimals).
     // Credit threshold is in want token, and will trigger a harvest if credit is large enough. check earmark to look at convex's booster.
     function setHarvestTriggerParams(
         uint256 _harvestProfitMin,
@@ -614,5 +623,10 @@ contract StrategyConvexEthVolatilePairsClonable is StrategyConvexBase {
         harvestProfitMax = _harvestProfitMax;
         creditThreshold = _creditThreshold;
         checkEarmark = _checkEarmark;
+    }
+
+    /// @notice Set the fee pool we'd like to swap through on UniV3 (1% = 10_000)
+    function setUniFees(uint24 _stableFee) external onlyVaultManagers {
+        uniStableFee = _stableFee;
     }
 }
