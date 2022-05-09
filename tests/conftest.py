@@ -34,12 +34,16 @@ def pid():
 
 
 @pytest.fixture(scope="module")
-def whale(accounts):
+def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
         "0x9899c2c49f5eF2f37fbA6F9F8E7557E7A945c964", force=True
     )  # 0x44Bc6e3a8384979DF6673Ac81066c67C83d6d6b2 for USDP
+    if token.balanceOf(whale) < 2 * amount:
+        raise ValueError(
+            "Our whale needs more funds. Find another whale or reduce your amount variable."
+        )
     yield whale
 
 
