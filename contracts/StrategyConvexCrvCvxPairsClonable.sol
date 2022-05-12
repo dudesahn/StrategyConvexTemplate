@@ -251,7 +251,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     }
 }
 
-contract StrategyConvexEthVolatilePairsClonable is StrategyConvexBase {
+contract StrategyConvexCrvCvxPairsClonable is StrategyConvexBase {
     /* ========== STATE VARIABLES ========== */
     // these will likely change across different wants.
 
@@ -266,22 +266,19 @@ contract StrategyConvexEthVolatilePairsClonable is StrategyConvexBase {
     ICurveFi internal constant cvxeth =
         ICurveFi(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4); // use curve's new CVX-ETH crypto pool to sell our CVX
 
-    // use this to check on our claimable profit
-    IERC20 internal constant usdt =
-        IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
-
     // check for cloning
     bool internal isOriginal = true;
 
+    // use this to determine if we are CRV-ETH or CVX-ETH
+    bool public isCrvEthLp;
+
     /* ========== CONSTRUCTOR ========== */
 
-    constructor(
-        address _vault,
-        uint256 _pid,
-        address _curvePool,
-        string memory _name
-    ) public StrategyConvexBase(_vault) {
-        _initializeStrat(_pid, _curvePool, _name);
+    constructor(address _vault, bool _isCrvEthLp)
+        public
+        StrategyConvexBase(_vault)
+    {
+        _initializeStrat(_isCrvEthLp);
     }
 
     /* ========== CLONING ========== */
@@ -289,14 +286,12 @@ contract StrategyConvexEthVolatilePairsClonable is StrategyConvexBase {
     event Cloned(address indexed clone);
 
     // we use this to clone our original strategy to other vaults
-    function cloneConvexEthPairs(
+    function cloneConvexCrvCvxPairs(
         address _vault,
         address _strategist,
         address _rewards,
         address _keeper,
-        uint256 _pid,
-        address _curvePool,
-        string memory _name
+        bool _isCrvEthLp
     ) external returns (address payable newStrategy) {
         require(isOriginal);
         // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
@@ -316,14 +311,12 @@ contract StrategyConvexEthVolatilePairsClonable is StrategyConvexBase {
             newStrategy := create(0, clone_code, 0x37)
         }
 
-        StrategyConvexEthVolatilePairsClonable(newStrategy).initialize(
+        StrategyConvexCrvCvxPairsClonable(newStrategy).initialize(
             _vault,
             _strategist,
             _rewards,
             _keeper,
-            _pid,
-            _curvePool,
-            _name
+            _isCrvEthLp
         );
 
         emit Cloned(newStrategy);
@@ -335,22 +328,29 @@ contract StrategyConvexEthVolatilePairsClonable is StrategyConvexBase {
         address _strategist,
         address _rewards,
         address _keeper,
-        uint256 _pid,
-        address _curvePool,
-        string memory _name
+        bool _isCrvEthLp
     ) public {
         _initialize(_vault, _strategist, _rewards, _keeper);
-        _initializeStrat(_pid, _curvePool, _name);
+        _initializeStrat(_isCrvEthLp);
     }
 
     // this is called by our original strategy, as well as any clones
-    function _initializeStrat(
-        uint256 _pid,
-        address _curvePool,
-        string memory _name
-    ) internal {
+    function _initializeStrat(bool _isCrvEthLp) internal {
         // make sure that we haven't initialized this before
         require(address(curve) == address(0)); // already initialized.
+
+        // set up our CRV-ETH or CVX_ETH LP
+        if (_isCrvEthLp) {
+            curve = crveth; // this is the pool specific to this vault
+            pid = 61; // this is the pool ID on convex, we use this to determine what the reweardsContract address is
+            stratName = "StrategyConvexCRVETH"; // set our strategy's name
+            isCrvEthLp = true;
+        } else {
+            curve = cvxeth;
+            pid = 64;
+            stratName = "StrategyConvexCVXETH";
+            isCrvEthLp = false;
+        }
 
         // You can set these parameters on deployment to whatever you want
         maxReportDelay = 21 days; // 21 days in seconds, if we hit this then harvestTrigger = True
@@ -365,11 +365,7 @@ contract StrategyConvexEthVolatilePairsClonable is StrategyConvexBase {
         convexToken.approve(address(cvxeth), type(uint256).max);
         crv.approve(address(crveth), type(uint256).max);
 
-        // this is the pool specific to this vault, but we only use it as an address
-        curve = ICurveFi(_curvePool);
-
         // setup our rewards contract
-        pid = _pid; // this is the pool ID on convex, we use this to determine what the reweardsContract address is
         (address lptoken, , , address _rewardsContract, , ) =
             IConvexDeposit(depositContract).poolInfo(_pid);
 
@@ -378,9 +374,6 @@ contract StrategyConvexEthVolatilePairsClonable is StrategyConvexBase {
 
         // check that our LP token based on our pid matches our want
         require(address(lptoken) == address(want));
-
-        // set our strategy's name
-        stratName = _name;
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
@@ -410,10 +403,22 @@ contract StrategyConvexEthVolatilePairsClonable is StrategyConvexBase {
 
         _sellCrvAndCvx(crvBalance, convexBalance);
 
-        // deposit our ETH to the pool
+        // update our balances after selling
+        uint256 toDeposit;
+        if (isCrvEthLp) {
+            toDeposit = crv.balanceOf(address(this));
+        } else {
+            toDeposit = convexToken.balanceOf(address(this));
+        }
+
+        // deposit our assets to the pool
         uint256 ethBalance = address(this).balance;
-        if (ethBalance > 0) {
-            curve.add_liquidity{value: ethBalance}([ethBalance, 0], 0, true);
+        if (ethBalance > 0 || toDeposit > 0) {
+            curve.add_liquidity{value: ethBalance}(
+                [ethBalance, toDeposit],
+                0,
+                true
+            );
         }
 
         // debtOustanding will only be > 0 in the event of revoking or if we need to rebalance from a withdrawal or lowering the debtRatio
@@ -465,16 +470,18 @@ contract StrategyConvexEthVolatilePairsClonable is StrategyConvexBase {
         );
     }
 
-    // Sells our CRV and CVX for ETH on Curve
+    // Sell our CRV or CVX for ETH on Curve
     function _sellCrvAndCvx(uint256 _crvAmount, uint256 _convexAmount)
         internal
     {
-        if (_convexAmount > 0) {
-            cvxeth.exchange(1, 0, _convexAmount, 0, true);
-        }
-
-        if (_crvAmount > 0) {
-            crveth.exchange(1, 0, _crvAmount, 0, true);
+        if (isCrvEthLp) {
+            if (_convexAmount > 0) {
+                cvxeth.exchange(1, 0, _convexAmount, 0, true);
+            }
+        } else {
+            if (_crvAmount > 0) {
+                crveth.exchange(1, 0, _crvAmount, 0, true);
+            }
         }
     }
 

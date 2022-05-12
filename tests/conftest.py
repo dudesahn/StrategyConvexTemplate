@@ -38,16 +38,16 @@ def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0xeCb456EA5365865EbAb8a2661B0c503410e9B347", force=True
+        "0x38eE5F5A39c01cB43473992C12936ba1219711ab", force=True
     )  # 0x6f9BB7e454f5B3eb2310343f0E99269dC2BB8A1d for T-ETH (253 total)
-    # 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 for btrfly-eth (5.6 total)
+    # 0x38eE5F5A39c01cB43473992C12936ba1219711ab for cvx-eth (~630 total)
     yield whale
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 2e18
+    amount = 300e18
     yield amount
 
 
@@ -74,9 +74,9 @@ def sleep_time():
 # curve deposit pool, for old curve pools set this manually
 @pytest.fixture(scope="module")
 def pool():
-    poolAddress = Contract("0xF43b15Ab692fDe1F9c24a9FCE700AdCC809D5391")
-    # 0x752eBeb79963cf0732E9c0fec72a49FD1DEfAEAC for T-ETH
-    # 0xF43b15Ab692fDe1F9c24a9FCE700AdCC809D5391 BTRFLY-ETH
+    poolAddress = Contract("0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4")
+    # 0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511 for CRV-ETH
+    # 0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4 CVX-ETH
     yield poolAddress
 
 
