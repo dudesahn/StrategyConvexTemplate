@@ -219,22 +219,22 @@ def strategist(accounts):
 
 
 # use this if you need to deploy the vault
-@pytest.fixture(scope="function")
-def vault(pm, gov, rewards, guardian, management, token, chain):
-    Vault = pm(config["dependencies"][0]).Vault
-    vault = guardian.deploy(Vault)
-    vault.initialize(token, gov, rewards, "", "", guardian)
-    vault.setDepositLimit(2**256 - 1, {"from": gov})
-    vault.setManagement(management, {"from": gov})
-    chain.sleep(1)
-    yield vault
+# @pytest.fixture(scope="function")
+# def vault(pm, gov, rewards, guardian, management, token, chain):
+#     Vault = pm(config["dependencies"][0]).Vault
+#     vault = guardian.deploy(Vault)
+#     vault.initialize(token, gov, rewards, "", "", guardian)
+#     vault.setDepositLimit(2**256 - 1, {"from": gov})
+#     vault.setManagement(management, {"from": gov})
+#     chain.sleep(1)
+#     yield vault
 
 
 # use this if your vault is already deployed
-# @pytest.fixture(scope="function")
-# def vault(pm, gov, rewards, guardian, management, token, chain):
-#     vault = Contract("0x497590d2d57f05cf8B42A36062fA53eBAe283498")
-#     yield vault
+@pytest.fixture(scope="function")
+def vault(pm, gov, rewards, guardian, management, token, chain):
+    vault = Contract("0x27b7b1ad7288079A66d12350c828D3C00A6F07d7")
+    yield vault
 
 
 # replace the first value with the name of your strategy
@@ -269,9 +269,8 @@ def strategy(
     # set our management fee to zero so it doesn't mess with our profit checking
     vault.setManagementFee(0, {"from": gov})
     # add our new strategy
-    vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
-    strategy.setHealthCheck(healthCheck, {"from": gov})
-    strategy.setDoHealthCheck(True, {"from": gov})
+    old_strategy = vault.withdrawalQueue(1)
+    vault.migrateStrategy(old_strategy, strategy, {"from": gov})
 
     # earmark rewards if we are using a convex strategy
     booster.earmarkRewards(pid, {"from": gov})
