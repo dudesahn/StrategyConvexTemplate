@@ -367,7 +367,7 @@ contract StrategyConvexCrvCvxPairsClonable is StrategyConvexBase {
 
         // setup our rewards contract
         (address lptoken, , , address _rewardsContract, , ) =
-            IConvexDeposit(depositContract).poolInfo(_pid);
+            IConvexDeposit(depositContract).poolInfo(pid);
 
         // set up our rewardsContract
         rewardsContract = IConvexRewards(_rewardsContract);

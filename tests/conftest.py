@@ -26,35 +26,52 @@ def tenderly_fork(web3, chain):
 
 ################################################ UPDATE THINGS BELOW HERE ################################################
 
-# put our pool's convex pid here; this is the only thing that should need to change up here **************
+# for this strategy, set this if we want to test CVX or CRV-ETH LPs. shouldn't need to touch anything else
 @pytest.fixture(scope="module")
-def pid():
-    pid = 75  # BTRFLY 75, T 67
+def use_crv():
+    use_crv = True
+    yield use_crv
+
+
+# for these LPs, we only use this to generate the correct want token. 61 CRV-ETH, 64 CVX-ETH
+@pytest.fixture(scope="module")
+def pid(use_crv):
+    if use_crv:
+        pid = 61
+    else:
+        pid = 64
     yield pid
 
 
 @pytest.fixture(scope="module")
-def whale(accounts):
+def whale(accounts, use_crv):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    whale = accounts.at(
-        "0x38eE5F5A39c01cB43473992C12936ba1219711ab", force=True
-    )  # 0x6f9BB7e454f5B3eb2310343f0E99269dC2BB8A1d for T-ETH (253 total)
-    # 0x38eE5F5A39c01cB43473992C12936ba1219711ab for cvx-eth (~630 total)
+    if use_crv:
+        whale = accounts.at(
+            "0x279a7DBFaE376427FFac52fcb0883147D42165FF", force=True
+        )  # 0x279a7DBFaE376427FFac52fcb0883147D42165FF for CRV-ETH (999 total)
+    else:
+        whale = accounts.at(
+            "0x38eE5F5A39c01cB43473992C12936ba1219711ab", force=True
+        )  # 0x38eE5F5A39c01cB43473992C12936ba1219711ab for cvx-eth (~630 total)
     yield whale
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
-def amount():
-    amount = 300e18
+def amount(use_crv):
+    if use_crv:
+        amount = 400e18
+    else:
+        amount = 300e18
     yield amount
 
 
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexEthVolatilePairsClonable"
+    strategy_name = "StrategyConvexCrvCvxPairsClonable"
     yield strategy_name
 
 
@@ -71,12 +88,13 @@ def sleep_time():
     yield sleep_time
 
 
-# curve deposit pool, for old curve pools set this manually
+# curve deposit pool, we don't actually need it but set it anyway
 @pytest.fixture(scope="module")
-def pool():
-    poolAddress = Contract("0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4")
-    # 0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511 for CRV-ETH
-    # 0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4 CVX-ETH
+def pool(use_crv):
+    if use_crv:
+        poolAddress = Contract("0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511")
+    else:
+        poolAddress = Contract("0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4")
     yield poolAddress
 
 
@@ -238,7 +256,7 @@ def vault(pm, gov, rewards, guardian, management, token, chain):
 # replace the first value with the name of your strategy
 @pytest.fixture(scope="function")
 def strategy(
-    StrategyConvexEthVolatilePairsClonable,
+    StrategyConvexCrvCvxPairsClonable,
     strategist,
     keeper,
     vault,
@@ -254,14 +272,13 @@ def strategy(
     gasOracle,
     strategist_ms,
     booster,
+    use_crv,
 ):
     # make sure to include all constructor parameters needed here
     strategy = strategist.deploy(
-        StrategyConvexEthVolatilePairsClonable,
+        StrategyConvexCrvCvxPairsClonable,
         vault,
-        pid,
-        pool,
-        strategy_name,
+        use_crv,
     )
     strategy.setKeeper(keeper, {"from": gov})
     # set our management fee to zero so it doesn't mess with our profit checking

@@ -5,7 +5,7 @@ import math
 
 # test migrating a strategy
 def test_migration(
-    StrategyConvexEthVolatilePairsClonable,
+    StrategyConvexCrvCvxPairsClonable,
     gov,
     token,
     vault,
@@ -22,6 +22,7 @@ def test_migration(
     pool,
     strategy_name,
     sleep_time,
+    use_crv,
 ):
 
     ## deposit to the vault after approving
@@ -33,11 +34,9 @@ def test_migration(
 
     # deploy our new strategy
     new_strategy = strategist.deploy(
-        StrategyConvexEthVolatilePairsClonable,
+        StrategyConvexCrvCvxPairsClonable,
         vault,
-        pid,
-        pool,
-        strategy_name,
+        use_crv,
     )
     total_old = strategy.estimatedTotalAssets()
 

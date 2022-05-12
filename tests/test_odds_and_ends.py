@@ -15,7 +15,7 @@ def test_odds_and_ends(
     strategist_ms,
     voter,
     gauge,
-    StrategyConvexEthVolatilePairsClonable,
+    StrategyConvexCrvCvxPairsClonable,
     cvxDeposit,
     rewardsContract,
     pid,
@@ -25,6 +25,7 @@ def test_odds_and_ends(
     pool,
     strategy_name,
     sleep_time,
+    use_crv,
 ):
 
     ## deposit to the vault after approving. turn off health check before each harvest since we're doing weird shit
@@ -63,11 +64,9 @@ def test_odds_and_ends(
     # we can try to migrate too, lol
     # deploy our new strategy
     new_strategy = strategist.deploy(
-        StrategyConvexEthVolatilePairsClonable,
+        StrategyConvexCrvCvxPairsClonable,
         vault,
-        pid,
-        pool,
-        strategy_name,
+        use_crv,
     )
     total_old = strategy.estimatedTotalAssets()
 
@@ -155,7 +154,7 @@ def test_odds_and_ends_2(
 
 
 def test_odds_and_ends_migration(
-    StrategyConvexEthVolatilePairsClonable,
+    StrategyConvexCrvCvxPairsClonable,
     gov,
     token,
     vault,
@@ -171,6 +170,7 @@ def test_odds_and_ends_migration(
     pool,
     strategy_name,
     sleep_time,
+    use_crv,
 ):
 
     ## deposit to the vault after approving
@@ -182,11 +182,9 @@ def test_odds_and_ends_migration(
 
     # deploy our new strategy
     new_strategy = strategist.deploy(
-        StrategyConvexEthVolatilePairsClonable,
+        StrategyConvexCrvCvxPairsClonable,
         vault,
-        pid,
-        pool,
-        strategy_name,
+        use_crv,
     )
     total_old = strategy.estimatedTotalAssets()
 

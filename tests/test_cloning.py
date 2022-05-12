@@ -12,13 +12,14 @@ def test_cloning(
     keeper,
     rewards,
     chain,
-    StrategyConvexEthVolatilePairsClonable,
+    StrategyConvexCrvCvxPairsClonable,
     rewardsContract,
     pid,
     amount,
     pool,
     strategy_name,
     sleep_time,
+    use_crv,
 ):
     # Shouldn't be able to call initialize again
     with brownie.reverts():
@@ -27,17 +28,15 @@ def test_cloning(
             strategist,
             rewards,
             keeper,
-            pid,
-            pool,
-            strategy_name,
+            use_crv,
             {"from": gov},
         )
 
     ## clone our strategy
-    tx = strategy.cloneConvexEthPairs(
-        vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
+    tx = strategy.cloneConvexCrvCvxPairs(
+        vault, strategist, rewards, keeper, use_crv, {"from": gov}
     )
-    newStrategy = StrategyConvexEthVolatilePairsClonable.at(tx.return_value)
+    newStrategy = StrategyConvexCrvCvxPairsClonable.at(tx.return_value)
 
     # Shouldn't be able to call initialize again
     with brownie.reverts():
@@ -46,16 +45,14 @@ def test_cloning(
             strategist,
             rewards,
             keeper,
-            pid,
-            pool,
-            strategy_name,
+            use_crv,
             {"from": gov},
         )
 
     ## shouldn't be able to clone a clone
     with brownie.reverts():
-        newStrategy.cloneConvexEthPairs(
-            vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
+        newStrategy.cloneConvexCrvCvxPairs(
+            vault, strategist, rewards, keeper, use_crv, {"from": gov}
         )
 
     # revoke to send all funds back to vault
