@@ -4,7 +4,9 @@ pragma experimental ABIEncoderV2;
 
 // These are the core Yearn libraries
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/Math.sol";
 
 import "./interfaces/curve.sol";
@@ -103,7 +105,9 @@ interface IConvexDeposit {
 }
 
 abstract contract StrategyConvexBase is BaseStrategy {
+    using SafeERC20 for IERC20;
     using Address for address;
+    using SafeMath for uint256;
 
     /* ========== STATE VARIABLES ========== */
     // these should stay the same across different wants.
@@ -209,20 +213,10 @@ abstract contract StrategyConvexBase is BaseStrategy {
         }
     }
 
-    // fire sale, get rid of it all!
-    function liquidateAllPositions() internal override returns (uint256) {
-        uint256 _stakedBal = stakedBalance();
-        if (_stakedBal > 0) {
-            // don't bother withdrawing zero
-            rewardsContract.withdrawAndUnwrap(_stakedBal, claimRewards);
-        }
-        return balanceOfWant();
-    }
-
     // in case we need to exit into the convex deposit token, this will allow us to do that
     // make sure to check claimRewards before this step if needed
     // plan to have gov sweep convex deposit tokens from strategy after this
-    function withdrawToConvexDepositTokens() external onlyVaultManagers {
+    function withdrawToConvexDepositTokens() external onlyAuthorized {
         uint256 _stakedBal = stakedBalance();
         if (_stakedBal > 0) {
             rewardsContract.withdraw(_stakedBal, claimRewards);
@@ -242,20 +236,20 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
     // Set the amount of CRV to be locked in Yearn's veCRV voter from each harvest. Default is 10%.
-    function setKeepCRV(uint256 _keepCRV) external onlyVaultManagers {
+    function setKeepCRV(uint256 _keepCRV) external onlyAuthorized {
         require(_keepCRV <= 10_000);
         keepCRV = _keepCRV;
     }
 
     // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
-    function setClaimRewards(bool _claimRewards) external onlyVaultManagers {
+    function setClaimRewards(bool _claimRewards) external onlyAuthorized {
         claimRewards = _claimRewards;
     }
 
     // This allows us to manually harvest with our keeper as needed
     function setForceHarvestTriggerOnce(bool _forceHarvestTriggerOnce)
         external
-        onlyVaultManagers
+        onlyAuthorized
     {
         forceHarvestTriggerOnce = _forceHarvestTriggerOnce;
     }
@@ -463,7 +457,7 @@ contract StrategyConvexEthPoolsClonable is StrategyConvexBase {
             uint256 _wantBal = balanceOfWant();
             if (_profit.add(_debtPayment) > _wantBal) {
                 // this should only be hit following donations to strategy
-                liquidateAllPositions();
+                liquidatePosition(assets);
             }
         }
         // if assets are less than debt, we are in trouble
@@ -632,14 +626,6 @@ contract StrategyConvexEthPoolsClonable is StrategyConvexBase {
         return crvValue.add(cvxValue).add(rewardsValue);
     }
 
-    // convert our keeper's eth cost into want, we don't need this anymore since we don't use baseStrategy harvestTrigger
-    function ethToWant(uint256 _ethAmount)
-        public
-        view
-        override
-        returns (uint256)
-    {}
-
     // check if the current baseFee is below our external target
     function isBaseFeeAcceptable() internal view returns (bool) {
         return
@@ -706,7 +692,7 @@ contract StrategyConvexEthPoolsClonable is StrategyConvexBase {
         uint256 _harvestProfitMax,
         uint256 _creditThreshold,
         bool _checkEarmark
-    ) external onlyVaultManagers {
+    ) external onlyAuthorized {
         harvestProfitMin = _harvestProfitMin;
         harvestProfitMax = _harvestProfitMax;
         creditThreshold = _creditThreshold;

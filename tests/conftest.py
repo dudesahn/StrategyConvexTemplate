@@ -255,15 +255,22 @@ if chain_used == 1:  # mainnet
         yield accounts.at("0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7", force=True)
 
     # use this if you need to deploy the vault
+#     @pytest.fixture(scope="function")
+#     def vault(pm, gov, rewards, guardian, management, token, chain):
+#         Vault = pm(config["dependencies"][0]).Vault
+#         vault = guardian.deploy(Vault)
+#         vault.initialize(token, gov, rewards, "", "", guardian)
+#         vault.setDepositLimit(2**256 - 1, {"from": gov})
+#         vault.setManagement(management, {"from": gov})
+#         chain.sleep(1)
+#         yield vault
+
+    # use this if your vault is already deployed
     @pytest.fixture(scope="function")
     def vault(pm, gov, rewards, guardian, management, token, chain):
-        Vault = pm(config["dependencies"][0]).Vault
-        vault = guardian.deploy(Vault)
-        vault.initialize(token, gov, rewards, "", "", guardian)
-        vault.setDepositLimit(2**256 - 1, {"from": gov})
-        vault.setManagement(management, {"from": gov})
-        chain.sleep(1)
+        vault = Contract("0xdCD90C7f6324cfa40d7169ef80b12031770B4325")
         yield vault
+
 
     # replace the first value with the name of your strategy
     @pytest.fixture(scope="function")
@@ -298,8 +305,10 @@ if chain_used == 1:  # mainnet
         strategy.setKeeper(keeper, {"from": gov})
         # set our management fee to zero so it doesn't mess with our profit checking
         vault.setManagementFee(0, {"from": gov})
-        # add our new strategy
-        vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
+        
+        
+        # we will be migrating on our live vault
+        vault.addStrategy(strategy, 10_000, 0, 2_000, {"from": gov})
         strategy.setHealthCheck(healthCheck, {"from": gov})
         strategy.setDoHealthCheck(True, {"from": gov})
 
