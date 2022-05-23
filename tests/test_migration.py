@@ -5,7 +5,7 @@ import math
 
 # test migrating a strategy
 def test_migration(
-    StrategyConvexEthPoolsClonable,
+    StrategyConvexstETH,
     gov,
     token,
     vault,
@@ -26,7 +26,7 @@ def test_migration(
 
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -34,7 +34,7 @@ def test_migration(
 
     # deploy our new strategy
     new_strategy = strategist.deploy(
-        StrategyConvexEthPoolsClonable,
+        StrategyConvexstETH,
         vault,
         pid,
         pool,

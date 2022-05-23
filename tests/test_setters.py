@@ -48,7 +48,7 @@ def test_setters(
 
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -57,8 +57,6 @@ def test_setters(
     strategy.setDebtThreshold(1, {"from": gov})
     strategy.setMaxReportDelay(0, {"from": gov})
     strategy.setMaxReportDelay(1e18, {"from": gov})
-    strategy.setMetadataURI(0, {"from": gov})
-    strategy.setMinReportDelay(100, {"from": gov})
     strategy.setProfitFactor(1000, {"from": gov})
     strategy.setRewards(gov, {"from": strategist})
     strategy.setKeepCRV(10, {"from": gov})

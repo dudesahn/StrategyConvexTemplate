@@ -13,7 +13,7 @@ def test_update_to_zero_then_back(
     keeper,
     rewards,
     chain,
-    StrategyConvexEthPoolsClonable,
+    StrategyConvexstETH,
     voter,
     proxy,
     pid,
@@ -36,29 +36,26 @@ def test_update_to_zero_then_back(
         print("Don't need to do these tests if not Curve or Convex strategy")
         return
 
-    ## clone our strategy, set our rewards to none
-    tx = strategy.cloneConvexOldEth(
+    # make sure to include all constructor parameters needed here
+    newStrategy = strategist.deploy(
+        StrategyConvexstETH,
         vault,
-        strategist,
-        rewards,
-        keeper,
         pid,
         pool,
         strategy_name,
-        {"from": gov},
     )
-    newStrategy = StrategyConvexEthPoolsClonable.at(tx.return_value)
 
     # revoke and send all funds back to vault
     vault.revokeStrategy(strategy, {"from": gov})
     strategy.harvest({"from": gov})
 
     # attach our new strategy and approve it on the proxy
-    vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(newStrategy, 10_000, 0, 2_000, {"from": gov})
 
-    assert vault.withdrawalQueue(1) == newStrategy
+    # make sure we added to our queue, may need to update this number
+    assert vault.withdrawalQueue(2) == newStrategy
     assert vault.strategies(newStrategy)[2] == 10_000
-    assert vault.withdrawalQueue(0) == strategy
+    assert vault.withdrawalQueue(1) == strategy
     assert vault.strategies(strategy)["debtRatio"] == 0
 
     # setup our rewards on our new stategy
@@ -67,7 +64,7 @@ def test_update_to_zero_then_back(
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
@@ -208,7 +205,7 @@ def test_update_from_zero_to_off(
     keeper,
     rewards,
     chain,
-    StrategyConvexEthPoolsClonable,
+    StrategyConvexstETH,
     voter,
     proxy,
     pid,
@@ -232,37 +229,34 @@ def test_update_from_zero_to_off(
         return
 
     ## clone our strategy, set our rewards to none
-    tx = strategy.cloneConvexOldEth(
+    newStrategy = strategist.deploy(
+        StrategyConvexstETH,
         vault,
-        strategist,
-        rewards,
-        keeper,
         pid,
         pool,
         strategy_name,
-        {"from": gov},
     )
-    newStrategy = StrategyConvexEthPoolsClonable.at(tx.return_value)
 
     # revoke and send all funds back to vault
     vault.revokeStrategy(strategy, {"from": gov})
     strategy.harvest({"from": gov})
 
     # attach our new strategy and approve it on the proxy
-    vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(newStrategy, 10_000, 0, 2_000, {"from": gov})
 
     # setup our rewards on our new stategy
     newStrategy.updateRewards(True, 0, {"from": gov})
 
-    assert vault.withdrawalQueue(1) == newStrategy
+    # make sure we added to our queue, may need to update this number
+    assert vault.withdrawalQueue(2) == newStrategy
     assert vault.strategies(newStrategy)[2] == 10_000
-    assert vault.withdrawalQueue(0) == strategy
+    assert vault.withdrawalQueue(1) == strategy
     assert vault.strategies(strategy)["debtRatio"] == 0
 
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
@@ -400,7 +394,7 @@ def test_change_rewards(
     keeper,
     rewards,
     chain,
-    StrategyConvexEthPoolsClonable,
+    StrategyConvexstETH,
     voter,
     proxy,
     pid,
@@ -423,24 +417,20 @@ def test_change_rewards(
         return
 
     ## clone our strategy, set our rewards to none
-    tx = strategy.cloneConvexOldEth(
+    newStrategy = strategist.deploy(
+        StrategyConvexstETH,
         vault,
-        strategist,
-        rewards,
-        keeper,
         pid,
         pool,
         strategy_name,
-        {"from": gov},
     )
-    newStrategy = StrategyConvexEthPoolsClonable.at(tx.return_value)
 
     # revoke and send all funds back to vault
     vault.revokeStrategy(strategy, {"from": gov})
     strategy.harvest({"from": gov})
 
     # attach our new strategy and approve it on the proxy
-    vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(newStrategy, 10_000, 0, 2_000, {"from": gov})
 
     # setup our rewards on our new stategy
     newStrategy.updateRewards(True, 0, {"from": gov})
@@ -448,7 +438,7 @@ def test_change_rewards(
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
@@ -489,7 +479,7 @@ def test_check_rewards(
     keeper,
     rewards,
     chain,
-    StrategyConvexEthPoolsClonable,
+    StrategyConvexstETH,
     voter,
     proxy,
     pid,
@@ -544,7 +534,7 @@ def test_weird_amounts(
         return
 
     ## deposit to the vault after approving
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     strategy.harvest({"from": gov})
 
@@ -600,7 +590,7 @@ def test_more_rewards_stuff(
         print("Don't need to do these tests if not Curve or Convex strategy")
         return
     ## deposit to the vault after approving
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     strategy.harvest({"from": gov})
 

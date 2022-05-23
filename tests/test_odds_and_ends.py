@@ -15,7 +15,7 @@ def test_odds_and_ends(
     strategist_ms,
     voter,
     gauge,
-    StrategyConvexEthPoolsClonable,
+    StrategyConvexstETH,
     cvxDeposit,
     rewardsContract,
     pid,
@@ -30,7 +30,7 @@ def test_odds_and_ends(
     ## deposit to the vault after approving. turn off health check before each harvest since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -51,6 +51,9 @@ def test_odds_and_ends(
     rewards_token.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
 
+    # our whale donates 1 gwei to the vault so we don't divide by zero (0.3.0 vault, errors in vault._reportLoss)
+    token.transfer(strategy, 1, {"from": whale})
+
     chain.sleep(86400)
     chain.mine(1)
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -63,7 +66,7 @@ def test_odds_and_ends(
     # we can try to migrate too, lol
     # deploy our new strategy
     new_strategy = strategist.deploy(
-        StrategyConvexEthPoolsClonable,
+        StrategyConvexstETH,
         vault,
         pid,
         pool,
@@ -81,7 +84,7 @@ def test_odds_and_ends(
     # harvest to get funds back in strategy
     new_strategy.harvest({"from": gov})
     new_strat_balance = new_strategy.estimatedTotalAssets()
-    assert new_strat_balance >= total_old
+    assert new_strat_balance >= updated_total_old
 
     startingVault = vault.totalAssets()
     print("\nVault starting assets with new strategy: ", startingVault)
@@ -95,11 +98,6 @@ def test_odds_and_ends(
     vaultAssets_2 = vault.totalAssets()
     assert vaultAssets_2 >= startingVault
     print("\nAssets after 1 day harvest: ", vaultAssets_2)
-
-    # check our oracle
-    one_eth_in_want = strategy.ethToWant(1000000000000000000)
-    print("This is how much want one ETH buys:", one_eth_in_want)
-    zero_eth_in_want = strategy.ethToWant(0)
 
     # check our views
     strategy.apiVersion()
@@ -130,7 +128,7 @@ def test_odds_and_ends_2(
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -142,6 +140,9 @@ def test_odds_and_ends_2(
     print("cvxToken Balance of Strategy", to_send)
     cvxDeposit.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
+
+    # our whale donates 1 gwei to the vault so we don't divide by zero (0.3.0 vault, errors in vault._reportLoss)
+    token.transfer(strategy, 1, {"from": whale})
 
     strategy.setEmergencyExit({"from": gov})
 
@@ -155,7 +156,7 @@ def test_odds_and_ends_2(
 
 
 def test_odds_and_ends_migration(
-    StrategyConvexEthPoolsClonable,
+    StrategyConvexstETH,
     gov,
     token,
     vault,
@@ -173,7 +174,7 @@ def test_odds_and_ends_migration(
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -181,7 +182,7 @@ def test_odds_and_ends_migration(
 
     # deploy our new strategy
     new_strategy = strategist.deploy(
-        StrategyConvexEthPoolsClonable,
+        StrategyConvexstETH,
         vault,
         pid,
         pool,
@@ -251,7 +252,7 @@ def test_odds_and_ends_liquidatePosition(
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
 
@@ -325,7 +326,7 @@ def test_odds_and_ends_rekt(
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -373,7 +374,7 @@ def test_odds_and_ends_liquidate_rekt(
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -437,7 +438,7 @@ def test_odds_and_ends_empty_strat(
     sleep_time,
 ):
     ## deposit to the vault after approving
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -488,7 +489,7 @@ def test_odds_and_ends_no_profit(
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})

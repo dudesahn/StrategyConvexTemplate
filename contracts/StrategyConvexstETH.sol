@@ -255,7 +255,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     }
 }
 
-contract StrategyConvexEthPoolsClonable is StrategyConvexBase {
+contract StrategyConvexstETH is StrategyConvexBase {
     /* ========== STATE VARIABLES ========== */
     // these will likely change across different wants.
 
@@ -294,63 +294,6 @@ contract StrategyConvexEthPoolsClonable is StrategyConvexBase {
     }
 
     /* ========== CLONING ========== */
-
-    event Cloned(address indexed clone);
-
-    // we use this to clone our original strategy to other vaults
-    function cloneConvexOldEth(
-        address _vault,
-        address _strategist,
-        address _rewards,
-        address _keeper,
-        uint256 _pid,
-        address _curvePool,
-        string memory _name
-    ) external returns (address payable newStrategy) {
-        require(isOriginal);
-        // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
-        bytes20 addressBytes = bytes20(address(this));
-        assembly {
-            // EIP-1167 bytecode
-            let clone_code := mload(0x40)
-            mstore(
-                clone_code,
-                0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000
-            )
-            mstore(add(clone_code, 0x14), addressBytes)
-            mstore(
-                add(clone_code, 0x28),
-                0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000
-            )
-            newStrategy := create(0, clone_code, 0x37)
-        }
-
-        StrategyConvexEthPoolsClonable(newStrategy).initialize(
-            _vault,
-            _strategist,
-            _rewards,
-            _keeper,
-            _pid,
-            _curvePool,
-            _name
-        );
-
-        emit Cloned(newStrategy);
-    }
-
-    // this will only be called by the clone function above
-    function initialize(
-        address _vault,
-        address _strategist,
-        address _rewards,
-        address _keeper,
-        uint256 _pid,
-        address _curvePool,
-        string memory _name
-    ) public {
-        _initialize(_vault, _strategist, _rewards, _keeper);
-        _initializeStrat(_pid, _curvePool, _name);
-    }
 
     // this is called by our original strategy, as well as any clones
     function _initializeStrat(
