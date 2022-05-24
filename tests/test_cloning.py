@@ -98,7 +98,7 @@ def test_cloning(
     print("\nAssets Staked: ", rewardsContract.balanceOf(newStrategy) / 1e18)
 
     # simulate some earnings
-    chain.sleep(sleep_time)
+    chain.sleep(86400)
     chain.mine(1)
 
     # harvest after a day, store new asset amount
@@ -112,7 +112,7 @@ def test_cloning(
     print(
         "\nEstimated APR: ",
         "{:.2%}".format(
-            ((new_assets_dai - old_assets_dai) * (365 * (86400 / sleep_time)))
+            ((new_assets_dai - old_assets_dai) * (365))
             / (newStrategy.estimatedTotalAssets())
         ),
     )

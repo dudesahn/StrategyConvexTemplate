@@ -103,6 +103,8 @@ def test_emergency_exit_with_no_gain_or_loss(
     voter,
     cvxDeposit,
     amount,
+    booster,
+    pid,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -120,9 +122,10 @@ def test_emergency_exit_with_no_gain_or_loss(
     cvxDeposit.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
 
-    # have our whale send in exactly our debtOutstanding
-    whale_to_give = vault.debtOutstanding(strategy)
-    token.transfer(strategy, whale_to_give, {"from": whale})
+    # gov sends it back, glad someone was watching!
+    booster.withdrawAll(pid, {"from": gov})
+    token.transfer(strategy, to_send, {"from": gov})
+    assert strategy.estimatedTotalAssets() > 0
 
     # set emergency and exit, then confirm that the strategy has no funds
     strategy.setEmergencyExit({"from": gov})
@@ -138,7 +141,7 @@ def test_emergency_exit_with_no_gain_or_loss(
 
     # withdraw and confirm we made money, accounting for all of the funds we lost lol
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) + amount + whale_to_give >= startingWhale
+    assert token.balanceOf(whale) + amount >= startingWhale
 
 
 def test_emergency_withdraw_method_0(
@@ -175,6 +178,10 @@ def test_emergency_withdraw_method_0(
     strategy.withdrawToConvexDepositTokens({"from": gov})
     # turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
+
+    # our whale donates 1 wei to the vault so we don't divide by zero (0.3.5 vault errors in vault._reportLoss)
+    token.transfer(strategy, 1, {"from": whale})
+
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
@@ -221,6 +228,10 @@ def test_emergency_withdraw_method_1(
     strategy.withdrawToConvexDepositTokens({"from": gov})
     # turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
+
+    # our whale donates 1 wei to the vault so we don't divide by zero (0.3.5 vault errors in vault._reportLoss)
+    token.transfer(strategy, 1, {"from": whale})
+
     chain.sleep(1)
     strategy.harvest({"from": gov})
     assert strategy.estimatedTotalAssets() == 0

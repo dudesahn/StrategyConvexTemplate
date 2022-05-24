@@ -43,7 +43,7 @@ chain_used = 1
 # If testing a Convex strategy, set this equal to your PID
 @pytest.fixture(scope="module")
 def pid():
-    pid = 40  # mim 40, FRAX 32
+    pid = 32  # mim 40, FRAX 32
     yield pid
 
 
@@ -59,7 +59,7 @@ def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     # MIM 0xe896e539e557BC751860a7763C8dD589aF1698Ce, FRAX 0xA86e412109f77c45a3BC1c5870b880492Fb86A14
-    whale = accounts.at("0xe896e539e557BC751860a7763C8dD589aF1698Ce", force=True)
+    whale = accounts.at("0xA86e412109f77c45a3BC1c5870b880492Fb86A14", force=True)
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -84,7 +84,7 @@ def rewards_token():  # OGN 0x8207c1FfC5B6804F6024322CcF34F29c3541Ae26, SPELL 0x
 # this is whether our pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
 @pytest.fixture(scope="module")
 def has_rewards():
-    has_rewards = True
+    has_rewards = False  # MIM True, FRAX False
     yield has_rewards
 
 
@@ -266,7 +266,7 @@ if chain_used == 1:  # mainnet
     # use this if your vault is already deployed
     @pytest.fixture(scope="function")
     def vault(pm, gov, rewards, guardian, management, token, chain):
-        vault = Contract("0x2DfB14E32e2F8156ec15a2c21c3A6c053af52Be8")
+        vault = Contract("0xB4AdA607B9d6b2c9Ee07A275e9616B84AC560139")
         # MIM 0x2DfB14E32e2F8156ec15a2c21c3A6c053af52Be8
         # FRAX 0xB4AdA607B9d6b2c9Ee07A275e9616B84AC560139
         yield vault

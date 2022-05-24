@@ -187,7 +187,7 @@ def test_withdraw_after_donation_3(
     token.transfer(strategy, donation, {"from": whale})
 
     # have our whale withdraws more than his donation, ensuring we pull from strategy
-    withdrawal = donation + amount / 2
+    withdrawal = donation + amount / 4
 
     # convert since our PPS isn't 1 (live vault!)
     withdrawal_in_shares = withdrawal * 1e18 / vault.pricePerShare()
@@ -267,7 +267,7 @@ def test_withdraw_after_donation_4(
     token.transfer(strategy, donation, {"from": whale})
 
     # have our whale withdraws more than his donation, ensuring we pull from strategy
-    withdrawal = donation + amount / 2
+    withdrawal = donation + amount / 4
 
     # convert since our PPS isn't 1 (live vault!)
     withdrawal_in_shares = withdrawal * 1e18 / vault.pricePerShare()
@@ -346,7 +346,7 @@ def test_withdraw_after_donation_5(
     token.transfer(strategy, donation, {"from": whale})
 
     # have our whale withdraws more than his donation, ensuring we pull from strategy
-    withdrawal = donation + amount / 2
+    withdrawal = donation + amount / 4
 
     # convert since our PPS isn't 1 (live vault!)
     withdrawal_in_shares = withdrawal * 1e18 / vault.pricePerShare()
@@ -499,7 +499,7 @@ def test_withdraw_after_donation_7(
     token.transfer(strategy, donation, {"from": whale})
 
     # have our whale withdraws more than his donation, ensuring we pull from strategy
-    withdrawal = donation + amount / 2
+    withdrawal = donation + amount / 4
 
     # convert since our PPS isn't 1 (live vault!)
     withdrawal_in_shares = withdrawal * 1e18 / vault.pricePerShare()
@@ -559,7 +559,7 @@ def test_withdraw_after_donation_7(
         assert new_params["totalLoss"] == prev_params["totalLoss"]
 
 
-# lower debtRatio to 0, donate, withdraw more than the donation, then harvest
+# lower debtRatio to 0, donate, withdraw less than the donation, then harvest
 def test_withdraw_after_donation_8(
     gov,
     token,
@@ -591,7 +591,7 @@ def test_withdraw_after_donation_8(
     donation = amount / 2
     token.transfer(strategy, donation, {"from": whale})
 
-    # have our whale withdraws more than his donation, ensuring we pull from strategy
+    # have our whale withdraws less than his donation
     withdrawal = donation / 2
 
     # convert since our PPS isn't 1 (live vault!)
