@@ -61,17 +61,17 @@ def test_cloning(
     # revoke to send all funds back to vault
     vault.revokeStrategy(strategy, {"from": gov})
 
-    # attach our new strategy
-    vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
-    assert vault.withdrawalQueue(1) == newStrategy
+    # attach our new strategy, may need to adjust queue numbers if live vault
+    vault.addStrategy(newStrategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
+    assert vault.withdrawalQueue(2) == newStrategy
     assert vault.strategies(newStrategy)[2] == 10_000
-    assert vault.withdrawalQueue(0) == strategy
+    assert vault.withdrawalQueue(1) == strategy
     assert vault.strategies(strategy)["debtRatio"] == 0
 
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount

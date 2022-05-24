@@ -29,7 +29,7 @@ def tenderly_fork(web3, chain):
 # put our pool's convex pid here; this is the only thing that should need to change up here **************
 @pytest.fixture(scope="module")
 def pid():
-    pid = 29
+    pid = 24  # IB 29, Aave 24
     yield pid
 
 
@@ -38,8 +38,9 @@ def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0x1a6525E4a4aB2E3aEa7ED3CF813e8ed07fA3446D", force=True  # IB 0x1a6525E4a4aB2E3aEa7ED3CF813e8ed07fA3446D
-    )  # 0x310D5C8EE1512D5092ee4377061aE82E48973689 for Aave
+        "0xa14B5A062f7a11c258f49c75A5D396BA77d50364",
+        force=True,  # IB 0x1a6525E4a4aB2E3aEa7ED3CF813e8ed07fA3446D
+    )  # 0xa14B5A062f7a11c258f49c75A5D396BA77d50364 for Aave
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -77,8 +78,9 @@ def sleep_time():
 # curve deposit pool, for old curve pools set this manually
 @pytest.fixture(scope="module")
 def pool():
-    poolAddress = Contract("0x2dded6Da1BF5DBdF597C45fcFaa3194e53EcfeAF")
+    poolAddress = Contract("0xDeBF20617708857ebe4F679508E7b7863a8A8EeE")
     # IB 0x2dded6Da1BF5DBdF597C45fcFaa3194e53EcfeAF
+    # Aave 0xDeBF20617708857ebe4F679508E7b7863a8A8EeE
     yield poolAddress
 
 
@@ -233,7 +235,9 @@ def strategist(accounts):
 # use this if your vault is already deployed
 @pytest.fixture(scope="function")
 def vault(pm, gov, rewards, guardian, management, token, chain):
-    vault = Contract("0x27b7b1ad7288079A66d12350c828D3C00A6F07d7")
+    vault = Contract("0x39CAF13a104FF567f71fd2A4c68C026FDB6E740B")
+    # Iron Bank 0x27b7b1ad7288079A66d12350c828D3C00A6F07d7
+    # Aave 0x39CAF13a104FF567f71fd2A4c68C026FDB6E740B
     yield vault
 
 
@@ -266,14 +270,31 @@ def strategy(
         strategy_name,
     )
     strategy.setKeeper(keeper, {"from": gov})
+
     # set our management fee to zero so it doesn't mess with our profit checking
     vault.setManagementFee(0, {"from": gov})
-    # add our new strategy
-    old_strategy = vault.withdrawalQueue(1)
+
+    # we will be migrating on our live vault instead of adding it directly
+    old_strategy = Contract(vault.withdrawalQueue(1))
     vault.migrateStrategy(old_strategy, strategy, {"from": gov})
+    strategy.setHealthCheck(healthCheck, {"from": gov})
+    strategy.setDoHealthCheck(True, {"from": gov})
+    vault.updateStrategyDebtRatio(strategy, 10000, {"from": gov})
 
     # earmark rewards if we are using a convex strategy
     booster.earmarkRewards(pid, {"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    # make all harvests permissive unless we change the value lower
+    gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})
+
+    # set up custom params and setters
+    strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
+    strategy.setMaxReportDelay(86400 * 21)
+
+    # harvest to send our funds into the strategy and fix any triggers already true
+    strategy.harvest({"from": gov})
     chain.sleep(1)
     chain.mine(1)
 
