@@ -44,7 +44,7 @@ def test_withdraw_after_donation_1(
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
-    strategy.harvest({"from": gov})
+    tx = strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy)
 
     # sleep 10 hours to increase our credit available for last assert at the bottom.
@@ -54,11 +54,9 @@ def test_withdraw_after_donation_1(
 
     # specifically check that our gain is greater than our donation or at least no more than 10 wei if we get slippage on deposit/withdrawal
     if is_slippery and no_profit:
-        assert math.isclose(
-            new_params["totalGain"] - prev_params["totalGain"], donation, abs_tol=10
-        )
+        assert math.isclose(profit, donation, abs_tol=10) or profit >= donation
     else:
-        assert new_params["totalGain"] - prev_params["totalGain"] >= donation
+        assert profit >= donation
         assert profit >= 0
 
     # check that we didn't add any more loss, or at least no more than 10 wei if we get slippage on deposit/withdrawal
@@ -130,11 +128,9 @@ def test_withdraw_after_donation_2(
 
     # specifically check that our gain is greater than our donation or at least no more than 10 wei if we get slippage on deposit/withdrawal
     if is_slippery and no_profit:
-        assert math.isclose(
-            new_params["totalGain"] - prev_params["totalGain"], donation, abs_tol=10
-        )
+        assert math.isclose(profit, donation, abs_tol=10) or profit >= donation
     else:
-        assert new_params["totalGain"] - prev_params["totalGain"] >= donation
+        assert profit >= donation
         assert profit >= 0
 
     # check that we didn't add any more loss, or at least no more than 10 wei if we get slippage on deposit/withdrawal
@@ -210,11 +206,9 @@ def test_withdraw_after_donation_3(
 
     # specifically check that our gain is greater than our donation or at least no more than 10 wei if we get slippage on deposit/withdrawal
     if is_slippery and no_profit:
-        assert math.isclose(
-            new_params["totalGain"] - prev_params["totalGain"], donation, abs_tol=10
-        )
+        assert math.isclose(profit, donation, abs_tol=10) or profit >= donation
     else:
-        assert new_params["totalGain"] - prev_params["totalGain"] >= donation
+        assert profit >= donation
         assert profit >= 0
 
     # check that we didn't add any more loss, or at least no more than 10 wei if we get slippage on deposit/withdrawal
@@ -290,11 +284,9 @@ def test_withdraw_after_donation_4(
 
     # specifically check that our gain is greater than our donation or at least no more than 10 wei if we get slippage on deposit/withdrawal
     if is_slippery and no_profit:
-        assert math.isclose(
-            new_params["totalGain"] - prev_params["totalGain"], donation, abs_tol=10
-        )
+        assert math.isclose(profit, donation, abs_tol=10) or profit >= donation
     else:
-        assert new_params["totalGain"] - prev_params["totalGain"] >= donation
+        assert profit >= donation
         assert profit >= 0
 
     # check that we didn't add any more loss, or at least no more than 10 wei if we get slippage on deposit/withdrawal
@@ -369,11 +361,9 @@ def test_withdraw_after_donation_5(
 
     # specifically check that our gain is greater than our donation or at least no more than 10 wei if we get slippage on deposit/withdrawal
     if is_slippery and no_profit:
-        assert math.isclose(
-            new_params["totalGain"] - prev_params["totalGain"], donation, abs_tol=10
-        )
+        assert math.isclose(profit, donation, abs_tol=10) or profit >= donation
     else:
-        assert new_params["totalGain"] - prev_params["totalGain"] >= donation
+        assert profit >= donation
         assert profit >= 0
 
     # check that we didn't add any more loss, or at least no more than 10 wei if we get slippage on deposit/withdrawal
@@ -441,11 +431,9 @@ def test_withdraw_after_donation_6(
 
     # specifically check that our gain is greater than our donation or at least no more than 10 wei if we get slippage on deposit/withdrawal
     if is_slippery and no_profit:
-        assert math.isclose(
-            new_params["totalGain"] - prev_params["totalGain"], donation, abs_tol=10
-        )
+        assert math.isclose(profit, donation, abs_tol=10) or profit >= donation
     else:
-        assert new_params["totalGain"] - prev_params["totalGain"] >= donation
+        assert profit >= donation
         assert profit >= 0
 
     # check that we didn't add any more loss, or at least no more than 10 wei if we get slippage on deposit/withdrawal
@@ -523,8 +511,11 @@ def test_withdraw_after_donation_7(
 
     # assert that our total assets have gone up or stayed the same when accounting for the donation and withdrawal, or that we're close if we have no yield and a funky token
     if is_slippery and no_profit:
-        assert math.isclose(
-            donation - withdrawal + prev_assets, current_assets, abs_tol=10
+        assert (
+            math.isclose(
+                donation - withdrawal + prev_assets, current_assets, abs_tol=10
+            )
+            or current_assets >= donation - withdrawal + prev_assets
         )
     else:
         assert current_assets >= donation - withdrawal + prev_assets
@@ -543,11 +534,9 @@ def test_withdraw_after_donation_7(
 
     # specifically check that our gain is greater than our donation or at least no more than 10 wei if we get slippage on deposit/withdrawal
     if is_slippery and no_profit:
-        assert math.isclose(
-            new_params["totalGain"] - prev_params["totalGain"], donation, abs_tol=10
-        )
+        assert math.isclose(profit, donation, abs_tol=10) or profit >= donation
     else:
-        assert new_params["totalGain"] - prev_params["totalGain"] >= donation
+        assert profit >= donation
         assert profit >= 0
 
     # check that we didn't add any more loss, or at least no more than 10 wei if we get slippage on deposit/withdrawal
@@ -616,8 +605,11 @@ def test_withdraw_after_donation_8(
 
     # assert that our total assets have gone up or stayed the same when accounting for the donation and withdrawal, or that we're close if we have no yield and a funky token
     if is_slippery and no_profit:
-        assert math.isclose(
-            donation - withdrawal + prev_assets, current_assets, abs_tol=10
+        assert (
+            math.isclose(
+                donation - withdrawal + prev_assets, current_assets, abs_tol=10
+            )
+            or current_assets >= donation - withdrawal + prev_assets
         )
     else:
         assert current_assets >= donation - withdrawal + prev_assets
@@ -636,11 +628,9 @@ def test_withdraw_after_donation_8(
 
     # specifically check that our gain is greater than our donation or at least no more than 10 wei if we get slippage on deposit/withdrawal
     if is_slippery and no_profit:
-        assert math.isclose(
-            new_params["totalGain"] - prev_params["totalGain"], donation, abs_tol=10
-        )
+        assert math.isclose(profit, donation, abs_tol=10) or profit >= donation
     else:
-        assert new_params["totalGain"] - prev_params["totalGain"] >= donation
+        assert profit >= donation
         assert profit >= 0
 
     # check that we didn't add any more loss, or at least no more than 10 wei if we get slippage on deposit/withdrawal

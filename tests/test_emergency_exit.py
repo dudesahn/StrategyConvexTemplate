@@ -45,7 +45,10 @@ def test_emergency_exit(
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
     if is_slippery and no_profit:
-        assert math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
+        assert (
+            math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
+            or token.balanceOf(whale) >= startingWhale
+        )
     else:
         assert token.balanceOf(whale) >= startingWhale
 
@@ -96,8 +99,9 @@ def test_emergency_exit_with_profit(
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
     if is_slippery and no_profit:
-        assert math.isclose(
-            token.balanceOf(whale) + donation, startingWhale, abs_tol=10
+        assert (
+            math.isclose(token.balanceOf(whale) + donation, startingWhale, abs_tol=10)
+            or token.balanceOf(whale) + donation >= startingWhale
         )
     else:
         assert token.balanceOf(whale) + donation >= startingWhale
