@@ -50,11 +50,11 @@ def test_update_to_zero_then_back(
     strategy.harvest({"from": gov})
 
     # attach our new strategy and approve it on the proxy
-    vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(newStrategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 
-    assert vault.withdrawalQueue(1) == newStrategy
+    assert vault.withdrawalQueue(2) == newStrategy
     assert vault.strategies(newStrategy)[2] == 10_000
-    assert vault.withdrawalQueue(0) == strategy
+    assert vault.withdrawalQueue(1) == strategy
     assert vault.strategies(strategy)["debtRatio"] == 0
 
     # setup our rewards on our new stategy
@@ -63,7 +63,7 @@ def test_update_to_zero_then_back(
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
@@ -241,20 +241,20 @@ def test_update_from_zero_to_off(
     strategy.harvest({"from": gov})
 
     # attach our new strategy and approve it on the proxy
-    vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(newStrategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 
     # setup our rewards on our new stategy
     newStrategy.updateRewards(True, 0, {"from": gov})
 
-    assert vault.withdrawalQueue(1) == newStrategy
+    assert vault.withdrawalQueue(2) == newStrategy
     assert vault.strategies(newStrategy)[2] == 10_000
-    assert vault.withdrawalQueue(0) == strategy
+    assert vault.withdrawalQueue(1) == strategy
     assert vault.strategies(strategy)["debtRatio"] == 0
 
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
@@ -427,7 +427,7 @@ def test_change_rewards(
     strategy.harvest({"from": gov})
 
     # attach our new strategy and approve it on the proxy
-    vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(newStrategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 
     # setup our rewards on our new stategy
     newStrategy.updateRewards(True, 0, {"from": gov})
@@ -435,7 +435,7 @@ def test_change_rewards(
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
@@ -496,11 +496,12 @@ def test_check_rewards(
         return
 
     # check if our strategy has extra rewards
-    rewards_token = Contract(strategy.rewardsToken())
-    print("\nThis is our rewards token:", rewards_token.name())
+    rewards_token = strategy.rewardsToken()
 
     # if we're supposed to have a rewards token, make sure it's not CVX
     if has_rewards:
+        rewards_token = Contract(strategy.rewardsToken())
+        print("\nThis is our rewards token:", rewards_token.name())
         assert convexToken != rewards_token
     else:
         assert zero_address == rewards_token
@@ -527,7 +528,7 @@ def test_weird_amounts(
         return
 
     ## deposit to the vault after approving
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     strategy.harvest({"from": gov})
 
@@ -595,7 +596,7 @@ def test_more_rewards_stuff(
         return
 
     ## deposit to the vault after approving
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     strategy.harvest({"from": gov})
 

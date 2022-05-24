@@ -43,7 +43,7 @@ chain_used = 1
 # If testing a Convex strategy, set this equal to your PID
 @pytest.fixture(scope="module")
 def pid():
-    pid = 40  # mim 40, OUSD 56
+    pid = 40  # mim 40, FRAX 32
     yield pid
 
 
@@ -58,7 +58,7 @@ def amount():
 def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    # MIM 0xe896e539e557BC751860a7763C8dD589aF1698Ce, OUSD 0x89eBCb7714bd0D2F33ce3a35C12dBEB7b94af169
+    # MIM 0xe896e539e557BC751860a7763C8dD589aF1698Ce, FRAX 0xA86e412109f77c45a3BC1c5870b880492Fb86A14
     whale = accounts.at("0xe896e539e557BC751860a7763C8dD589aF1698Ce", force=True)
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
@@ -253,14 +253,22 @@ if chain_used == 1:  # mainnet
         yield accounts.at("0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7", force=True)
 
     # use this if you need to deploy the vault
+    #     @pytest.fixture(scope="function")
+    #     def vault(pm, gov, rewards, guardian, management, token, chain):
+    #         Vault = pm(config["dependencies"][0]).Vault
+    #         vault = guardian.deploy(Vault)
+    #         vault.initialize(token, gov, rewards, "", "", guardian)
+    #         vault.setDepositLimit(2**256 - 1, {"from": gov})
+    #         vault.setManagement(management, {"from": gov})
+    #         chain.sleep(1)
+    #         yield vault
+
+    # use this if your vault is already deployed
     @pytest.fixture(scope="function")
     def vault(pm, gov, rewards, guardian, management, token, chain):
-        Vault = pm(config["dependencies"][0]).Vault
-        vault = guardian.deploy(Vault)
-        vault.initialize(token, gov, rewards, "", "", guardian)
-        vault.setDepositLimit(2**256 - 1, {"from": gov})
-        vault.setManagement(management, {"from": gov})
-        chain.sleep(1)
+        vault = Contract("0x2DfB14E32e2F8156ec15a2c21c3A6c053af52Be8")
+        # MIM 0x2DfB14E32e2F8156ec15a2c21c3A6c053af52Be8
+        # FRAX 0xB4AdA607B9d6b2c9Ee07A275e9616B84AC560139
         yield vault
 
     # replace the first value with the name of your strategy
@@ -293,28 +301,40 @@ if chain_used == 1:  # mainnet
             strategy_name,
         )
         strategy.setKeeper(keeper, {"from": gov})
+
         # set our management fee to zero so it doesn't mess with our profit checking
         vault.setManagementFee(0, {"from": gov})
-        # add our new strategy
-        vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
+
+        # we will be migrating on our live vault instead of adding it directly
+        old_strategy = Contract(vault.withdrawalQueue(1))
+        vault.migrateStrategy(old_strategy, strategy, {"from": gov})
         strategy.setHealthCheck(healthCheck, {"from": gov})
         strategy.setDoHealthCheck(True, {"from": gov})
-
-        # make all harvests permissive unless we change the value lower
-        gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})
+        vault.updateStrategyDebtRatio(strategy, 10000, {"from": gov})
 
         # earmark rewards if we are using a convex strategy
         booster.earmarkRewards(pid, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
 
-        # for MIM we use index 0
-        strategy.updateRewards(True, 0, {"from": gov})
+        # make all harvests permissive unless we change the value lower
+        gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})
 
         # set up custom params and setters
         strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
         strategy.setMaxReportDelay(86400 * 21)
+
+        # harvest to send our funds into the strategy and fix any triggers already true
+        strategy.harvest({"from": gov})
+        chain.sleep(1)
+        chain.mine(1)
+
+        # for MIM we use index 0
+        if pid == 40:
+            strategy.updateRewards(True, 0, {"from": gov})
+
         yield strategy
+
 
 elif chain_used == 250:  # only fantom so far and convex doesn't exist there
 
@@ -402,13 +422,6 @@ elif chain_used == 250:  # only fantom so far and convex doesn't exist there
 # @pytest.fixture(scope="module")
 # def LiveStrategy_1():
 #     yield Contract("0xC1810aa7F733269C39D640f240555d0A4ebF4264")
-
-
-# use this if your vault is already deployed
-# @pytest.fixture(scope="function")
-# def vault(pm, gov, rewards, guardian, management, token, chain):
-#     vault = Contract("0x497590d2d57f05cf8B42A36062fA53eBAe283498")
-#     yield vault
 
 
 # use this if your strategy is already deployed
