@@ -43,14 +43,14 @@ chain_used = 1
 # If testing a Convex strategy, set this equal to your PID
 @pytest.fixture(scope="module")
 def pid():
-    pid = 25  # stETH 25, alETH 49
+    pid = 49  # sETH 23, alETH 49, ankrETH 27
     yield pid
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 100e18 # stETH 100e18, alETH 20e18
+    amount = 20e18  # sETH 100e18, alETH 20e18, ankrETH 12e18
     yield amount
 
 
@@ -58,9 +58,10 @@ def amount():
 def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    # stETH 0x56c915758Ad3f76Fd287FFF7563ee313142Fb663
-    # alETH 0x3da4b6ff177122c30CE8F0236709232289D31DF1
-    whale = accounts.at("0x56c915758Ad3f76Fd287FFF7563ee313142Fb663", force=True)
+    # sETH 0x781814773609D820aB3FFF2f21624d93E9B4784A
+    # alETH 0xAB8e74017a8Cc7c15FFcCd726603790d26d7DeCa
+    # ankrETH 0x7A791a73eAE3CCE350a2b4A34E3231D151D09D72
+    whale = accounts.at("0xAB8e74017a8Cc7c15FFcCd726603790d26d7DeCa", force=True)
     if token.balanceOf(whale) < 2 * amount:
         print("Token address:", token.address, "Whale:", whale)
         raise ValueError(
@@ -72,7 +73,7 @@ def whale(accounts, amount, token):
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexstETH" # StrategyConvexstETH, StrategyConvexalETH
+    strategy_name = "StrategyConvexstETH"  # StrategyConvexstETH, StrategyConvexalETH
     yield strategy_name
 
 
@@ -86,7 +87,7 @@ def rewards_token():  # LDO 0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32
 # this is whether our pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
 @pytest.fixture(scope="module")
 def has_rewards():
-    has_rewards = True # stETH true, alETH false
+    has_rewards = False  # stETH true, alETH false
     yield has_rewards
 
 
@@ -255,14 +256,23 @@ if chain_used == 1:  # mainnet
         yield accounts.at("0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7", force=True)
 
     # use this if you need to deploy the vault
+    #     @pytest.fixture(scope="function")
+    #     def vault(pm, gov, rewards, guardian, management, token, chain):
+    #         Vault = pm(config["dependencies"][0]).Vault
+    #         vault = guardian.deploy(Vault)
+    #         vault.initialize(token, gov, rewards, "", "", guardian)
+    #         vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
+    #         vault.setManagement(management, {"from": gov})
+    #         chain.sleep(1)
+    #         yield vault
+
+    # use this if your vault is already deployed
     @pytest.fixture(scope="function")
     def vault(pm, gov, rewards, guardian, management, token, chain):
-        Vault = pm(config["dependencies"][0]).Vault
-        vault = guardian.deploy(Vault)
-        vault.initialize(token, gov, rewards, "", "", guardian)
-        vault.setDepositLimit(2**256 - 1, {"from": gov})
-        vault.setManagement(management, {"from": gov})
-        chain.sleep(1)
+        vault = Contract("0x718AbE90777F5B778B52D553a5aBaa148DD0dc5D")
+        # sETH 0x986b4AFF588a109c09B50A03f42E4110E29D353F
+        # alETH 0x718AbE90777F5B778B52D553a5aBaa148DD0dc5D
+        # ankrETH 0x132d8D2C76Db3812403431fAcB00F3453Fc42125
         yield vault
 
     # replace the first value with the name of your strategy
@@ -296,29 +306,35 @@ if chain_used == 1:  # mainnet
             strategy_name,
         )
         strategy.setKeeper(keeper, {"from": gov})
+
         # set our management fee to zero so it doesn't mess with our profit checking
         vault.setManagementFee(0, {"from": gov})
-        # add our new strategy
-        vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
+
+        # we will be migrating on our live vault instead of adding it directly
+        old_strategy = Contract(vault.withdrawalQueue(1))
+        vault.migrateStrategy(old_strategy, strategy, {"from": gov})
         strategy.setHealthCheck(healthCheck, {"from": gov})
         strategy.setDoHealthCheck(True, {"from": gov})
-
-        # make all harvests permissive unless we change the value lower
-        gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})
+        vault.updateStrategyDebtRatio(strategy, 10000, {"from": gov})
 
         # earmark rewards if we are using a convex strategy
         booster.earmarkRewards(pid, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
 
-        # for stETH we use index 0, but only turn this on if we have rewards (stETH)
-        if has_rewards:
-            strategy.updateRewards(True, 0, {"from": gov})
+        # make all harvests permissive unless we change the value lower
+        gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})
 
         # set up custom params and setters
         strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
         strategy.setMaxReportDelay(86400 * 21)
+
+        # harvest to send our funds into the strategy and fix any triggers already true
+        strategy.harvest({"from": gov})
+        chain.sleep(1)
+        chain.mine(1)
         yield strategy
+
 
 elif chain_used == 250:  # only fantom so far and convex doesn't exist there
 
