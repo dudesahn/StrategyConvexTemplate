@@ -254,6 +254,8 @@ def test_odds_and_ends_liquidatePosition(
     voter,
     rewardsContract,
     amount,
+    is_slippery,
+    no_profit,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -286,6 +288,7 @@ def test_odds_and_ends_liquidatePosition(
     strategy.harvest({"from": gov})
     chain.sleep(1)
     new_assets = vault.totalAssets()
+
     # confirm we made money, or at least that we have about the same
     assert new_assets >= old_assets or math.isclose(new_assets, old_assets, abs_tol=5)
     print("\nAssets after 7 days: ", new_assets / 1e18)
@@ -307,9 +310,10 @@ def test_odds_and_ends_liquidatePosition(
 
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) + amount >= startingWhale or math.isclose(
-        token.balanceOf(whale), startingWhale, abs_tol=5
-    )
+    if is_slippery and no_profit:
+        assert math.isclose(token.balanceOf(whale) + amount, startingWhale, abs_tol=10)
+    else:
+        assert token.balanceOf(whale) + amount >= startingWhale
 
 
 def test_odds_and_ends_rekt(
@@ -475,6 +479,9 @@ def test_odds_and_ends_empty_strat(
     assert strategy.estimatedTotalAssets() == 0
     assert strategy.claimableBalance() > 0
 
+    # our whale donates 1 wei to the vault so we don't divide by zero (0.3.5 vault errors in vault._reportLoss)
+    token.transfer(strategy, 1, {"from": whale})
+
     # harvest to check that it works okay, turn off health check since we'll have profit without assets lol
     chain.sleep(1)
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -495,6 +502,8 @@ def test_odds_and_ends_no_profit(
     cvxDeposit,
     amount,
     sleep_time,
+    is_slippery,
+    no_profit,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -524,7 +533,10 @@ def test_odds_and_ends_no_profit(
 
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) >= startingWhale
+    if is_slippery and no_profit:
+        assert math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
+    else:
+        assert token.balanceOf(whale) >= startingWhale
 
 
 # this test makes sure we can use keepCVX

@@ -50,7 +50,7 @@ def pid():
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 35_000e18
+    amount = 35_000e18  # same amount for both
     yield amount
 
 

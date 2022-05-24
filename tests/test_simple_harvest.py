@@ -18,6 +18,8 @@ def test_simple_harvest(
     rewardsContract,
     amount,
     sleep_time,
+    is_slippery,
+    no_profit,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -135,4 +137,7 @@ def test_simple_harvest(
 
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) >= startingWhale
+    if is_slippery and no_profit:
+        assert math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
+    else:
+        assert token.balanceOf(whale) >= startingWhale
