@@ -43,14 +43,14 @@ chain_used = 1
 # If testing a Convex strategy, set this equal to your PID
 @pytest.fixture(scope="module")
 def pid():
-    pid = 49  # sETH 23, alETH 49, ankrETH 27
+    pid = 27  # sETH 23, alETH 49, ankrETH 27
     yield pid
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 20e18  # sETH 100e18, alETH 20e18, ankrETH 12e18
+    amount = 12e18  # sETH 100e18, alETH 20e18, ankrETH 12e18
     yield amount
 
 
@@ -61,13 +61,23 @@ def whale(accounts, amount, token):
     # sETH 0x781814773609D820aB3FFF2f21624d93E9B4784A
     # alETH 0xAB8e74017a8Cc7c15FFcCd726603790d26d7DeCa
     # ankrETH 0x7A791a73eAE3CCE350a2b4A34E3231D151D09D72
-    whale = accounts.at("0xAB8e74017a8Cc7c15FFcCd726603790d26d7DeCa", force=True)
+    whale = accounts.at("0x7A791a73eAE3CCE350a2b4A34E3231D151D09D72", force=True)
     if token.balanceOf(whale) < 2 * amount:
         print("Token address:", token.address, "Whale:", whale)
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
         )
     yield whale
+
+
+# use this if your vault is already deployed
+@pytest.fixture(scope="function")
+def vault_address():
+    vault_address = "0x132d8D2C76Db3812403431fAcB00F3453Fc42125"
+    # sETH 0x986b4AFF588a109c09B50A03f42E4110E29D353F
+    # alETH 0x718AbE90777F5B778B52D553a5aBaa148DD0dc5D
+    # ankrETH 0x132d8D2C76Db3812403431fAcB00F3453Fc42125
+    yield vault_address
 
 
 # this is the name we want to give our strategy
@@ -87,7 +97,7 @@ def rewards_token():  # LDO 0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32
 # this is whether our pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
 @pytest.fixture(scope="module")
 def has_rewards():
-    has_rewards = False  # stETH true, alETH false
+    has_rewards = False  # all false for this one
     yield has_rewards
 
 
@@ -108,14 +118,14 @@ def is_curve():
 # use this when we might lose a few wei on conversions between want and another deposit token
 @pytest.fixture(scope="module")
 def is_slippery():
-    is_slippery = False
+    is_slippery = True
     yield is_slippery
 
 
 # use this to test our strategy in case there are no profits
 @pytest.fixture(scope="module")
 def no_profit():
-    no_profit = False
+    no_profit = True
     yield no_profit
 
 
@@ -268,11 +278,8 @@ if chain_used == 1:  # mainnet
 
     # use this if your vault is already deployed
     @pytest.fixture(scope="function")
-    def vault(pm, gov, rewards, guardian, management, token, chain):
-        vault = Contract("0x718AbE90777F5B778B52D553a5aBaa148DD0dc5D")
-        # sETH 0x986b4AFF588a109c09B50A03f42E4110E29D353F
-        # alETH 0x718AbE90777F5B778B52D553a5aBaa148DD0dc5D
-        # ankrETH 0x132d8D2C76Db3812403431fAcB00F3453Fc42125
+    def vault(pm, gov, rewards, guardian, management, token, chain, vault_address):
+        vault = Contract(vault_address)
         yield vault
 
     # replace the first value with the name of your strategy

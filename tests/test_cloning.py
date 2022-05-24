@@ -1,5 +1,6 @@
 import brownie
 from brownie import Wei, accounts, Contract, config
+import math
 
 # test cloning our strategy, make sure the cloned strategy still works just fine by sending funds to it
 def test_cloning(
@@ -20,6 +21,8 @@ def test_cloning(
     strategy_name,
     sleep_time,
     tests_using_tenderly,
+    is_slippery,
+    no_profit,
 ):
     # tenderly doesn't work for "with brownie.reverts"
     if tests_using_tenderly:
@@ -74,7 +77,13 @@ def test_cloning(
                 {"from": gov},
             )
 
+    # revoke and get funds back into vault
     vault.revokeStrategy(strategy, {"from": gov})
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+
+    # attach our new strategy, may need to adjust queue numbers if live vault
     vault.addStrategy(newStrategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
     assert vault.withdrawalQueue(2) == newStrategy
     assert vault.strategies(newStrategy)[2] == 10_000
@@ -97,8 +106,8 @@ def test_cloning(
     print("\nStarting Assets: ", old_assets_dai / 1e18)
     print("\nAssets Staked: ", rewardsContract.balanceOf(newStrategy) / 1e18)
 
-    # simulate some earnings (do this for poorly-yielding strats to make sure we have a profit)
-    chain.sleep(86400)
+    # simulate some earnings
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # harvest after a day, store new asset amount
@@ -112,7 +121,7 @@ def test_cloning(
     print(
         "\nEstimated APR: ",
         "{:.2%}".format(
-            ((new_assets_dai - old_assets_dai) * (365))
+            ((new_assets_dai - old_assets_dai) * (365 * (86400 / sleep_time)))
             / (newStrategy.estimatedTotalAssets())
         ),
     )
@@ -121,7 +130,13 @@ def test_cloning(
     chain.sleep(86400)
     chain.mine(1)
 
-    # withdraw and confirm we made money
+    # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) >= startingWhale
-    assert vault.pricePerShare() > before_pps
+    if is_slippery and no_profit:
+        assert (
+            math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
+            or token.balanceOf(whale) >= startingWhale
+        )
+    else:
+        assert token.balanceOf(whale) >= startingWhale
+    assert vault.pricePerShare() >= before_pps

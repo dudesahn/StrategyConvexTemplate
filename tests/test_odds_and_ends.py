@@ -254,6 +254,8 @@ def test_odds_and_ends_liquidatePosition(
     voter,
     rewardsContract,
     amount,
+    is_slippery,
+    no_profit,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -307,9 +309,13 @@ def test_odds_and_ends_liquidatePosition(
 
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) + amount >= startingWhale or math.isclose(
-        token.balanceOf(whale), startingWhale, abs_tol=5
-    )
+    if is_slippery and no_profit:
+        assert (
+            math.isclose(token.balanceOf(whale) + amount, startingWhale, abs_tol=10)
+            or token.balanceOf(whale) + amount >= startingWhale
+        )
+    else:
+        assert token.balanceOf(whale) + amount >= startingWhale
 
 
 def test_odds_and_ends_rekt(
@@ -445,6 +451,8 @@ def test_odds_and_ends_empty_strat(
     cvxDeposit,
     amount,
     sleep_time,
+    is_slippery,
+    no_profit,
 ):
     ## deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
@@ -467,13 +475,17 @@ def test_odds_and_ends_empty_strat(
     chain.sleep(sleep_time)
 
     # send away all funds so we have profit but no assets. make sure to turn off claimRewards first
-    strategy.setClaimRewards(False)
+    strategy.setClaimRewards(False, {"from": gov})
     strategy.withdrawToConvexDepositTokens({"from": gov})
     to_send = cvxDeposit.balanceOf(strategy)
     print("cvxToken Balance of Strategy", to_send)
     cvxDeposit.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
-    assert strategy.claimableBalance() > 0
+    if not (is_slippery and no_profit):
+        assert strategy.claimableBalance() > 0
+
+    # our whale donates 1 wei to the vault so we don't divide by zero (0.3.5 vault, errors in vault._reportLoss)
+    token.transfer(strategy, 1, {"from": whale})
 
     # harvest to check that it works okay, turn off health check since we'll have profit without assets lol
     chain.sleep(1)
@@ -495,6 +507,8 @@ def test_odds_and_ends_no_profit(
     cvxDeposit,
     amount,
     sleep_time,
+    is_slippery,
+    no_profit,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -510,7 +524,8 @@ def test_odds_and_ends_no_profit(
     tx = strategy.harvest({"from": gov})
     profit = tx.events["Harvested"]["profit"]
     print("Harvest profit:", profit)
-    assert profit > 0
+    if not (is_slippery and no_profit):
+        assert profit > 0
     chain.mine(1)
     chain.sleep(1)
     assert strategy.needsEarmarkReward()
@@ -524,7 +539,13 @@ def test_odds_and_ends_no_profit(
 
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) >= startingWhale
+    if is_slippery and no_profit:
+        assert (
+            math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
+            or token.balanceOf(whale) >= startingWhale
+        )
+    else:
+        assert token.balanceOf(whale) >= startingWhale
 
 
 # this test makes sure we can use keepCVX

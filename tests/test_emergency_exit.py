@@ -12,6 +12,8 @@ def test_emergency_exit(
     strategy,
     chain,
     amount,
+    is_slippery,
+    no_profit,
     sleep_time,
 ):
     ## deposit to the vault after approving
@@ -40,9 +42,15 @@ def test_emergency_exit(
     chain.sleep(86400)
     chain.mine(1)
 
-    # withdraw and confirm we made money
+    # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) >= startingWhale
+    if is_slippery and no_profit:
+        assert (
+            math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
+            or token.balanceOf(whale) >= startingWhale
+        )
+    else:
+        assert token.balanceOf(whale) >= startingWhale
 
 
 # test emergency exit, but with a donation (profit)
@@ -54,6 +62,8 @@ def test_emergency_exit_with_profit(
     strategy,
     chain,
     amount,
+    is_slippery,
+    no_profit,
     sleep_time,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
@@ -73,7 +83,7 @@ def test_emergency_exit_with_profit(
     chain.sleep(1)
 
     # set emergency and exit, then confirm that the strategy has no funds
-    donation = amount
+    donation = amount / 2
     token.transfer(strategy, donation, {"from": whale})
     strategy.setDoHealthCheck(False, {"from": gov})
     strategy.setEmergencyExit({"from": gov})
@@ -86,9 +96,15 @@ def test_emergency_exit_with_profit(
     chain.sleep(86400)
     chain.mine(1)
 
-    # withdraw and confirm we made money
+    # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) + donation >= startingWhale
+    if is_slippery and no_profit:
+        assert (
+            math.isclose(token.balanceOf(whale) + donation, startingWhale, abs_tol=10)
+            or token.balanceOf(whale) + donation >= startingWhale
+        )
+    else:
+        assert token.balanceOf(whale) + donation >= startingWhale
 
 
 # test emergency exit, but after somehow losing all of our assets
@@ -103,6 +119,8 @@ def test_emergency_exit_with_no_gain_or_loss(
     voter,
     cvxDeposit,
     amount,
+    is_slippery,
+    no_profit,
     booster,
     pid,
 ):
@@ -116,7 +134,7 @@ def test_emergency_exit_with_no_gain_or_loss(
     chain.sleep(1)
 
     # send away all funds, will need to alter this based on strategy
-    strategy.withdrawToConvexDepositTokens()
+    strategy.withdrawToConvexDepositTokens({"from": gov})
     to_send = cvxDeposit.balanceOf(strategy)
     print("cvxToken Balance of Strategy", to_send)
     cvxDeposit.transfer(gov, to_send, {"from": strategy})
@@ -139,9 +157,9 @@ def test_emergency_exit_with_no_gain_or_loss(
     chain.sleep(86400)
     chain.mine(1)
 
-    # withdraw and confirm we made money, accounting for all of the funds we lost lol
+    # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) + amount >= startingWhale
+    assert math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
 
 
 def test_emergency_withdraw_method_0(
@@ -165,6 +183,7 @@ def test_emergency_withdraw_method_0(
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
+
     # simulate earnings
     chain.sleep(sleep_time)
     chain.mine(1)
@@ -177,9 +196,8 @@ def test_emergency_withdraw_method_0(
 
     strategy.withdrawToConvexDepositTokens({"from": gov})
 
-    # transfer in 1 wei of want to prevent dividing by zero in reportLoss step
-    whale_to_give = 1
-    token.transfer(strategy, whale_to_give, {"from": whale})
+    # our whale donates 1 wei to the vault so we don't divide by zero (0.3.2 vault, errors in vault._reportLoss)
+    token.transfer(strategy, 1, {"from": whale})
 
     # turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -228,9 +246,8 @@ def test_emergency_withdraw_method_1(
 
     strategy.withdrawToConvexDepositTokens({"from": gov})
 
-    # transfer in 1 wei of want to prevent dividing by zero in reportLoss step
-    whale_to_give = 1
-    token.transfer(strategy, whale_to_give, {"from": whale})
+    # our whale donates 1 wei to the vault so we don't divide by zero (0.3.2 vault, errors in vault._reportLoss)
+    token.transfer(strategy, 1, {"from": whale})
 
     # turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
