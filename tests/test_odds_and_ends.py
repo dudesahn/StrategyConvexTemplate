@@ -30,7 +30,7 @@ def test_odds_and_ends(
     ## deposit to the vault after approving. turn off health check before each harvest since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -50,6 +50,9 @@ def test_odds_and_ends(
     to_send = rewards_token.balanceOf(strategy)
     rewards_token.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
+
+    # our whale donates 1 wei to the vault so we don't divide by zero (0.3.2 vault, errors in vault._reportLoss)
+    token.transfer(strategy, 1, {"from": whale})
 
     chain.sleep(86400)
     chain.mine(1)
@@ -81,7 +84,7 @@ def test_odds_and_ends(
     # harvest to get funds back in strategy
     new_strategy.harvest({"from": gov})
     new_strat_balance = new_strategy.estimatedTotalAssets()
-    assert new_strat_balance >= total_old
+    assert new_strat_balance >= updated_total_old
 
     startingVault = vault.totalAssets()
     print("\nVault starting assets with new strategy: ", startingVault)
@@ -130,7 +133,7 @@ def test_odds_and_ends_2(
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -142,6 +145,9 @@ def test_odds_and_ends_2(
     print("cvxToken Balance of Strategy", to_send)
     cvxDeposit.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
+
+    # our whale donates 1 wei to the vault so we don't divide by zero (0.3.2 vault, errors in vault._reportLoss)
+    token.transfer(strategy, 1, {"from": whale})
 
     strategy.setEmergencyExit({"from": gov})
 
@@ -173,7 +179,7 @@ def test_odds_and_ends_migration(
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -251,7 +257,7 @@ def test_odds_and_ends_liquidatePosition(
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
 
@@ -325,7 +331,7 @@ def test_odds_and_ends_rekt(
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -345,6 +351,9 @@ def test_odds_and_ends_rekt(
     assert strategy.estimatedTotalAssets() == 0
 
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
+
+    # our whale donates 1 wei to the vault so we don't divide by zero (0.3.2 vault, errors in vault._reportLoss)
+    token.transfer(strategy, 1, {"from": whale})
 
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
@@ -373,7 +382,7 @@ def test_odds_and_ends_liquidate_rekt(
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -388,7 +397,8 @@ def test_odds_and_ends_liquidate_rekt(
     strategy.withdrawToConvexDepositTokens({"from": gov})
 
     # we can also withdraw from an empty vault as well, but make sure we're okay with losing 100%
-    vault.withdraw(10e18, whale, 10000, {"from": whale})
+    to_withdraw = 2 ** 256 - 1  # withdraw our full amount
+    vault.withdraw(to_withdraw, whale, 10000, {"from": whale})
 
 
 def test_weird_reverts(
@@ -437,7 +447,7 @@ def test_odds_and_ends_empty_strat(
     sleep_time,
 ):
     ## deposit to the vault after approving
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -488,7 +498,7 @@ def test_odds_and_ends_no_profit(
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -515,3 +525,51 @@ def test_odds_and_ends_no_profit(
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
     assert token.balanceOf(whale) >= startingWhale
+
+
+# this test makes sure we can use keepCVX
+def test_odds_and_ends_keep_cvx(
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    voter,
+    cvxDeposit,
+    amount,
+    sleep_time,
+    convexToken,
+):
+    ## deposit to the vault after approving
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    vault.deposit(amount, {"from": whale})
+    strategy.harvest({"from": gov})
+
+    # sleep for a week to get some profit
+    chain.sleep(86400 * 7)
+    chain.mine(1)
+
+    # take 100% of our CVX to the treasury
+    strategy.setKeep(1000, 10000, {"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+    treasury_before = convexToken.balanceOf(vault.rewards())
+    strategy.harvest({"from": gov})
+    treasury_after = convexToken.balanceOf(vault.rewards())
+    assert treasury_after > treasury_before
+
+    # sleep for a week to get some profit
+    chain.sleep(86400 * 7)
+    chain.mine(1)
+
+    # take 0% of our CVX to the treasury
+    strategy.setKeep(1000, 0, {"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+    treasury_before = convexToken.balanceOf(vault.rewards())
+    strategy.harvest({"from": gov})
+    treasury_after = convexToken.balanceOf(vault.rewards())
+    assert treasury_after == treasury_before

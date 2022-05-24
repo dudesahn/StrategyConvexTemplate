@@ -112,7 +112,7 @@ def test_cloning(
     print(
         "\nEstimated APR: ",
         "{:.2%}".format(
-            ((new_assets_dai - old_assets_dai) * (365 * (86400 / sleep_time)))
+            ((new_assets_dai - old_assets_dai) * (365))
             / (newStrategy.estimatedTotalAssets())
         ),
     )

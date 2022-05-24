@@ -54,7 +54,7 @@ def test_update_to_zero_then_back(
     strategy.harvest({"from": gov})
 
     # attach our new strategy and approve it on the proxy
-    vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(newStrategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 
     assert vault.withdrawalQueue(1) == newStrategy
     assert vault.strategies(newStrategy)[2] == 10_000
@@ -67,7 +67,7 @@ def test_update_to_zero_then_back(
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
@@ -249,7 +249,7 @@ def test_update_from_zero_to_off(
     strategy.harvest({"from": gov})
 
     # attach our new strategy and approve it on the proxy
-    vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(newStrategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 
     # setup our rewards on our new stategy
     newStrategy.updateRewards(True, 0, {"from": gov})
@@ -262,7 +262,7 @@ def test_update_from_zero_to_off(
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
@@ -440,7 +440,7 @@ def test_change_rewards(
     strategy.harvest({"from": gov})
 
     # attach our new strategy and approve it on the proxy
-    vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(newStrategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 
     # setup our rewards on our new stategy
     newStrategy.updateRewards(True, 0, {"from": gov})
@@ -448,7 +448,7 @@ def test_change_rewards(
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
@@ -544,7 +544,7 @@ def test_weird_amounts(
         return
 
     ## deposit to the vault after approving
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     strategy.harvest({"from": gov})
 
@@ -553,7 +553,7 @@ def test_weird_amounts(
     chain.mine(1)
 
     # take 100% of our CRV to the voter
-    strategy.setKeepCRV(10000, {"from": gov})
+    strategy.setKeep(10000, 0, {"from": gov})
     chain.sleep(1)
     chain.mine(1)
     strategy.harvest({"from": gov})
@@ -563,7 +563,7 @@ def test_weird_amounts(
     chain.mine(1)
 
     # take 0% of our CRV to the voter
-    strategy.setKeepCRV(0, {"from": gov})
+    strategy.setKeep(0, 0, {"from": gov})
     chain.sleep(1)
     chain.mine(1)
     strategy.harvest({"from": gov})
@@ -600,7 +600,7 @@ def test_more_rewards_stuff(
         print("Don't need to do these tests if not Curve or Convex strategy")
         return
     ## deposit to the vault after approving
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     strategy.harvest({"from": gov})
 
@@ -623,7 +623,7 @@ def test_more_rewards_stuff(
     strategy.harvest({"from": gov})
 
     # take 100% of our CRV to the voter
-    strategy.setKeepCRV(10000, {"from": gov})
+    strategy.setKeep(10000, 0, {"from": gov})
     chain.sleep(1)
     chain.mine(1)
     tx = strategy.harvest(
@@ -653,7 +653,7 @@ def test_more_rewards_stuff(
     chain.mine(1)
 
     # take 0% of our CRV to the voter
-    strategy.setKeepCRV(0, {"from": gov})
+    strategy.setKeep(0, 0, {"from": gov})
     chain.sleep(1)
     chain.mine(1)
     strategy.harvest({"from": gov})
