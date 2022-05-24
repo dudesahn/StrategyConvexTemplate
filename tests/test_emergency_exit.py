@@ -12,6 +12,9 @@ def test_emergency_exit(
     strategy,
     chain,
     amount,
+    is_slippery,
+    no_profit,
+    sleep_time,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -21,8 +24,8 @@ def test_emergency_exit(
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate earnings
+    chain.sleep(sleep_time)
     chain.mine(1)
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -39,9 +42,15 @@ def test_emergency_exit(
     chain.sleep(86400)
     chain.mine(1)
 
-    # withdraw and confirm we made money
+    # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) >= startingWhale
+    if is_slippery and no_profit:
+        assert (
+            math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
+            or token.balanceOf(whale) >= startingWhale
+        )
+    else:
+        assert token.balanceOf(whale) >= startingWhale
 
 
 # test emergency exit, but with a donation (profit)
@@ -53,6 +62,9 @@ def test_emergency_exit_with_profit(
     strategy,
     chain,
     amount,
+    is_slippery,
+    no_profit,
+    sleep_time,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -63,8 +75,8 @@ def test_emergency_exit_with_profit(
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate earnings
+    chain.sleep(sleep_time)
     chain.mine(1)
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -84,9 +96,15 @@ def test_emergency_exit_with_profit(
     chain.sleep(86400)
     chain.mine(1)
 
-    # withdraw and confirm we made money
+    # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) + donation >= startingWhale
+    if is_slippery and no_profit:
+        assert (
+            math.isclose(token.balanceOf(whale) + donation, startingWhale, abs_tol=10)
+            or token.balanceOf(whale) + donation >= startingWhale
+        )
+    else:
+        assert token.balanceOf(whale) + donation >= startingWhale
 
 
 # test emergency exit, but after somehow losing all of our assets
@@ -101,6 +119,10 @@ def test_emergency_exit_with_no_gain_or_loss(
     voter,
     cvxDeposit,
     amount,
+    is_slippery,
+    no_profit,
+    booster,
+    pid,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -118,13 +140,10 @@ def test_emergency_exit_with_no_gain_or_loss(
     cvxDeposit.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
 
-    # have our whale send in exactly our debtOutstanding
-    whale_to_give = vault.debtOutstanding(strategy)
-    token.transfer(strategy, whale_to_give, {"from": whale})
-
-    # transfer in 1 wei of want to prevent dividing by zero in reportLoss step
-    whale_to_give = 1
-    token.transfer(strategy, whale_to_give, {"from": whale})
+    # gov sends it back, glad someone was watching!
+    booster.withdrawAll(pid, {"from": gov})
+    token.transfer(strategy, to_send, {"from": gov})
+    assert strategy.estimatedTotalAssets() > 0
 
     # set emergency and exit, then confirm that the strategy has no funds
     strategy.setEmergencyExit({"from": gov})
@@ -138,9 +157,9 @@ def test_emergency_exit_with_no_gain_or_loss(
     chain.sleep(86400)
     chain.mine(1)
 
-    # withdraw and confirm we made money, accounting for all of the funds we lost lol
+    # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) + amount + whale_to_give >= startingWhale
+    assert math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
 
 
 def test_emergency_withdraw_method_0(
@@ -177,9 +196,8 @@ def test_emergency_withdraw_method_0(
 
     strategy.withdrawToConvexDepositTokens({"from": gov})
 
-    # transfer in 1 wei of want to prevent dividing by zero in reportLoss step
-    whale_to_give = 1
-    token.transfer(strategy, whale_to_give, {"from": whale})
+    # our whale donates 1 wei to the vault so we don't divide by zero (0.3.2 vault, errors in vault._reportLoss)
+    token.transfer(strategy, 1, {"from": whale})
 
     # turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -228,9 +246,8 @@ def test_emergency_withdraw_method_1(
 
     strategy.withdrawToConvexDepositTokens({"from": gov})
 
-    # transfer in 1 wei of want to prevent dividing by zero in reportLoss step
-    whale_to_give = 1
-    token.transfer(strategy, whale_to_give, {"from": whale})
+    # our whale donates 1 wei to the vault so we don't divide by zero (0.3.2 vault, errors in vault._reportLoss)
+    token.transfer(strategy, 1, {"from": whale})
 
     # turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})

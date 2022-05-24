@@ -32,7 +32,7 @@ def test_setters(
     strategy.setMinReportDelay(100, {"from": gov})
     strategy.setProfitFactor(1000, {"from": gov})
     strategy.setRewards(gov, {"from": strategist})
-    strategy.setKeepCRV(10, {"from": gov})
+    strategy.setKeep(10, 0, {"from": gov})
     strategy.setClaimRewards(True, {"from": gov})
     strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
     strategy.setUniFees(3000, {"from": gov})
@@ -67,7 +67,9 @@ def test_setters(
     with brownie.reverts():
         strategy.setRewards(strategist, {"from": whale})
     with brownie.reverts():
-        strategy.setKeepCRV(10_001, {"from": gov})
+        strategy.setKeep(10_001, 0, {"from": gov})
+    with brownie.reverts():
+        strategy.setKeep(0, 10_001, {"from": gov})
 
     # try a health check with zero address as health check
     strategy.setHealthCheck(zero, {"from": gov})

@@ -13,6 +13,8 @@ def test_revoke_strategy_from_vault(
     strategy,
     amount,
     sleep_time,
+    is_slippery,
+    no_profit,
 ):
 
     ## deposit to the vault after approving
@@ -47,6 +49,12 @@ def test_revoke_strategy_from_vault(
     chain.sleep(86400)
     chain.mine(1)
 
-    # withdraw and confirm we made money
+    # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) >= startingWhale
+    if is_slippery and no_profit:
+        assert (
+            math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
+            or token.balanceOf(whale) >= startingWhale
+        )
+    else:
+        assert token.balanceOf(whale) >= startingWhale

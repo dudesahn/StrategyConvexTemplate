@@ -38,9 +38,9 @@ def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0xa14B5A062f7a11c258f49c75A5D396BA77d50364",
+        "0x03403154afc09Ce8e44C3B185C82C6aD5f86b9ab",
         force=True,  # IB 0x1a6525E4a4aB2E3aEa7ED3CF813e8ed07fA3446D
-    )  # 0xa14B5A062f7a11c258f49c75A5D396BA77d50364 for Aave
+    )  # 0x03403154afc09Ce8e44C3B185C82C6aD5f86b9ab for Aave
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -51,7 +51,7 @@ def whale(accounts, amount, token):
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 50_000e18
+    amount = 40_000e18
     yield amount
 
 
@@ -82,6 +82,20 @@ def pool():
     # IB 0x2dded6Da1BF5DBdF597C45fcFaa3194e53EcfeAF
     # Aave 0xDeBF20617708857ebe4F679508E7b7863a8A8EeE
     yield poolAddress
+
+
+# use this when we might lose a few wei on conversions between want and another deposit token (sometimes even want -> vault token we can lose a few wei)
+@pytest.fixture(scope="module")
+def is_slippery():
+    is_slippery = True
+    yield is_slippery
+
+
+# use this to test our strategy in case there are no (or very low) profits
+@pytest.fixture(scope="module")
+def no_profit():
+    no_profit = True
+    yield no_profit
 
 
 # Only worry about changing things above this line, unless you want to make changes to the vault or strategy.
