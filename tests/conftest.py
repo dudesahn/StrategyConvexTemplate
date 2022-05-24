@@ -29,7 +29,7 @@ def tenderly_fork(web3, chain):
 # put our pool's convex pid here; this is the only thing that should need to change up here **************
 @pytest.fixture(scope="module")
 def pid():
-    pid = 13
+    pid = 13  # 13 USDN, 28 USDP
     yield pid
 
 
@@ -39,7 +39,8 @@ def whale(accounts, amount, token):
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
         "0x9899c2c49f5eF2f37fbA6F9F8E7557E7A945c964", force=True
-    )  # 0x44Bc6e3a8384979DF6673Ac81066c67C83d6d6b2 for USDP
+    )  # 0x1B5eb1173D2Bf770e50F10410C9a96F7a8eB6e75 for USDP
+    # 0x9899c2c49f5eF2f37fbA6F9F8E7557E7A945c964 for USDN
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -78,6 +79,8 @@ def sleep_time():
 @pytest.fixture(scope="module")
 def pool():
     poolAddress = Contract("0x094d12e5b541784701FD8d65F11fc0598FBC6332")
+    # USDN 0x094d12e5b541784701FD8d65F11fc0598FBC6332
+    # USDP 0x3c8caee4e09296800f8d29a68fa3837e2dae4940
     yield poolAddress
 
 
@@ -218,22 +221,24 @@ def strategist(accounts):
 
 
 # use this if you need to deploy the vault
-@pytest.fixture(scope="function")
-def vault(pm, gov, rewards, guardian, management, token, chain):
-    Vault = pm(config["dependencies"][0]).Vault
-    vault = guardian.deploy(Vault)
-    vault.initialize(token, gov, rewards, "", "", guardian)
-    vault.setDepositLimit(2**256 - 1, {"from": gov})
-    vault.setManagement(management, {"from": gov})
-    chain.sleep(1)
-    yield vault
+# @pytest.fixture(scope="function")
+# def vault(pm, gov, rewards, guardian, management, token, chain):
+#     Vault = pm(config["dependencies"][0]).Vault
+#     vault = guardian.deploy(Vault)
+#     vault.initialize(token, gov, rewards, "", "", guardian)
+#     vault.setDepositLimit(2**256 - 1, {"from": gov})
+#     vault.setManagement(management, {"from": gov})
+#     chain.sleep(1)
+#     yield vault
 
 
 # use this if your vault is already deployed
-# @pytest.fixture(scope="function")
-# def vault(pm, gov, rewards, guardian, management, token, chain):
-#     vault = Contract("0x497590d2d57f05cf8B42A36062fA53eBAe283498")
-#     yield vault
+@pytest.fixture(scope="function")
+def vault(pm, gov, rewards, guardian, management, token, chain):
+    vault = Contract("0x3B96d491f067912D18563d56858Ba7d6EC67a6fa")
+    # USDN 0x3B96d491f067912D18563d56858Ba7d6EC67a6fa
+    # USDP 0xC4dAf3b5e2A9e93861c3FBDd25f1e943B8D87417
+    yield vault
 
 
 # replace the first value with the name of your strategy
@@ -265,15 +270,31 @@ def strategy(
         strategy_name,
     )
     strategy.setKeeper(keeper, {"from": gov})
+
     # set our management fee to zero so it doesn't mess with our profit checking
     vault.setManagementFee(0, {"from": gov})
-    # add our new strategy
-    vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
+
+    # we will be migrating on our live vault instead of adding it directly
+    old_strategy = Contract(vault.withdrawalQueue(1))
+    vault.migrateStrategy(old_strategy, strategy, {"from": gov})
     strategy.setHealthCheck(healthCheck, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
+    vault.updateStrategyDebtRatio(strategy, 10000, {"from": gov})
 
     # earmark rewards if we are using a convex strategy
     booster.earmarkRewards(pid, {"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    # make all harvests permissive unless we change the value lower
+    gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})
+
+    # set up custom params and setters
+    strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
+    strategy.setMaxReportDelay(86400 * 21)
+
+    # harvest to send our funds into the strategy and fix any triggers already true
+    strategy.harvest({"from": gov})
     chain.sleep(1)
     chain.mine(1)
 
