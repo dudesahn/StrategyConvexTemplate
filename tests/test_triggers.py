@@ -27,7 +27,7 @@ def test_triggers(
 
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
     starting_assets = vault.totalAssets()
@@ -98,8 +98,9 @@ def test_triggers(
     assert tx == False
     strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
 
-    # harvest, wait
+    # harvest, wait, turn off health check in case big profit here
     chain.sleep(1)
+    strategy.setDoHealthCheck(False, {"from": gov})
     strategy.harvest({"from": gov})
     chain.sleep(86400)
     chain.mine(1)

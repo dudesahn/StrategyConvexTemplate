@@ -1,5 +1,6 @@
 import brownie
 from brownie import Wei, accounts, Contract, config
+import math
 
 # test cloning our strategy, make sure the cloned strategy still works just fine by sending funds to it
 def test_cloning(
@@ -19,6 +20,8 @@ def test_cloning(
     pool,
     strategy_name,
     sleep_time,
+    is_slippery,
+    no_profit,
 ):
     # Shouldn't be able to call initialize again
     with brownie.reverts():
@@ -62,7 +65,7 @@ def test_cloning(
     vault.revokeStrategy(strategy, {"from": gov})
 
     # attach our new strategy
-    vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(newStrategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
     assert vault.withdrawalQueue(1) == newStrategy
     assert vault.strategies(newStrategy)[2] == 10_000
     assert vault.withdrawalQueue(0) == strategy
@@ -71,7 +74,7 @@ def test_cloning(
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
@@ -108,7 +111,13 @@ def test_cloning(
     chain.sleep(86400)
     chain.mine(1)
 
-    # withdraw and confirm we made money
+    # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) >= startingWhale
-    assert vault.pricePerShare() > before_pps
+    if is_slippery and no_profit:
+        assert (
+            math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
+            or token.balanceOf(whale) >= startingWhale
+        )
+    else:
+        assert token.balanceOf(whale) >= startingWhale
+    assert vault.pricePerShare() >= before_pps

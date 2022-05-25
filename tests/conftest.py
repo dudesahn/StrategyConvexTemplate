@@ -78,6 +78,20 @@ def pool():
     yield poolAddress
 
 
+# use this when we might lose a few wei on conversions between want and another deposit token
+@pytest.fixture(scope="module")
+def is_slippery():
+    is_slippery = False
+    yield is_slippery
+
+
+# use this to test our strategy in case there are no profits
+@pytest.fixture(scope="module")
+def no_profit():
+    no_profit = False
+    yield no_profit
+
+
 # Only worry about changing things above this line, unless you want to make changes to the vault or strategy.
 # ----------------------------------------------------------------------- #
 
@@ -220,7 +234,7 @@ def vault(pm, gov, rewards, guardian, management, token, chain):
     Vault = pm(config["dependencies"][0]).Vault
     vault = guardian.deploy(Vault)
     vault.initialize(token, gov, rewards, "", "", guardian)
-    vault.setDepositLimit(2**256 - 1, {"from": gov})
+    vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
     vault.setManagement(management, {"from": gov})
     chain.sleep(1)
     yield vault
@@ -265,7 +279,7 @@ def strategy(
     # set our management fee to zero so it doesn't mess with our profit checking
     vault.setManagementFee(0, {"from": gov})
     # add our new strategy
-    vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
     strategy.setHealthCheck(healthCheck, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
 
@@ -273,6 +287,13 @@ def strategy(
     booster.earmarkRewards(pid, {"from": gov})
     chain.sleep(1)
     chain.mine(1)
+
+    # make all harvests permissive unless we change the value lower
+    gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})
+
+    # set up custom params and setters
+    strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
+    strategy.setMaxReportDelay(86400 * 21)
 
     yield strategy
 
