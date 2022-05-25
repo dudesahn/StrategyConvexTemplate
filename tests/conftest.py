@@ -48,6 +48,15 @@ def whale(accounts, amount, token):
     yield whale
 
 
+# use this if your vault is already deployed
+@pytest.fixture(scope="function")
+def vault_address():
+    vault_address = "0x39CAF13a104FF567f71fd2A4c68C026FDB6E740B"
+    # Iron Bank 0x27b7b1ad7288079A66d12350c828D3C00A6F07d7
+    # Aave 0x39CAF13a104FF567f71fd2A4c68C026FDB6E740B
+    yield vault_address
+
+
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
@@ -248,10 +257,8 @@ def strategist(accounts):
 
 # use this if your vault is already deployed
 @pytest.fixture(scope="function")
-def vault(pm, gov, rewards, guardian, management, token, chain):
-    vault = Contract("0x39CAF13a104FF567f71fd2A4c68C026FDB6E740B")
-    # Iron Bank 0x27b7b1ad7288079A66d12350c828D3C00A6F07d7
-    # Aave 0x39CAF13a104FF567f71fd2A4c68C026FDB6E740B
+def vault(pm, gov, rewards, guardian, management, token, chain, vault_address):
+    vault = Contract(vault_address)
     yield vault
 
 

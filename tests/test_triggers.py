@@ -15,6 +15,8 @@ def test_triggers(
     amount,
     gasOracle,
     strategist_ms,
+    is_slippery,
+    no_profit,
 ):
 
     # inactive strategy (0 DR and 0 assets) shouldn't be touched by keepers
@@ -74,17 +76,18 @@ def test_triggers(
         assert tx == False
     strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
 
-    # update our minProfit so our harvest triggers true
-    strategy.setHarvestTriggerParams(1e6, 1000000e6, 1e24, False, {"from": gov})
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be true.", tx)
-    assert tx == True
+    if not (is_slippery and no_profit):
+        # update our minProfit so our harvest triggers true
+        strategy.setHarvestTriggerParams(1e6, 1000000e6, 1e24, False, {"from": gov})
+        tx = strategy.harvestTrigger(0, {"from": gov})
+        print("\nShould we harvest? Should be true.", tx)
+        assert tx == True
 
-    # update our maxProfit so harvest triggers true
-    strategy.setHarvestTriggerParams(1000000e6, 1e6, 1e24, False, {"from": gov})
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be true.", tx)
-    assert tx == True
+        # update our maxProfit so harvest triggers true
+        strategy.setHarvestTriggerParams(1000000e6, 1e6, 1e24, False, {"from": gov})
+        tx = strategy.harvestTrigger(0, {"from": gov})
+        print("\nShould we harvest? Should be true.", tx)
+        assert tx == True
 
     # earmark should be false now (it's been too long), turn it off after
     chain.sleep(86400 * 21)
@@ -110,6 +113,12 @@ def test_triggers(
     print("\nShould we harvest? Should be false.", tx)
     assert tx == False
 
-    # withdraw and confirm we made money
+    # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) >= startingWhale
+    if is_slippery and no_profit:
+        assert (
+            math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
+            or token.balanceOf(whale) >= startingWhale
+        )
+    else:
+        assert token.balanceOf(whale) >= startingWhale
