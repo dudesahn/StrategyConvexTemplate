@@ -17,7 +17,7 @@ def test_sweep(
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -26,7 +26,7 @@ def test_sweep(
 
     # Strategy want token doesn't work
     startingWhale = token.balanceOf(whale)
-    token.transfer(strategy.address, amount, {"from": whale})
+    token.transfer(strategy.address, amount / 4, {"from": whale})
     assert token.address == strategy.want()
     assert token.balanceOf(strategy) > 0
     with brownie.reverts("!want"):

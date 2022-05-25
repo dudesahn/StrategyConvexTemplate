@@ -29,7 +29,7 @@ def tenderly_fork(web3, chain):
 # put our pool's convex pid here; this is the only thing that should need to change up here **************
 @pytest.fixture(scope="module")
 def pid():
-    pid = 75  # BTRFLY 75, T 67
+    pid = 67  # BTRFLY 75, T 67
     yield pid
 
 
@@ -38,16 +38,16 @@ def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0xeCb456EA5365865EbAb8a2661B0c503410e9B347", force=True
+        "0x6f9BB7e454f5B3eb2310343f0E99269dC2BB8A1d", force=True
     )  # 0x6f9BB7e454f5B3eb2310343f0E99269dC2BB8A1d for T-ETH (253 total)
-    # 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 for btrfly-eth (5.6 total)
+    # 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 for btrfly-eth (3.8 total)
     yield whale
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 2e18
+    amount = 100e18  # 1.5e18 for btrfly, 100e18 for T-ETH
     yield amount
 
 
@@ -78,6 +78,20 @@ def pool():
     # 0x752eBeb79963cf0732E9c0fec72a49FD1DEfAEAC for T-ETH
     # 0xF43b15Ab692fDe1F9c24a9FCE700AdCC809D5391 BTRFLY-ETH
     yield poolAddress
+
+
+# use this when we might lose a few wei on conversions between want and another deposit token
+@pytest.fixture(scope="module")
+def is_slippery():
+    is_slippery = True
+    yield is_slippery
+
+
+# use this to test our strategy in case there are no profits
+@pytest.fixture(scope="module")
+def no_profit():
+    no_profit = True  # BTRLFY still true for this one
+    yield no_profit
 
 
 # Only worry about changing things above this line, unless you want to make changes to the vault or strategy.
@@ -222,7 +236,7 @@ def vault(pm, gov, rewards, guardian, management, token, chain):
     Vault = pm(config["dependencies"][0]).Vault
     vault = guardian.deploy(Vault)
     vault.initialize(token, gov, rewards, "", "", guardian)
-    vault.setDepositLimit(2**256 - 1, {"from": gov})
+    vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
     vault.setManagement(management, {"from": gov})
     chain.sleep(1)
     yield vault
@@ -264,10 +278,12 @@ def strategy(
         strategy_name,
     )
     strategy.setKeeper(keeper, {"from": gov})
+
     # set our management fee to zero so it doesn't mess with our profit checking
     vault.setManagementFee(0, {"from": gov})
+
     # add our new strategy
-    vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
     strategy.setHealthCheck(healthCheck, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
 
@@ -275,6 +291,13 @@ def strategy(
     booster.earmarkRewards(pid, {"from": gov})
     chain.sleep(1)
     chain.mine(1)
+
+    # make all harvests permissive unless we change the value lower
+    gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})
+
+    # set up custom params and setters
+    strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
+    strategy.setMaxReportDelay(86400 * 21)
 
     yield strategy
 
