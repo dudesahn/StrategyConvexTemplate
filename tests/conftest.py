@@ -67,6 +67,15 @@ def whale(accounts, amount, token):
     yield whale
 
 
+# use this if your vault is already deployed
+@pytest.fixture(scope="function")
+def vault_address():
+    vault_address = "0x2DfB14E32e2F8156ec15a2c21c3A6c053af52Be8"
+    # MIM 0x2DfB14E32e2F8156ec15a2c21c3A6c053af52Be8
+    # FRAX 0xB4AdA607B9d6b2c9Ee07A275e9616B84AC560139
+    yield vault_address
+
+
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
@@ -265,10 +274,8 @@ if chain_used == 1:  # mainnet
 
     # use this if your vault is already deployed
     @pytest.fixture(scope="function")
-    def vault(pm, gov, rewards, guardian, management, token, chain):
-        vault = Contract("0x2DfB14E32e2F8156ec15a2c21c3A6c053af52Be8")
-        # MIM 0x2DfB14E32e2F8156ec15a2c21c3A6c053af52Be8
-        # FRAX 0xB4AdA607B9d6b2c9Ee07A275e9616B84AC560139
+    def vault(pm, gov, rewards, guardian, management, token, chain, vault_address):
+        vault = Contract(vault_address)
         yield vault
 
     # replace the first value with the name of your strategy
