@@ -1,5 +1,6 @@
 import brownie
 from brownie import Wei, accounts, Contract, config
+import math
 
 # test cloning our strategy, make sure the cloned strategy still works just fine by sending funds to it
 def test_cloning(

@@ -528,7 +528,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         );
     }
 
-    // Sells our CRV -> WETH on UniV3 and CVX -> WETH on Sushi, then WETH -> stables together on UniV3
+    // Sells our CRV and CVX on Curve, then WETH -> stables together on UniV3
     function _sellCrvAndCvx(uint256 _crvAmount, uint256 _convexAmount)
         internal
     {
