@@ -29,7 +29,7 @@ def tenderly_fork(web3, chain):
 # put our pool's convex pid here; this is the only thing that should need to change up here **************
 @pytest.fixture(scope="module")
 def pid():
-    pid = 24  # IB 29, Aave 24
+    pid = 29  # IB 29, Aave 24
     yield pid
 
 
@@ -38,7 +38,7 @@ def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0x03403154afc09Ce8e44C3B185C82C6aD5f86b9ab",
+        "0x1a6525E4a4aB2E3aEa7ED3CF813e8ed07fA3446D",
         force=True,  # IB 0x1a6525E4a4aB2E3aEa7ED3CF813e8ed07fA3446D
     )  # 0x03403154afc09Ce8e44C3B185C82C6aD5f86b9ab for Aave
     if token.balanceOf(whale) < 2 * amount:
@@ -51,10 +51,19 @@ def whale(accounts, amount, token):
 # use this if your vault is already deployed
 @pytest.fixture(scope="function")
 def vault_address():
-    vault_address = "0x39CAF13a104FF567f71fd2A4c68C026FDB6E740B"
+    vault_address = "0x27b7b1ad7288079A66d12350c828D3C00A6F07d7"
     # Iron Bank 0x27b7b1ad7288079A66d12350c828D3C00A6F07d7
     # Aave 0x39CAF13a104FF567f71fd2A4c68C026FDB6E740B
     yield vault_address
+
+
+# curve deposit pool, for old curve pools set this manually
+@pytest.fixture(scope="module")
+def pool():
+    poolAddress = Contract("0x2dded6Da1BF5DBdF597C45fcFaa3194e53EcfeAF")
+    # IB 0x2dded6Da1BF5DBdF597C45fcFaa3194e53EcfeAF
+    # Aave 0xDeBF20617708857ebe4F679508E7b7863a8A8EeE
+    yield poolAddress
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
@@ -84,26 +93,17 @@ def sleep_time():
     yield sleep_time
 
 
-# curve deposit pool, for old curve pools set this manually
-@pytest.fixture(scope="module")
-def pool():
-    poolAddress = Contract("0xDeBF20617708857ebe4F679508E7b7863a8A8EeE")
-    # IB 0x2dded6Da1BF5DBdF597C45fcFaa3194e53EcfeAF
-    # Aave 0xDeBF20617708857ebe4F679508E7b7863a8A8EeE
-    yield poolAddress
-
-
 # use this when we might lose a few wei on conversions between want and another deposit token (sometimes even want -> vault token we can lose a few wei)
 @pytest.fixture(scope="module")
 def is_slippery():
-    is_slippery = True
+    is_slippery = False
     yield is_slippery
 
 
 # use this to test our strategy in case there are no (or very low) profits
 @pytest.fixture(scope="module")
 def no_profit():
-    no_profit = True
+    no_profit = False
     yield no_profit
 
 
