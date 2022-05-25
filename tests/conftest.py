@@ -48,6 +48,15 @@ def whale(accounts, amount, token):
     yield whale
 
 
+# use this if your vault is already deployed
+@pytest.fixture(scope="function")
+def vault_address():
+    vault_address = "0x3B96d491f067912D18563d56858Ba7d6EC67a6fa"
+    # USDN 0x3B96d491f067912D18563d56858Ba7d6EC67a6fa
+    # USDP 0xC4dAf3b5e2A9e93861c3FBDd25f1e943B8D87417
+    yield vault_address
+
+
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
@@ -82,6 +91,20 @@ def pool():
     # USDN 0x094d12e5b541784701FD8d65F11fc0598FBC6332
     # USDP 0x3c8caee4e09296800f8d29a68fa3837e2dae4940
     yield poolAddress
+
+
+# use this when we might lose a few wei on conversions between want and another deposit token (sometimes even want -> vault token we can lose a few wei)
+@pytest.fixture(scope="module")
+def is_slippery():
+    is_slippery = False
+    yield is_slippery
+
+
+# use this to test our strategy in case there are no (or very low) profits
+@pytest.fixture(scope="module")
+def no_profit():
+    no_profit = False
+    yield
 
 
 # Only worry about changing things above this line, unless you want to make changes to the vault or strategy.
@@ -234,10 +257,8 @@ def strategist(accounts):
 
 # use this if your vault is already deployed
 @pytest.fixture(scope="function")
-def vault(pm, gov, rewards, guardian, management, token, chain):
-    vault = Contract("0x3B96d491f067912D18563d56858Ba7d6EC67a6fa")
-    # USDN 0x3B96d491f067912D18563d56858Ba7d6EC67a6fa
-    # USDP 0xC4dAf3b5e2A9e93861c3FBDd25f1e943B8D87417
+def vault(pm, gov, rewards, guardian, management, token, chain, vault_address):
+    vault = Contract(vault_address)
     yield vault
 
 

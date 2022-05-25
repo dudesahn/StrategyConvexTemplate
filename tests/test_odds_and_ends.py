@@ -49,6 +49,9 @@ def test_odds_and_ends(
     convexToken.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
 
+    # our whale donates 1 wei to the vault so we don't divide by zero (0.3.5 vault errors in vault._reportLoss)
+    token.transfer(strategy, 1, {"from": whale})
+
     # sleep to collect earnings
     chain.sleep(sleep_time)
     chain.mine(1)
@@ -81,7 +84,7 @@ def test_odds_and_ends(
     # harvest to get funds back in strategy
     new_strategy.harvest({"from": gov})
     new_strat_balance = new_strategy.estimatedTotalAssets()
-    assert new_strat_balance >= total_old
+    assert new_strat_balance >= updated_total_old
 
     startingVault = vault.totalAssets()
     print("\nVault starting assets with new strategy: ", startingVault)
@@ -144,6 +147,9 @@ def test_odds_and_ends_2(
     assert strategy.estimatedTotalAssets() == 0
 
     strategy.setEmergencyExit({"from": gov})
+
+    # our whale donates 1 wei to the vault so we don't divide by zero (0.3.5 vault errors in vault._reportLoss)
+    token.transfer(strategy, 1, {"from": whale})
 
     chain.sleep(1)
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -341,6 +347,9 @@ def test_odds_and_ends_rekt(
     to_send = convexToken.balanceOf(strategy)
     convexToken.transfer(gov, to_send, {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
+
+    # our whale donates 1 wei to the vault so we don't divide by zero (0.3.5 vault errors in vault._reportLoss)
+    token.transfer(strategy, 1, {"from": whale})
 
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
 

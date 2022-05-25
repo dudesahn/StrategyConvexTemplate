@@ -58,8 +58,11 @@ def test_cloning(
             vault, strategist, rewards, keeper, pid, pool, strategy_name, {"from": gov}
         )
 
-    # revoke to send all funds back to vault
+    # revoke and get funds back into vault
     vault.revokeStrategy(strategy, {"from": gov})
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
 
     # attach our new strategy
     vault.addStrategy(newStrategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
