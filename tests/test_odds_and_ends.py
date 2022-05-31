@@ -547,7 +547,9 @@ def test_odds_and_ends_keep_cvx(
     chain.mine(1)
 
     # take 100% of our CVX to the treasury
-    strategy.setKeep(1000, 10000, {"from": gov})
+    strategy.setKeep(
+        1000, 10000, "0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde", {"from": gov}
+    )
     chain.sleep(1)
     chain.mine(1)
     treasury_before = convexToken.balanceOf(vault.rewards())
@@ -561,7 +563,9 @@ def test_odds_and_ends_keep_cvx(
     chain.mine(1)
 
     # take 0% of our CVX to the treasury
-    strategy.setKeep(1000, 0, {"from": gov})
+    strategy.setKeep(
+        1000, 0, "0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde", {"from": gov}
+    )
     chain.sleep(1)
     chain.mine(1)
     treasury_before = convexToken.balanceOf(vault.rewards())
