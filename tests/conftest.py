@@ -49,8 +49,8 @@ def whale(accounts, use_crv):
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     if use_crv:
         whale = accounts.at(
-            "0xeCb456EA5365865EbAb8a2661B0c503410e9B347", force=True
-        )  # 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 for CRV-ETH (997 total)
+            "0xc75441D085d73983d8659635251dCf528DFB9Be2", force=True
+        )  # 0xc75441D085d73983d8659635251dCf528DFB9Be2 for CRV-ETH (400 total)
     else:
         whale = accounts.at(
             "0x38eE5F5A39c01cB43473992C12936ba1219711ab", force=True
@@ -62,7 +62,7 @@ def whale(accounts, use_crv):
 @pytest.fixture(scope="module")
 def amount(use_crv):
     if use_crv:
-        amount = 400e18
+        amount = 175e18
     else:
         amount = 300e18
     yield amount
