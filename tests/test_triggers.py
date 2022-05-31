@@ -48,7 +48,7 @@ def test_triggers(
 
     # should trigger false, nothing is ready yet
     tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we tend? Should be false.", tx)
+    print("\nShould we harvest? Should be false.", tx)
     assert tx == False
 
     # simulate a day of earnings
