@@ -122,6 +122,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // keepCRV stuff
     uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points)
     uint256 public keepCVX; // the percentage of CVX we keep for boosting yield (in basis points)
+    address public keepCVXDestination; // where we send the CVX we are keeping
     address internal constant voter =
         0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
@@ -237,13 +238,15 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
     // Set the amount of CRV to be locked in Yearn's veCRV voter from each harvest. Default is 10%. Option to keep CVX as well.
-    function setKeep(uint256 _keepCRV, uint256 _keepCVX)
-        external
-        onlyAuthorized
-    {
+    function setKeep(
+        uint256 _keepCRV,
+        uint256 _keepCVX,
+        address _keepCVXDestination
+    ) external onlyGovernance {
         require(_keepCRV <= 10_000 && _keepCVX <= 10_000);
         keepCRV = _keepCRV;
         keepCVX = _keepCVX;
+        keepCVXDestination = _keepCVXDestination;
     }
 
     // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
@@ -316,6 +319,7 @@ contract StrategyConvexstETH is StrategyConvexBase {
         harvestProfitMax = 120000e6;
         creditThreshold = 4000 * 1e18; // roughly $1m in ETH
         keepCRV = 1000; // default of 10%
+        keepCVXDestination = 0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde; // default to treasury
 
         // want = Curve LP
         want.approve(address(depositContract), type(uint256).max);
@@ -360,12 +364,13 @@ contract StrategyConvexstETH is StrategyConvexBase {
         uint256 _sendToVoter = crvBalance.mul(keepCRV).div(FEE_DENOMINATOR);
         if (_sendToVoter > 0) {
             crv.safeTransfer(voter, _sendToVoter);
+            crvBalance = crv.balanceOf(address(this));
         }
 
         uint256 _cvxToKeep = convexBalance.mul(keepCVX).div(FEE_DENOMINATOR);
         if (_cvxToKeep > 0) {
-            address treasury = 0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde;
-            convexToken.safeTransfer(treasury, _cvxToKeep);
+            convexToken.safeTransfer(keepCVXDestination, _cvxToKeep);
+            convexBalance = convexToken.balanceOf(address(this));
         }
 
         // claim and sell our rewards if we have them
@@ -376,10 +381,6 @@ contract StrategyConvexstETH is StrategyConvexBase {
                 _sellRewards(_rewardsBalance);
             }
         }
-
-        // check our balance again after transferring for our keep
-        crvBalance = crv.balanceOf(address(this));
-        convexBalance = convexToken.balanceOf(address(this));
 
         // do this even if we have zero balances so we can sell WETH from rewards
         _sellCrvAndCvx(crvBalance, convexBalance);
@@ -601,9 +602,7 @@ contract StrategyConvexstETH is StrategyConvexBase {
             // check if there is any bonus reward we need to earmark
             uint256 rewardsExpiry =
                 IConvexRewards(virtualRewardsPool).periodFinish();
-            if (rewardsExpiry < block.timestamp) {
-                return true;
-            }
+            return rewardsExpiry < block.timestamp;
         }
     }
 
