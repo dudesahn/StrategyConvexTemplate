@@ -29,7 +29,7 @@ def tenderly_fork(web3, chain):
 # put our pool's convex pid here; this is the only thing that should need to change up here **************
 @pytest.fixture(scope="module")
 def pid():
-    pid = 79  # CAD 79
+    pid = 95  # CAD 79, STG 95
     yield pid
 
 
@@ -38,15 +38,15 @@ def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0x26f539A0fE189A7f228D7982BF10Bc294FA9070c", force=True
-    )  # 0x26f539A0fE189A7f228D7982BF10Bc294FA9070c for CAD-USDC (270k total)
+        "0xeCb456EA5365865EbAb8a2661B0c503410e9B347", force=True
+    )  # 0x26f539A0fE189A7f228D7982BF10Bc294FA9070c for CAD-USDC (270k total), 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 for STG-USDC
     yield whale
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 100_000e18
+    amount = 10_000e18
     yield amount
 
 
@@ -59,12 +59,13 @@ def strategy_name():
 
 # use this to set the standard amount of time we sleep between harvests.
 # generally 1 day, but can be less if dealing with smaller windows (oracles) or longer if we need to trigger weekly earnings.
+# some strategies won't report any profits unless we wait long enough (1 day vs 2 hours)
 @pytest.fixture(scope="module")
 def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 2
+    hours_to_sleep = 24
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
@@ -73,8 +74,8 @@ def sleep_time():
 # curve deposit pool, for old curve pools and crypto LPs set this manually
 @pytest.fixture(scope="module")
 def pool():
-    poolAddress = Contract("0xE07BDe9Eb53DEFfa979daE36882014B758111a78")
-    # 0xE07BDe9Eb53DEFfa979daE36882014B758111a78 for CAD-USDC
+    poolAddress = Contract("0x3211C6cBeF1429da3D0d58494938299C92Ad5860")
+    # 0xE07BDe9Eb53DEFfa979daE36882014B758111a78 for CAD-USDC, 0x3211C6cBeF1429da3D0d58494938299C92Ad5860 for STG-USDC
     yield poolAddress
 
 
