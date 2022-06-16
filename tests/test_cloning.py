@@ -12,7 +12,7 @@ def test_cloning(
     keeper,
     rewards,
     chain,
-    StrategyConvexCrvCvxPairsClonable,
+    StrategyConvex3Crypto,
     rewardsContract,
     pid,
     amount,
@@ -36,7 +36,7 @@ def test_cloning(
     tx = strategy.cloneConvexCrvCvxPairs(
         vault, strategist, rewards, keeper, use_crv, {"from": gov}
     )
-    newStrategy = StrategyConvexCrvCvxPairsClonable.at(tx.return_value)
+    newStrategy = StrategyConvex3Crypto.at(tx.return_value)
 
     # Shouldn't be able to call initialize again
     with brownie.reverts():
@@ -60,9 +60,9 @@ def test_cloning(
 
     # attach our new strategy
     vault.addStrategy(newStrategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
-    assert vault.withdrawalQueue(1) == newStrategy
+    assert vault.withdrawalQueue(2) == newStrategy
     assert vault.strategies(newStrategy)[2] == 10_000
-    assert vault.withdrawalQueue(0) == strategy
+    assert vault.withdrawalQueue(1) == strategy
     assert vault.strategies(strategy)["debtRatio"] == 0
 
     ## deposit to the vault after approving; this is basically just our simple_harvest test

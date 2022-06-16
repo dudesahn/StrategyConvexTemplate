@@ -5,7 +5,7 @@ import math
 
 # test migrating a strategy
 def test_migration(
-    StrategyConvexCrvCvxPairsClonable,
+    StrategyConvex3Crypto,
     gov,
     token,
     vault,
@@ -34,7 +34,7 @@ def test_migration(
 
     # deploy our new strategy
     new_strategy = strategist.deploy(
-        StrategyConvexCrvCvxPairsClonable,
+        StrategyConvex3Crypto,
         vault,
         use_crv,
     )

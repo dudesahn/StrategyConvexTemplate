@@ -26,52 +26,34 @@ def tenderly_fork(web3, chain):
 
 ################################################ UPDATE THINGS BELOW HERE ################################################
 
-# for this strategy, set this if we want to test CVX or CRV-ETH LPs. shouldn't need to touch anything else
-@pytest.fixture(scope="module")
-def use_crv():
-    use_crv = True
-    yield use_crv
-
-
 # for these LPs, we only use this to generate the correct want token. 61 CRV-ETH, 64 CVX-ETH
 @pytest.fixture(scope="module")
-def pid(use_crv):
-    if use_crv:
-        pid = 61
-    else:
-        pid = 64
+def pid():
+    pid = 38
     yield pid
 
 
 @pytest.fixture(scope="module")
-def whale(accounts, use_crv):
+def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    if use_crv:
-        whale = accounts.at(
-            "0xc75441D085d73983d8659635251dCf528DFB9Be2", force=True
-        )  # 0xc75441D085d73983d8659635251dCf528DFB9Be2 for CRV-ETH (400 total)
-    else:
-        whale = accounts.at(
-            "0x38eE5F5A39c01cB43473992C12936ba1219711ab", force=True
-        )  # 0x38eE5F5A39c01cB43473992C12936ba1219711ab for cvx-eth (~630 total)
+    whale = accounts.at(
+        "0xAE653682Dee958914A82C9628de794dCbbEe3D04", force=True
+    )  # 0xc75441D085d73983d8659635251dCf528DFB9Be2 for CRV-ETH (1400 total)
     yield whale
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
-def amount(use_crv):
-    if use_crv:
-        amount = 175e18
-    else:
-        amount = 300e18
+def amount():
+    amount = 500e18
     yield amount
 
 
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexCrvCvxPairsClonable"
+    strategy_name = "StrategyConvex3Crypto"
     yield strategy_name
 
 
@@ -82,7 +64,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 2
+    hours_to_sleep = 24
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
@@ -90,11 +72,8 @@ def sleep_time():
 
 # curve deposit pool, we don't actually need it but set it anyway
 @pytest.fixture(scope="module")
-def pool(use_crv):
-    if use_crv:
-        poolAddress = Contract("0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511")
-    else:
-        poolAddress = Contract("0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4")
+def pool():
+    poolAddress = Contract("0xD51a44d3FaE010294C616388b506AcdA1bfAAE46")
     yield poolAddress
 
 
@@ -262,18 +241,15 @@ def strategist(accounts):
 
 # use this if your vault is already deployed
 @pytest.fixture(scope="function")
-def vault(pm, gov, rewards, guardian, management, token, chain, use_crv):
-    if use_crv:
-        vault = Contract("0x6A5468752f8DB94134B6508dAbAC54D3b45efCE6")
-    else:
-        vault = Contract("0x1635b506a88fBF428465Ad65d00e8d6B6E5846C3")
+def vault(pm, gov, rewards, guardian, management, token, chain):
+    vault = Contract("0xE537B5cc158EB71037D4125BDD7538421981E6AA")
     yield vault
 
 
 # replace the first value with the name of your strategy
 @pytest.fixture(scope="function")
 def strategy(
-    StrategyConvexCrvCvxPairsClonable,
+    StrategyConvex3Crypto,
     strategist,
     keeper,
     vault,
@@ -289,13 +265,11 @@ def strategy(
     gasOracle,
     strategist_ms,
     booster,
-    use_crv,
 ):
     # make sure to include all constructor parameters needed here
     strategy = strategist.deploy(
-        StrategyConvexCrvCvxPairsClonable,
+        StrategyConvex3Crypto,
         vault,
-        use_crv,
     )
     strategy.setKeeper(keeper, {"from": gov})
 
@@ -303,7 +277,7 @@ def strategy(
     vault.setManagementFee(0, {"from": gov})
 
     # we will be migrating on our live vault instead of adding it directly
-    old_strategy = Contract(vault.withdrawalQueue(0))
+    old_strategy = Contract(vault.withdrawalQueue(1))
     vault.migrateStrategy(old_strategy, strategy, {"from": gov})
     strategy.setHealthCheck(healthCheck, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
