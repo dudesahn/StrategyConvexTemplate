@@ -29,7 +29,7 @@ def tenderly_fork(web3, chain):
 # put our pool's convex pid here; this is the only thing that should need to change up here **************
 @pytest.fixture(scope="module")
 def pid():
-    pid = 29  # IB 29, Aave 24
+    pid = 9
     yield pid
 
 
@@ -38,9 +38,9 @@ def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0x1a6525E4a4aB2E3aEa7ED3CF813e8ed07fA3446D",
-        force=True,  # IB 0x1a6525E4a4aB2E3aEa7ED3CF813e8ed07fA3446D
-    )  # 0x03403154afc09Ce8e44C3B185C82C6aD5f86b9ab for Aave
+        "0x5a6A4D54456819380173272A5E8E9B9904BdF41B",
+        force=True,  # 3pool 0x5a6A4D54456819380173272A5E8E9B9904BdF41B
+    )
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -51,18 +51,16 @@ def whale(accounts, amount, token):
 # use this if your vault is already deployed
 @pytest.fixture(scope="function")
 def vault_address():
-    vault_address = "0x27b7b1ad7288079A66d12350c828D3C00A6F07d7"
-    # Iron Bank 0x27b7b1ad7288079A66d12350c828D3C00A6F07d7
-    # Aave 0x39CAF13a104FF567f71fd2A4c68C026FDB6E740B
+    vault_address = "0x84E13785B5a27879921D6F685f041421C7F482dA"
+    # 3pool 0x84E13785B5a27879921D6F685f041421C7F482dA
     yield vault_address
 
 
 # curve deposit pool, for old curve pools set this manually
 @pytest.fixture(scope="module")
 def pool():
-    poolAddress = Contract("0x2dded6Da1BF5DBdF597C45fcFaa3194e53EcfeAF")
-    # IB 0x2dded6Da1BF5DBdF597C45fcFaa3194e53EcfeAF
-    # Aave 0xDeBF20617708857ebe4F679508E7b7863a8A8EeE
+    poolAddress = Contract("0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7")
+    # 3pool 0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7
     yield poolAddress
 
 
@@ -76,7 +74,7 @@ def amount():
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexUnderlying3Clonable"
+    strategy_name = "StrategyConvex3pool"
     yield strategy_name
 
 
@@ -265,7 +263,7 @@ def vault(pm, gov, rewards, guardian, management, token, chain, vault_address):
 # replace the first value with the name of your strategy
 @pytest.fixture(scope="function")
 def strategy(
-    StrategyConvexUnderlying3Clonable,
+    StrategyConvex3pool,
     strategist,
     keeper,
     vault,
@@ -284,7 +282,7 @@ def strategy(
 ):
     # make sure to include all constructor parameters needed here
     strategy = strategist.deploy(
-        StrategyConvexUnderlying3Clonable,
+        StrategyConvex3pool,
         vault,
         pid,
         pool,

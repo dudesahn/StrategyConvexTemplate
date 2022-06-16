@@ -259,7 +259,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     }
 }
 
-contract StrategyConvexUnderlying3Clonable is StrategyConvexBase {
+contract StrategyConvex3pool is StrategyConvexBase {
     /* ========== STATE VARIABLES ========== */
     // these will likely change across different wants.
 
@@ -284,9 +284,6 @@ contract StrategyConvexUnderlying3Clonable is StrategyConvexBase {
         IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     uint24 public uniStableFee; // this is equal to 0.05%, can change this later if a different path becomes more optimal
 
-    // check for cloning
-    bool internal isOriginal = true;
-
     /* ========== CONSTRUCTOR ========== */
 
     constructor(
@@ -298,66 +295,7 @@ contract StrategyConvexUnderlying3Clonable is StrategyConvexBase {
         _initializeStrat(_pid, _curvePool, _name);
     }
 
-    /* ========== CLONING ========== */
-
-    event Cloned(address indexed clone);
-
-    // we use this to clone our original strategy to other vaults
-    function cloneConvexUnderlying(
-        address _vault,
-        address _strategist,
-        address _rewards,
-        address _keeper,
-        uint256 _pid,
-        address _curvePool,
-        string memory _name
-    ) external returns (address newStrategy) {
-        require(isOriginal);
-        // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
-        bytes20 addressBytes = bytes20(address(this));
-        assembly {
-            // EIP-1167 bytecode
-            let clone_code := mload(0x40)
-            mstore(
-                clone_code,
-                0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000
-            )
-            mstore(add(clone_code, 0x14), addressBytes)
-            mstore(
-                add(clone_code, 0x28),
-                0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000
-            )
-            newStrategy := create(0, clone_code, 0x37)
-        }
-
-        StrategyConvexUnderlying3Clonable(newStrategy).initialize(
-            _vault,
-            _strategist,
-            _rewards,
-            _keeper,
-            _pid,
-            _curvePool,
-            _name
-        );
-
-        emit Cloned(newStrategy);
-    }
-
-    // this will only be called by the clone function above
-    function initialize(
-        address _vault,
-        address _strategist,
-        address _rewards,
-        address _keeper,
-        uint256 _pid,
-        address _curvePool,
-        string memory _name
-    ) public {
-        _initialize(_vault, _strategist, _rewards, _keeper);
-        _initializeStrat(_pid, _curvePool, _name);
-    }
-
-    // this is called by our original strategy, as well as any clones
+    // this is called by our constructor
     function _initializeStrat(
         uint256 _pid,
         address _curvePool,
@@ -367,9 +305,9 @@ contract StrategyConvexUnderlying3Clonable is StrategyConvexBase {
         require(address(curve) == address(0)); // already initialized.
 
         // You can set these parameters on deployment to whatever you want
-        maxReportDelay = 21 days; // 21 days in seconds, if we hit this then harvestTrigger = True
+        maxReportDelay = 100 days; // 100 days in seconds, if we hit this then harvestTrigger = True
         healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; // health.ychad.eth
-        harvestProfitMin = 60000e6;
+        harvestProfitMin = 30000e6;
         harvestProfitMax = 120000e6;
         creditThreshold = 1e6 * 1e18;
         keepCRV = 1000; // default of 10%
@@ -448,11 +386,7 @@ contract StrategyConvexUnderlying3Clonable is StrategyConvexBase {
 
         // deposit our balance to Curve if we have any
         if (_daiBalance > 0 || _usdcBalance > 0 || _usdtBalance > 0) {
-            curve.add_liquidity(
-                [_daiBalance, _usdcBalance, _usdtBalance],
-                0,
-                true
-            );
+            curve.add_liquidity([_daiBalance, _usdcBalance, _usdtBalance], 0);
         }
 
         // debtOustanding will only be > 0 in the event of revoking or if we need to rebalance from a withdrawal or lowering the debtRatio
