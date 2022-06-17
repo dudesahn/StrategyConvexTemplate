@@ -296,6 +296,7 @@ contract StrategyConvex3Crypto is StrategyConvexBase {
         want.approve(address(depositContract), type(uint256).max);
         convexToken.approve(address(cvxeth), type(uint256).max);
         crv.approve(address(crveth), type(uint256).max);
+        weth.approve(address(curve), type(uint256).max);
 
         // setup our rewards contract
         (address lptoken, , , address _rewardsContract, , ) =

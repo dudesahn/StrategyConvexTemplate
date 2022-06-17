@@ -22,7 +22,6 @@ def test_migration(
     pool,
     strategy_name,
     sleep_time,
-    use_crv,
 ):
 
     ## deposit to the vault after approving
@@ -36,7 +35,6 @@ def test_migration(
     new_strategy = strategist.deploy(
         StrategyConvex3Crypto,
         vault,
-        use_crv,
     )
     total_old = strategy.estimatedTotalAssets()
 

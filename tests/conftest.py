@@ -39,7 +39,7 @@ def whale(accounts):
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
         "0xAE653682Dee958914A82C9628de794dCbbEe3D04", force=True
-    )  # 0xc75441D085d73983d8659635251dCf528DFB9Be2 for CRV-ETH (1400 total)
+    )  # 0xAE653682Dee958914A82C9628de794dCbbEe3D04 for 3Crypto (1400 total)
     yield whale
 
 

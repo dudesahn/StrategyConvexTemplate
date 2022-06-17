@@ -25,7 +25,6 @@ def test_odds_and_ends(
     pool,
     strategy_name,
     sleep_time,
-    use_crv,
 ):
 
     ## deposit to the vault after approving. turn off health check before each harvest since we're doing weird shit
@@ -66,7 +65,6 @@ def test_odds_and_ends(
     new_strategy = strategist.deploy(
         StrategyConvex3Crypto,
         vault,
-        use_crv,
     )
     total_old = strategy.estimatedTotalAssets()
 
@@ -170,7 +168,6 @@ def test_odds_and_ends_migration(
     pool,
     strategy_name,
     sleep_time,
-    use_crv,
 ):
 
     ## deposit to the vault after approving
@@ -184,7 +181,6 @@ def test_odds_and_ends_migration(
     new_strategy = strategist.deploy(
         StrategyConvex3Crypto,
         vault,
-        use_crv,
     )
     total_old = strategy.estimatedTotalAssets()
 
