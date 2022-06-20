@@ -217,8 +217,7 @@ contract StrategyCurveFactoryClonable is BaseStrategy  {
         // harvest profit max set to 25k usdt. will trigger harvest in this situation
         harvestProfitMax = 25_000 * 1e6;
 
-        IConvexDeposit dp = IConvexDeposit(depositContract);
-        pid = _pid;
+       
         (address lptoken, , , address _rewardsContract, , ) = dp.poolInfo(_pid);
         rewardsContract = IConvexRewards(_rewardsContract);
 
@@ -255,7 +254,7 @@ contract StrategyCurveFactoryClonable is BaseStrategy  {
     // these will likely change across different wants.
 
     //anyone can call
-    function claimRewards(address _token) external{
+    function manualClaimRewards(address _token) external{
         ICurveStrategyProxy(proxy).claimRewards(gauge, _token);
     }
 

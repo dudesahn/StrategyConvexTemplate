@@ -160,7 +160,6 @@ contract StrategyConvexFactoryClonable is BaseStrategy  {
 
     // rewards token info. we can have more than 1 reward token but this is rare, so we don't include this in the template
     address[] public rewardsTokens;
-    bool public hasRewards;
 
     // check for cloning
     bool internal isOriginal = true;
@@ -507,15 +506,14 @@ contract StrategyConvexFactoryClonable is BaseStrategy  {
     function updateLocalKeepcrv(uint256 _keep) external onlyGovernance {
         
         require(_keep <= 10_000);
-        if(_local){
-            localKeepCRV = _keep;
-        }
+        
+        localKeepCRV = _keep;
+        
     }
 
     // Use to turn off extra rewards claiming and selling. set our allowance to zero on the router and set address to zero address.
     function turnOffRewards() external onlyGovernance {
-        hasRewards = false;
-        rewardsToken = address(0);
+        delete rewardsTokens;
     }
 
     // determine whether we will check if our convex rewards need to be earmarked
@@ -655,7 +653,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy  {
         ITradeFactory tf = ITradeFactory(_tradeFactory);
 
         crv.safeApprove(_tradeFactory, 0);
-        tf.disable(convexToken, address(want));
+        tf.disable(address(crv), address(want));
 
         //disable for all rewards tokens too
         for(uint256 i; i < rewardsTokens.length; i++){
@@ -664,7 +662,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy  {
         }
         
         convexToken.safeApprove(_tradeFactory, 0);
-        tf.disable(convexToken, address(want));
+        tf.disable(address(convexToken), address(want));
 
         tradeFactory = address(0);
         

@@ -2,10 +2,36 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
+enum VaultType {
+        DEFAULT,
+        AUTOMATED,
+        FIXED_TERM,
+        EXPERIMENTAL
+    }
+
 interface Registry{
-    function newVault(address token, address governance, address guardian, address rewards, string memory name, string memory symbol) external returns (address);
+    
+
+    function newVault(
+        address _token,
+        address _governance,
+        address _guardian,
+        address _rewards,
+        string calldata _name,
+        string calldata _symbol,
+        uint256 _releaseDelta,
+        VaultType _type
+    ) external returns (address);
+    
+    function isRegistered(address token) external view returns (bool);
 
     function latestVault(address token) external view returns (address);
+    function latestVault(address token, VaultType _type) external view returns (address);
+    function endorseVault(
+        address _vault,
+        uint256 _releaseDelta,
+        VaultType _type
+    ) external;
 }
 
 interface IPoolManager {
@@ -225,16 +251,26 @@ contract CurveGlobal{
     }
 
 
-    //TODO see if vault already exists in registry
-    function alreadyExists(address _gauge) public view returns(address){
+    function alreadyExistsFromGauge(address _gauge) public view returns(address){
         address lptoken = ICurveGauge(_gauge).lp_token();
-        bytes memory data = abi.encodeWithSignature("latestVault(address)", lptoken);
-        (bool success,) = address(registry).staticcall(data);
-        if(!success){
+        return alreadyExistsFromToken(lptoken);
+
+    }
+
+    function alreadyExistsFromToken(address lptoken) public view returns(address){
+       
+        if(!registry.isRegistered(lptoken)){
             return address(0);
         }
 
-        return registry.latestVault(lptoken);
+        // check default vault followed by automated
+        bytes memory data = abi.encodeWithSignature("latestVault(address)", lptoken);
+        (bool success,) = address(registry).staticcall(data);
+        if(success){
+            return registry.latestVault(lptoken);
+        }else{
+            return registry.latestVault(lptoken, VaultType.AUTOMATED);
+        }
 
     }
 
@@ -258,7 +294,7 @@ contract CurveGlobal{
             (, , address gauge, , , ) = convexDeposit.poolInfo(i-1);
 
             if(_gauge == gauge){
-                return i-i;
+                return i-1;
             }
         }
 
@@ -266,7 +302,7 @@ contract CurveGlobal{
 
 
     function createNewCurveVaultsAndStrategies(address _gauge) external returns (address vault, address convexStrategy){
-        require(alreadyExists(_gauge) == address(0), "Vault already exists");
+        require(alreadyExistsFromGauge(_gauge) == address(0), "Vault already exists");
         address lptoken = ICurveGauge(_gauge).lp_token();
         
         //check that gauge has rewards
@@ -282,12 +318,13 @@ contract CurveGlobal{
             require(IPoolManager(convexPoolManager).addPool(_gauge), "Unable to add pool to Convex");
         }
 
-        //now we create the vault
-        vault = registry.newVault(lptoken, address(this), devms, treasury, "", "");
+        //now we create the vault, endorses it as well
+        vault = registry.newVault(lptoken, address(this), devms, treasury, "", "", 0, VaultType.AUTOMATED);
         Vault(vault).setManagement(sms);
         //set governance to owner who needs to accept before it is finalised. until then governance is this factory
         Vault(vault).setGovernance(owner);
         Vault(vault).setDepositLimit(depositLimit);
+
 
         //now we create the convex strat
         convexStrategy = IStrategy(convexStratImplementation).cloneStrategyConvex(vault, sms, rewardsStrat, keeper, pid, tradeFactory);

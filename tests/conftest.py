@@ -1,4 +1,5 @@
 import pytest
+import brownie
 from brownie import config, Wei, Contract
 from brownie import network
 import time, re, json, requests
@@ -22,11 +23,15 @@ def tenderly_fork(web3):
 def isolation(fn_isolation):
     pass
 
+@pytest.fixture(scope="module")
+def new_registry(interface):
+    yield interface.IRegistry("0x78f73705105A63e06B932611643E0b210fAE93E9")
 
 # put our pool's convex pid here; this is the only thing that should need to change up here **************
 @pytest.fixture(scope="module")
 def pid():
-    pid = 56
+    # pid = 56
+    pid = 99 #toke
     yield pid
 
 
@@ -104,9 +109,7 @@ def other_vault_strategy():
 def proxy():
     yield Contract("0xA420A63BbEFfbda3B147d0585F1852C358e2C152")
 
-@pytest.fixture(scope="function")
-def booster():
-    yield Contract("0xF403C135812408BFbE8713b5A23a04b3D48AAE31")
+
 
 
 @pytest.fixture(scope="module")
@@ -293,15 +296,15 @@ def vault(
     Vault = pm(config["dependencies"][0]).Vault
     vault = Vault.at(strategy.vault())
 
-    vault.acceptGovernance({"from": strategist_ms})
-    vault.setGovernance(gov, {"from": strategist_ms})
     vault.acceptGovernance({"from": gov})
-    vault.setManagement(management, {"from": gov})
-    chain.sleep(1)
+
 
     vault.setManagementFee(0, {"from": gov})
     yield vault
 
+@pytest.fixture(scope="function")
+def toke_gauge(Contract):
+    yield Contract("0xa0C08C0Aede65a0306F7dD042D2560dA174c91fC")
 
 @pytest.fixture(scope="function")
 def v2(pm, gov, rewards, guardian, management, token, chain):
@@ -334,6 +337,7 @@ def strategy(
     v2,
     trade_factory,
     gov,
+    accounts,
     CurveGlobal,
     guardian,
     token,
@@ -343,27 +347,44 @@ def strategy(
     pid,
     proxy,
     gasOracle,
+    new_registry,
     strategist_ms,
+    toke_gauge
 ):
-    curveGlobal = strategist.deploy(CurveGlobal)
+
+    curveGlobal = strategist.deploy(CurveGlobal, new_registry, gasOracle)
+
+    pid = curveGlobal.getPid(toke_gauge)
+    print(pid)
+    
     s = strategist.deploy(
-        StrategyConvexFactoryClonable, v2, trade_factory, curveGlobal, pid
+        StrategyConvexFactoryClonable, v2, trade_factory, pid
     )
-    curveGlobal.initialise(s, {"from": strategist})
-    t11 = curveGlobal.createNewCurveVaultAndStrat(pid, 2**256-1, {"from": strategist})
+    curveGlobal.setConvexStratImplementation(s, {'from': gov})
+    
+    registry_owner = accounts.at(new_registry.owner(), force=True)
+    new_registry.setApprovedVaultsOwner(curveGlobal, True, {'from': registry_owner})
+    new_registry.setRole(curveGlobal, False, True, {'from': registry_owner})
+
+    t11 = curveGlobal.createNewCurveVaultsAndStrategies(toke_gauge, {"from": strategist})
     (vault, strat) = t11.return_value
+    print("endorsed")
+
+    with brownie.reverts("Vault already exists"):
+        curveGlobal.createNewCurveVaultsAndStrategies(toke_gauge, {"from": strategist})
+
+    # test a default type
+    assert curveGlobal.alreadyExistsFromToken("0xC4C319E2D4d66CcA4464C0c2B32c9Bd23ebe784e") == '0x718AbE90777F5B778B52D553a5aBaa148DD0dc5D'
 
     # make sure to include all constructor parameters needed here
     strategy = StrategyConvexFactoryClonable.at(strat)
     #print(strategy.rewards())
-    sharer = Contract(strategy.rewards())
     #print("contributors: ", sharer.viewContributors(strategy))
 
     trade_factory.grantRole(
         trade_factory.STRATEGY(), strategy, {"from": ymechs_safe, "gas_price": "0 gwei"}
     )
     strategy.setKeeper(keeper, {"from": strategist_ms})
-    strategy.setHarvestProfitNeeded(80000e6, 180000e6, {"from": strategist_ms})
     gasOracle.setMaxAcceptableBaseFee(20000000000000, {"from": strategist_ms})
     # set our management fee to zero so it doesn't mess with our profit checking
 
