@@ -4,6 +4,8 @@ pragma experimental ABIEncoderV2;
 
 interface Registry{
     function newVault(address token, address governance, address guardian, address rewards, string memory name, string memory symbol) external returns (address);
+
+    function latestVault(address token) external view returns (address);
 }
 
 interface IPoolManager {
@@ -217,24 +219,31 @@ contract CurveGlobal{
     //
     ////////////////////////////////////
 
-    constructor(address _registry, address _convexStratImplementation, address _curveStratImplementation ) public {
+    constructor(address _registry, address _convexStratImplementation ) public {
        registry = Registry(_registry);
        convexStratImplementation = _convexStratImplementation;
-       curveStratImplementation = _curveStratImplementation;
     }
 
 
     //TODO see if vault already exists in registry
     function alreadyExists(address _gauge) public view returns(address){
+        address lptoken = ICurveGauge(_gauge).lp_token();
+        bytes memory data = abi.encodeWithSignature("latestVault(address)", lptoken);
+        (bool success,) = address(registry).staticcall(data);
+        if(!success){
+            return address(0);
+        }
+
+        return registry.latestVault(lptoken);
 
     }
 
-    //TODO see if vault already exists in registry
-    function calculateOptimalRatios(address _gauge) public view returns(uint256 ratioConvex, uint256 ratioCurve){
+    // //TODO see if vault already exists in registry
+    // function calculateOptimalRatios(address _gauge) public view returns(uint256 ratioConvex, uint256 ratioCurve){
 
-        ratioConvex = 10_000;
+    //     ratioConvex = 10_000;
 
-    }
+    // }
 
     //very annoying
     function getPid(address _gauge) public view returns (uint256 pid){
@@ -256,7 +265,7 @@ contract CurveGlobal{
     }
 
 
-    function createNewCurveVaultsAndStrategies(address _gauge) external returns (address vault, address convexStrategy, address curveStrategy){
+    function createNewCurveVaultsAndStrategies(address _gauge) external returns (address vault, address convexStrategy){
         require(alreadyExists(_gauge) == address(0), "Vault already exists");
         address lptoken = ICurveGauge(_gauge).lp_token();
         
@@ -284,42 +293,23 @@ contract CurveGlobal{
         convexStrategy = IStrategy(convexStratImplementation).cloneStrategyConvex(vault, sms, rewardsStrat, keeper, pid, tradeFactory);
         IStrategy(convexStrategy).setHealthCheck(healthCheck);
 
-        //now we create the basic curve strategy
-        curveStrategy = IStrategy(curveStratImplementation).cloneStrategyCurve(vault, sms, rewardsStrat, keeper, tradeFactory);
-        IStrategy(curveStrategy).setHealthCheck(healthCheck);
+        //removed due to proxy limitations
+        // //now we create the basic curve strategy
+        // curveStrategy = IStrategy(curveStratImplementation).cloneStrategyCurve(vault, sms, rewardsStrat, keeper, tradeFactory);
+        // IStrategy(curveStrategy).setHealthCheck(healthCheck);
 
-        //now we setup our ratios based
-        uint256 ratioConvex;
-        uint256 ratioCurve;
-        if(allConvex){
-            ratioConvex = 10_000;
-        }
-        else{
-            (ratioConvex, ratioCurve) = calculateOptimalRatios(_gauge);
-        }
+        //removed due to yearn proxy limitations
+        // //now we setup our ratios based
+        // uint256 ratioConvex;
+        // uint256 ratioCurve;
+        // if(allConvex){
+        //     ratioConvex = 10_000;
+        // }
+        // else{
+        //     (ratioConvex, ratioCurve) = calculateOptimalRatios(_gauge);
+        // }
 
-        Vault(vault).addStrategy(convexStrategy, ratioConvex, 0, type(uint256).max, performanceFee);
-        Vault(vault).addStrategy(curveStrategy, ratioCurve, 0, type(uint256).max, performanceFee);
+        Vault(vault).addStrategy(convexStrategy, 10_000, 0, type(uint256).max, performanceFee);
 
-    }
-
-    function createNewCurveVaultAndStrat(uint256 _pid) external returns (address vault, address strat){
-
-        
-            
-        (address lptoken, , , , , ) = convexDeposit.poolInfo(_pid);
-
-        vault = registry.newVault(lptoken, address(this), devms, treasury, "", "");
-        Vault(vault).setManagement(sms);
-
-        //set governance to owner who needs to accept before it is finalised. until then governance is this factory
-        Vault(vault).setGovernance(owner);
-        Vault(vault).setDepositLimit(depositLimit);
-        
-        strat = IStrategy(convexStratImplementation).cloneStrategyConvex(vault, sms, rewardsStrat, keeper, _pid, tradeFactory);
-
-        IStrategy(strat).setHealthCheck(healthCheck);
-
-        Vault(vault).addStrategy(strat, 10_000, 0, type(uint256).max, performanceFee);
     }
 }

@@ -330,7 +330,7 @@ contract StrategyCurveFactoryClonable is BaseStrategy  {
     function prepareMigration(address _newStrategy) internal override {
         uint256 _stakedBal = stakedBalance();
         if (_stakedBal > 0) {
-            rewardsContract.withdrawAndUnwrap(_stakedBal, claimRewards);
+            ICurveStrategyProxy(proxy).withdraw(gauge, address(want), _stakedBal);
         }
     }
 
@@ -524,7 +524,7 @@ contract StrategyCurveFactoryClonable is BaseStrategy  {
 
     function stakedBalance() public view returns (uint256) {
         // how much want we have staked in Convex
-        return rewardsContract.balanceOf(address(this));
+        return ICurveStrategyProxy(proxy).balanceOf(gauge);
     }
 
     function balanceOfWant() public view returns (uint256) {
@@ -551,9 +551,11 @@ contract StrategyCurveFactoryClonable is BaseStrategy  {
         // Send all of our Curve pool tokens to be deposited
         uint256 _toInvest = balanceOfWant();
         // deposit into convex and stake immediately but only if we have something to invest
-        if (_toInvest > 0) {
-            IConvexDeposit(depositContract).deposit(pid, _toInvest, true);
+         if (_toInvest > 0) {
+            want.safeTransfer(proxy, _toInvest);
+            ICurveStrategyProxy(proxy).deposit(gauge, address(want));
         }
+
     }
 
     function liquidatePosition(uint256 _amountNeeded)
