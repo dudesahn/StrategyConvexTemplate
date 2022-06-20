@@ -109,6 +109,10 @@ interface Vault{
     
     function setGovernance(address) external;
     function setManagement(address) external;
+    function managementFee() external view returns (uint256);
+    function setManagementFee(uint256) external ;
+    function performanceFee() external view returns (uint256);
+    function setPerformanceFee(uint256) external ;
     function setDepositLimit(uint256) external;
     function addStrategy(address, uint, uint, uint, uint) external;
 }
@@ -152,43 +156,43 @@ contract CurveGlobal{
         convexDeposit = IConvexDeposit(_convexDeposit);
     }
 
-    address public sms = address(0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7);
+    address public sms = 0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7;
     function setSms(address _sms) external {
         require(msg.sender == owner);
         sms = _sms;
     }
 
-    address public devms = address(0x846e211e8ba920B353FB717631C015cf04061Cc9);
+    address public devms = 0x846e211e8ba920B353FB717631C015cf04061Cc9;
     function setDevms(address _devms) external {
         require(msg.sender == owner);
         devms = _devms;
     }
 
-    address public treasury = address(0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde);
+    address public treasury = 0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde;
     function setTreasury(address _treasury) external {
         require(msg.sender == owner);
         treasury = _treasury;
     }
 
-    address public keeper = address(0x736D7e3c5a6CB2CE3B764300140ABF476F6CFCCF);
+    address public keeper = 0x736D7e3c5a6CB2CE3B764300140ABF476F6CFCCF;
     function setKeeper(address _keeper) external {
         require(msg.sender == owner);
         keeper = _keeper;
     }
 
-    address public rewardsStrat = address(0xc491599b9A20c3A2F0A85697Ee6D9434EFa9f503);
+    address public rewardsStrat = 0xc491599b9A20c3A2F0A85697Ee6D9434EFa9f503;
     function setStratRewards(address _rewards) external {
         require(msg.sender == owner);
         rewardsStrat = _rewards;
     }
 
-    address public healthCheck = address(0xDDCea799fF1699e98EDF118e0629A974Df7DF012);
+    address public healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012;
     function setHealthcheck(address _health) external {
         require(msg.sender == owner);
         healthCheck = _health;
     }
 
-    address public tradeFactory = address(0x99d8679bE15011dEAD893EB4F5df474a4e6a8b29);
+    address public tradeFactory = 0x99d8679bE15011dEAD893EB4F5df474a4e6a8b29;
     function setTradeFactory(address _tradeFactory) external{
         require(msg.sender == owner || msg.sender == sms);
         tradeFactory = _tradeFactory;
@@ -220,11 +224,18 @@ contract CurveGlobal{
         keepCRV = _keepCRV;
     }
 
-    uint256 public performanceFee = 0;
-    function setPerfFee(uint256 _perf) external {
+    uint256 public performanceFee = 1_000;
+    function setPerformanceFee(uint256 _performanceFee) external {
         require(msg.sender == owner);
-        require(_perf <= 10_000);
-        performanceFee = _perf;
+        require(_performanceFee <= 5_000);
+        performanceFee = _performanceFee;
+    }
+
+    uint256 public managementFee = 0;
+    function setManagementFee(uint256 _managementFee) external {
+        require(msg.sender == owner);
+        require(_managementFee <= 1_000);
+        managementFee = _managementFee;
     }
 
     ///////////////////////////////////
@@ -295,16 +306,26 @@ contract CurveGlobal{
 
         //now we create the vault, endorses it as well
         vault = registry.newVault(lptoken, address(this), devms, treasury, "", "", 0, VaultType.AUTOMATED);
-        Vault(vault).setManagement(sms);
+        Vault v = Vault(vault);
+        v.setManagement(sms);
         //set governance to owner who needs to accept before it is finalised. until then governance is this factory
-        Vault(vault).setGovernance(owner);
+        v.setGovernance(owner);
+        v.setDepositLimit(depositLimit);
+
+        if(v.managementFee() != managementFee){
+            v.setManagementFee(managementFee);
+        }
+        if(v.performanceFee() != performanceFee){
+            v.setPerformanceFee(performanceFee);
+        }
+
         Vault(vault).setDepositLimit(depositLimit);
 
         //now we create the convex strat
         convexStrategy = IStrategy(convexStratImplementation).cloneStrategyConvex(vault, sms, rewardsStrat, keeper, pid, tradeFactory);
         IStrategy(convexStrategy).setHealthCheck(healthCheck);
 
-        Vault(vault).addStrategy(convexStrategy, 10_000, 0, type(uint256).max, performanceFee);
+        Vault(vault).addStrategy(convexStrategy, 10_000, 0, type(uint256).max, 0);
 
     }
 }
