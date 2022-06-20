@@ -36,17 +36,20 @@ def pid():
 
 
 @pytest.fixture(scope="module")
-def whale(accounts):
+def whale(accounts, toke_gauge, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
+
+
     whale = accounts.at("0x89eBCb7714bd0D2F33ce3a35C12dBEB7b94af169", force=True)
+    token.transfer(whale, 1_000*1e18, {'from': toke_gauge})
     yield whale
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 5_000e18
+    amount = 500e18
     yield amount
 
 
@@ -302,7 +305,7 @@ def vault(
     vault.setManagementFee(0, {"from": gov})
     yield vault
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def toke_gauge(Contract):
     yield Contract("0xa0C08C0Aede65a0306F7dD042D2560dA174c91fC")
 
@@ -356,6 +359,7 @@ def strategy(
 
     pid = curveGlobal.getPid(toke_gauge)
     print(pid)
+    print(toke_gauge.lp_token())
     
     s = strategist.deploy(
         StrategyConvexFactoryClonable, v2, trade_factory, pid
