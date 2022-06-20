@@ -21,6 +21,16 @@ interface ITradeFactory {
 interface IBaseFee {
     function isCurrentBaseFeeAcceptable() external view returns (bool);
 }
+interface ICurveGauge {
+    function deposit(uint256) external;
+    function balanceOf(address) external view returns (uint256);
+    function withdraw(uint256) external;
+    function claim_rewards() external;
+    function reward_tokens(uint256) external view returns(address);//v2
+    function rewarded_token() external view returns(address);//v1
+    function lp_token() external view returns(address);
+    function reward_count() external view returns(uint256);
+}
 
 interface IUniV3 {
     struct ExactInputParams {
@@ -37,40 +47,32 @@ interface IUniV3 {
         returns (uint256 amountOut);
 }
 
-interface IConvexRewards {
-    // strategy's staked balance in the synthetix staking contract
-    function balanceOf(address account) external view returns (uint256);
+interface ICurveStrategyProxy {
+    function proxy() external returns (address);
 
-    // read how much claimable CRV a strategy has
-    function earned(address account) external view returns (uint256);
+    function balanceOf(address _gauge) external view returns (uint256);
 
-    // stake a convex tokenized deposit
-    function stake(uint256 _amount) external returns (bool);
+    function deposit(address _gauge, address _token) external;
 
-    // withdraw to a convex tokenized deposit, probably never need to use this
-    function withdraw(uint256 _amount, bool _claim) external returns (bool);
+    function withdraw(
+        address _gauge,
+        address _token,
+        uint256 _amount
+    ) external returns (uint256);
 
-    // withdraw directly to curve LP token, this is what we primarily use
-    function withdrawAndUnwrap(uint256 _amount, bool _claim)
+    function withdrawAll(address _gauge, address _token)
         external
-        returns (bool);
+        returns (uint256);
 
-    // claim rewards, with an option to claim extra rewards or not
-    function getReward(address _account, bool _claimExtras)
-        external
-        returns (bool);
+    function harvest(address _gauge) external;
 
-    // check if we have rewards on a pool
-    function extraRewardsLength() external view returns (uint256);
+    function lock() external;
 
-    // if we have rewards, see what the address is
-    function extraRewards(uint256 _reward) external view returns (address);
+    function approveStrategy(address) external;
 
-    // read our rewards token
-    function rewardToken() external view returns (address);
+    function revokeStrategy(address) external;
 
-    // check our reward period finish
-    function periodFinish() external view returns (uint256);
+    function claimRewards(address _gauge, address _token) external;
 }
 
 interface IDetails {
@@ -78,35 +80,7 @@ interface IDetails {
     function name() external view returns (string memory);
 }
 
-interface IConvexDeposit {
-    // deposit into convex, receive a tokenized deposit.  parameter to stake immediately (we always do this).
-    function deposit(
-        uint256 _pid,
-        uint256 _amount,
-        bool _stake
-    ) external returns (bool);
-
-    // burn a tokenized deposit (Convex deposit tokens) to receive curve lp tokens back
-    function withdraw(uint256 _pid, uint256 _amount) external returns (bool);
-    function poolLength() external
-        view
-        returns ( uint256);
-
-    // give us info about a pool based on its pid
-    function poolInfo(uint256)
-        external
-        view
-        returns (
-            address,
-            address,
-            address,
-            address,
-            address,
-            bool
-        );
-}
-
-contract StrategyConvexFactoryClonable is BaseStrategy  {
+contract StrategyCurveFactoryClonable is BaseStrategy  {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
@@ -114,12 +88,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy  {
     /* ========== STATE VARIABLES ========== */
     // these should stay the same across different wants.
 
-    // convex stuff
-    address internal constant depositContract =
-        0xF403C135812408BFbE8713b5A23a04b3D48AAE31; // this is the deposit contract that all pools use, aka booster
-    IConvexRewards public rewardsContract; // This is unique to each curve pool
-    //address public virtualRewardsPool; // This is only if we have bonus rewards
-    uint256 public pid; // this is unique to each pool
+    
     uint256 public localKeepCRV;
 
     address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
@@ -130,8 +99,6 @@ contract StrategyConvexFactoryClonable is BaseStrategy  {
 
     IERC20 internal constant crv =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
-    IERC20 internal constant convexToken =
-        IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
     IERC20 internal constant weth =
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     IERC20 internal constant usdt =
@@ -151,16 +118,17 @@ contract StrategyConvexFactoryClonable is BaseStrategy  {
     // these will likely change across different wants.
 
     // Curve stuff
-    address public curve; // Curve Pool, this is our pool specific to this vault
+    address public gauge;
 
-    bool public checkEarmark; // this determines if we should check if we need to earmark rewards before harvesting
-
+    bool public skipClaim;
     bool public tradesEnabled;
     address public tradeFactory;
 
     // rewards token info. we can have more than 1 reward token but this is rare, so we don't include this in the template
     address[] public rewardsTokens;
     bool public hasRewards;
+
+    address public proxy; // our proxy
 
     // check for cloning
     bool internal isOriginal = true;
@@ -170,9 +138,9 @@ contract StrategyConvexFactoryClonable is BaseStrategy  {
     constructor(
         address _vault,
         address _tradeFactory,
-        uint256 _pid
+        address _gauge
     ) public BaseStrategy(_vault) {
-        _initializeStrat(_pid, _tradeFactory);
+        _initializeStrat(_gauge, _tradeFactory);
     }
 
     /* ========== CLONING ========== */
@@ -180,12 +148,12 @@ contract StrategyConvexFactoryClonable is BaseStrategy  {
     event Cloned(address indexed clone);
 
     // we use this to clone our original strategy to other vaults
-    function cloneStrategyConvex(
+    function cloneStrategyCurve(
         address _vault,
         address _strategist,
         address _rewards,
         address _keeper,
-        uint256 _pid,
+        address _gauge,
         address _tradeFactory
     ) external returns (address newStrategy) {
         require(isOriginal);
@@ -211,7 +179,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy  {
             _strategist,
             _rewards,
             _keeper,
-            _pid,
+            _gauge,
             _tradeFactory
         );
 
@@ -224,19 +192,24 @@ contract StrategyConvexFactoryClonable is BaseStrategy  {
         address _strategist,
         address _rewards,
         address _keeper,
-        uint256 _pid,
+        address _gauge,
         address _tradeFactory
     ) public {
         _initialize(_vault, _strategist, _rewards, _keeper);
-        _initializeStrat(_pid, _tradeFactory);
+        _initializeStrat(_gauge, _tradeFactory);
     }
 
     // this is called by our original strategy, as well as any clones
     function _initializeStrat(
-        uint256 _pid, address _tradeFactory
+        address _gauge, address _tradeFactory
     ) internal {
         // make sure that we haven't initialized this before
         require(address(tradeFactory) == address(0)); // already initialized.
+        
+        require(ICurveGauge(_gauge).lp_token() == want);
+        gauge = _gauge;
+
+        proxy = ICurveStrategyProxy(0xA420A63BbEFfbda3B147d0585F1852C358e2C152);
 
         // want = Curve LP
         want.approve(address(depositContract), type(uint256).max);
@@ -281,6 +254,20 @@ contract StrategyConvexFactoryClonable is BaseStrategy  {
     /* ========== VARIABLE FUNCTIONS ========== */
     // these will likely change across different wants.
 
+    //anyone can call
+    function claimRewards(address _token) external{
+        ICurveStrategyProxy(proxy).claimRewards(gauge, _token);
+    }
+
+    function _claimAllRewards() internal{
+        //get our rewards from the proxy
+        ICurveStrategyProxy p = ICurveStrategyProxy(proxy);
+        p.claimRewards(guage, crv);
+        for(uint256 i = 0; i < rewardsTokens.length; i ++){
+            p.claimRewards(guage, rewardsTokens[i]);
+        }
+    }
+
     function prepareReturn(uint256 _debtOutstanding)
         internal
         override
@@ -293,9 +280,11 @@ contract StrategyConvexFactoryClonable is BaseStrategy  {
         if(tradesEnabled == false && tradeFactory != address(0)){
             _setUpTradeFactory();
         }
-
-        // this claims our CRV, CVX, and any extra tokens like SNX or ANKR. no harm leaving this true even if no extra rewards currently.
-        rewardsContract.getReward(address(this), true);
+        
+        //allow normal ops if something is wrong
+        if(!skipClaim){
+            _claimAllRewards();
+        }
 
         uint256 crvBalance = crv.balanceOf(address(this));
         uint256 keep = localKeepCRV;
@@ -492,16 +481,20 @@ contract StrategyConvexFactoryClonable is BaseStrategy  {
     function _updateRewards() internal {
 
         delete rewardsTokens; //empty the rewardsTokens and rebuild
-        
-        for (uint256 i; i< rewardsContract.extraRewardsLength(); i++){
-            address virtualRewardsPool = rewardsContract.extraRewards(0);
-            address _rewardsToken = IConvexRewards(virtualRewardsPool).rewardToken();
+        ICurveGauge g = ICurveGauge(gauge);
 
-            // we only need to approve the new token and turn on rewards if the extra rewards isn't CVX
-            if (_rewardsToken != address(convexToken)) {
-                rewardsTokens.push(_rewardsToken);
+        //we need to treat differently for different gauge versions. start with v2 as that is more likely
+        if (IsV2()){
+            for (uint256 i; i< g.reward_count(); i++){
+                rewardsTokens.push(g.reward_tokens[i]);
             }
         }
+        else if(IsV1()){
+            //only one reward
+            rewardsTokens.push(g.rewarded_token());
+        }
+        
+        
     }
 
     function updateLocalKeepcrv(uint256 _keep) external onlyGovernance {
@@ -676,6 +669,29 @@ contract StrategyConvexFactoryClonable is BaseStrategy  {
         onlyAuthorized
     {
         forceHarvestTriggerOnce = _forceHarvestTriggerOnce;
+    }
+
+    function setSkipClaim(bool _skipClaim)
+        external
+        onlyEmergencyAuthorized
+    {
+        skipClaim = _skipClaim;
+    }
+
+
+    bytes4 private constant rewarded_token = 0x16fa50b1; //rewarded_token()
+    bytes4 private constant reward_tokens = 0x54c49fe9; //reward_tokens(uint256)
+
+    function IsV1() private returns(bool){
+        bytes memory data = abi.encode(rewarded_token);
+        (bool success,) = gauge.call(data);
+        return success;
+    }
+
+    function IsV2() private returns(bool){
+        bytes memory data = abi.encodeWithSelector(reward_tokens,uint256(0));
+        (bool success,) = gauge.call(data);
+        return success;
     }
 }
 
