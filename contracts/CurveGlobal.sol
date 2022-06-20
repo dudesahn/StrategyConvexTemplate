@@ -139,12 +139,6 @@ contract CurveGlobal{
         convexPoolManager = _convexPoolManager;
     }
 
-    address public gaugeController = 0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB;
-    function setGaugeController(address _gaugeController) external {
-        require(msg.sender == owner);
-        gaugeController = _gaugeController;
-    }
-
     
     Registry public registry; //= Registry(address(0x50c1a2eA0a861A967D9d0FFE2AE4012c2E053804));
     function setRegistry(address _registry) external {
@@ -212,12 +206,6 @@ contract CurveGlobal{
         convexStratImplementation = _convexStratImplementation;
     }
 
-    address public curveStratImplementation;
-    function setCurveStratImplementation(address _curveStratImplementation) external {
-        require(msg.sender == owner);
-        curveStratImplementation = _curveStratImplementation;
-    }
-
     bool public allConvex = true;
     function setAllConvex(bool _allConvex) external {
         require(msg.sender == owner || msg.sender == sms);
@@ -274,13 +262,6 @@ contract CurveGlobal{
 
     }
 
-    // //TODO see if vault already exists in registry
-    // function calculateOptimalRatios(address _gauge) public view returns(uint256 ratioConvex, uint256 ratioCurve){
-
-    //     ratioConvex = 10_000;
-
-    // }
-
     //very annoying
     function getPid(address _gauge) public view returns (uint256 pid){
         pid = type(uint256).max;
@@ -297,17 +278,11 @@ contract CurveGlobal{
                 return i-1;
             }
         }
-
     }
-
 
     function createNewCurveVaultsAndStrategies(address _gauge) external returns (address vault, address convexStrategy){
         require(alreadyExistsFromGauge(_gauge) == address(0), "Vault already exists");
         address lptoken = ICurveGauge(_gauge).lp_token();
-        
-        //check that gauge has rewards
-        uint256 weight = IGaugeController(gaugeController).get_gauge_weight(_gauge);
-        require(weight > 0, "gauge has no weight");
 
         //get convex pid. if no pid create one
         uint256 pid = getPid(_gauge);
@@ -325,26 +300,9 @@ contract CurveGlobal{
         Vault(vault).setGovernance(owner);
         Vault(vault).setDepositLimit(depositLimit);
 
-
         //now we create the convex strat
         convexStrategy = IStrategy(convexStratImplementation).cloneStrategyConvex(vault, sms, rewardsStrat, keeper, pid, tradeFactory);
         IStrategy(convexStrategy).setHealthCheck(healthCheck);
-
-        //removed due to proxy limitations
-        // //now we create the basic curve strategy
-        // curveStrategy = IStrategy(curveStratImplementation).cloneStrategyCurve(vault, sms, rewardsStrat, keeper, tradeFactory);
-        // IStrategy(curveStrategy).setHealthCheck(healthCheck);
-
-        //removed due to yearn proxy limitations
-        // //now we setup our ratios based
-        // uint256 ratioConvex;
-        // uint256 ratioCurve;
-        // if(allConvex){
-        //     ratioConvex = 10_000;
-        // }
-        // else{
-        //     (ratioConvex, ratioCurve) = calculateOptimalRatios(_gauge);
-        // }
 
         Vault(vault).addStrategy(convexStrategy, 10_000, 0, type(uint256).max, performanceFee);
 
