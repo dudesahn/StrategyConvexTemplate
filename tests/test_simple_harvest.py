@@ -21,14 +21,13 @@ def test_simple_harvest(
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
     booster.earmarkRewards(strategy.pid(), {"from": strategist})
 
     # this is part of our check into the staking contract balance
     stakingBeforeHarvest = rewardsContract.balanceOf(strategy)
-
 
     # harvest, store asset amount
     chain.sleep(1)
@@ -50,8 +49,8 @@ def test_simple_harvest(
     # harvest, store new asset amount
     chain.sleep(1)
     pending_rewards = strategy.claimableProfitInUsdt()
-    assert strategy.stakedBalance() >0
-    assert token.balanceOf(strategy) ==  0
+    assert strategy.stakedBalance() > 0
+    assert token.balanceOf(strategy) == 0
     claimable_crv = strategy.claimableBalance()
     assert claimable_crv > 0
     print("\nPending claimable in USDT after 1 day: ", pending_rewards / 1e6)
@@ -63,7 +62,6 @@ def test_simple_harvest(
     assert new_assets >= old_assets
     print("\nAssets after 1 day: ", new_assets / 1e18)
 
-    
     # Display estimated APR
     print(
         "\nEstimated DAI APR: ",
@@ -71,8 +69,6 @@ def test_simple_harvest(
             ((new_assets - old_assets) * (365 * 4)) / (strategy.estimatedTotalAssets())
         ),
     )
-
- 
 
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})

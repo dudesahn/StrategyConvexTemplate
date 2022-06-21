@@ -33,7 +33,7 @@ def test_yswap(
     vault_before = token.balanceOf(vault)
     strat_before = token.balanceOf(strategy)
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     vault_after = token.balanceOf(vault)
 
@@ -52,13 +52,15 @@ def test_yswap(
 
     print(f"Executing trades...")
     for id in ins:
-        
+
         print(id.address)
         receiver = strategy.address
         token_in = id
-        
+
         amount_in = id.balanceOf(strategy)
-        print(f"Executing trade {id}, tokenIn: {token_in} -> tokenOut {token_out} amount {amount_in}")
+        print(
+            f"Executing trade {id}, tokenIn: {token_in} -> tokenOut {token_out} amount {amount_in}"
+        )
 
         if amount_in == 0:
             continue
@@ -77,7 +79,7 @@ def test_yswap(
 
         path = [token_in.address, weth, dai]
         calldata = sushiswap_router.swapExactTokensForTokens.encode_input(
-            amount_in, 0, path, multicall_swapper, 2 ** 256 - 1
+            amount_in, 0, path, multicall_swapper, 2**256 - 1
         )
         t = createTx(sushiswap_router, calldata)
         a = a + t[0]
@@ -108,19 +110,22 @@ def test_yswap(
         transaction = encode_abi_packed(a, b)
 
         # min out must be at least 1 to ensure that the tx works correctly
-        #trade_factory.execute["uint256, address, uint, bytes"](
+        # trade_factory.execute["uint256, address, uint, bytes"](
         #    multicall_swapper.address, 1, transaction, {"from": ymechs_safe}
-        #)
-        trade_factory.execute['tuple,address,bytes'](asyncTradeExecutionDetails, 
-            multicall_swapper.address, transaction, {"from": ymechs_safe}
+        # )
+        trade_factory.execute["tuple,address,bytes"](
+            asyncTradeExecutionDetails,
+            multicall_swapper.address,
+            transaction,
+            {"from": ymechs_safe},
         )
         print(token_out.balanceOf(strategy))
     tx = strategy.harvest({"from": strategist})
     print(tx.events)
     assert tx.events["Harvested"]["profit"] > 0
 
-    vault.updateStrategyDebtRatio(strategy, 0, {'from': gov})
-    strategy.harvest({'from': strategist})
+    vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
+    strategy.harvest({"from": strategist})
     assert token.balanceOf(vault) > amount
     assert strategy.estimatedTotalAssets() == 0
 

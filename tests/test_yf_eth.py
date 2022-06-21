@@ -34,37 +34,37 @@ def test_yfi_yswap(
     token = Contract(vault.token())
     print(token)
     curve_zapper = Contract(token.minter())
-    whale = accounts.at("0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52", force=True) #prob needs changing a lot
+    whale = accounts.at(
+        "0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52", force=True
+    )  # prob needs changing a lot
     strategist = accounts.at(strategy.strategist(), force=True)
-    amount = 10*1e18
+    amount = 10 * 1e18
     gov = accounts.at(vault.governance(), force=True)
     booster.earmarkRewards(strategy.pid(), {"from": strategist})
-
 
     vault_before = token.balanceOf(vault)
     strat_before = token.balanceOf(strategy)
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     vault_after = token.balanceOf(vault)
     print(vault_after)
 
     strategy.harvest({"from": strategist})
     booster.earmarkRewards(strategy.pid(), {"from": strategist})
-    chain.sleep(60 * 60 * 12) #12 hours
+    chain.sleep(60 * 60 * 12)  # 12 hours
     chain.mine(1)
     booster.earmarkRewards(strategy.pid(), {"from": strategist})
     tx = strategy.harvest({"from": strategist})
 
     crv.transfer(whale, crv.balanceOf(strategy), {"from": strategy})
     convexToken.transfer(whale, crv.balanceOf(strategy), {"from": strategy})
-    assert crv.balanceOf(strategy) ==0
+    assert crv.balanceOf(strategy) == 0
 
-    chain.sleep(60 * 60 * 12) #12 hours
+    chain.sleep(60 * 60 * 12)  # 12 hours
     chain.mine(1)
     booster.earmarkRewards(strategy.pid(), {"from": strategist})
     tx = strategy.harvest({"from": strategist})
-
 
     token_out = token
 
@@ -76,13 +76,15 @@ def test_yfi_yswap(
 
     print(f"Executing trades...")
     for id in ins:
-        
+
         print(id.address)
         receiver = strategy.address
         token_in = id
-        
+
         amount_in = id.balanceOf(strategy)
-        print(f"Executing trade {id}, tokenIn: {token_in} -> tokenOut {token_out} amount {amount_in/1e18}")
+        print(
+            f"Executing trade {id}, tokenIn: {token_in} -> tokenOut {token_out} amount {amount_in/1e18}"
+        )
 
         asyncTradeExecutionDetails = [strategy, token_in, token_out, amount_in, 1]
 
@@ -98,7 +100,7 @@ def test_yfi_yswap(
 
         path = [token_in.address, weth]
         calldata = sushiswap_router.swapExactTokensForTokens.encode_input(
-            amount_in, 0, path, multicall_swapper, 2 ** 256 - 1
+            amount_in, 0, path, multicall_swapper, 2**256 - 1
         )
         t = createTx(sushiswap_router, calldata)
         a = a + t[0]
@@ -110,16 +112,13 @@ def test_yfi_yswap(
         a = a + t[0]
         b = b + t[1]
 
-        calldata = curve_zapper.add_liquidity.encode_input(
-            [expectedOut, 0], 0, False
-        )
+        calldata = curve_zapper.add_liquidity.encode_input([expectedOut, 0], 0, False)
         t = createTx(curve_zapper, calldata)
         a = a + t[0]
         b = b + t[1]
 
         expectedOut = (
-            curve_zapper.calc_token_amount([expectedOut, 0])
-            * 0.98
+            curve_zapper.calc_token_amount([expectedOut, 0]) * 0.98
         )  # less because it doesnt take into account fees
         calldata = token_out.transfer.encode_input(receiver, expectedOut)
         t = createTx(token_out, calldata)
@@ -129,23 +128,26 @@ def test_yfi_yswap(
         transaction = encode_abi_packed(a, b)
 
         # min out must be at least 1 to ensure that the tx works correctly
-        #trade_factory.execute["uint256, address, uint, bytes"](
+        # trade_factory.execute["uint256, address, uint, bytes"](
         #    multicall_swapper.address, 1, transaction, {"from": ymechs_safe}
-        #)
-        trade_factory.execute['tuple,address,bytes'](asyncTradeExecutionDetails, 
-            multicall_swapper.address, transaction, {"from": ymechs_safe}
+        # )
+        trade_factory.execute["tuple,address,bytes"](
+            asyncTradeExecutionDetails,
+            multicall_swapper.address,
+            transaction,
+            {"from": ymechs_safe},
         )
-        print(token_out.balanceOf(strategy)/1e18)
+        print(token_out.balanceOf(strategy) / 1e18)
     tx = strategy.harvest({"from": strategist})
-    print(tx.events["Harvested"]["profit"]/1e18)
+    print(tx.events["Harvested"]["profit"] / 1e18)
     assert tx.events["Harvested"]["profit"] > 0
 
-    print("apr = ", (365*2*tx.events["Harvested"]["profit"]) / vault_after)
+    print("apr = ", (365 * 2 * tx.events["Harvested"]["profit"]) / vault_after)
 
-    vault.updateStrategyDebtRatio(strategy, 0, {'from': gov})
-    strategy.harvest({'from': strategist})
-    print(token.balanceOf(vault)/1e18)
-    print(strategy.estimatedTotalAssets()/1e18)
+    vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
+    strategy.harvest({"from": strategist})
+    print(token.balanceOf(vault) / 1e18)
+    print(strategy.estimatedTotalAssets() / 1e18)
     assert token.balanceOf(vault) > amount
     assert strategy.estimatedTotalAssets() == 0
 

@@ -6,7 +6,7 @@ import time, re, json, requests
 import web3
 from web3 import HTTPProvider
 
-#@pytest.fixture(scope="module", autouse=True)
+# @pytest.fixture(scope="module", autouse=True)
 def tenderly_fork(web3):
     fork_base_url = "https://simulate.yearn.network/fork"
     payload = {"network_id": "1"}
@@ -18,20 +18,23 @@ def tenderly_fork(web3):
     web3.provider = tenderly_provider
     print(f"https://dashboard.tenderly.co/yearn/yearn-web/fork/{fork_id}")
 
+
 # Snapshots the chain before each test and reverts after test completion.
 @pytest.fixture(autouse=True)
 def isolation(fn_isolation):
     pass
 
+
 @pytest.fixture(scope="module")
 def new_registry(interface):
     yield interface.IRegistry("0x78f73705105A63e06B932611643E0b210fAE93E9")
+
 
 # put our pool's convex pid here; this is the only thing that should need to change up here **************
 @pytest.fixture(scope="module")
 def pid():
     # pid = 56
-    pid = 99 #toke
+    pid = 99  # toke
     yield pid
 
 
@@ -40,9 +43,8 @@ def whale(accounts, toke_gauge, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
 
-
     whale = accounts.at("0x89eBCb7714bd0D2F33ce3a35C12dBEB7b94af169", force=True)
-    token.transfer(whale, 1_000*1e18, {'from': toke_gauge})
+    token.transfer(whale, 1_000 * 1e18, {"from": toke_gauge})
     yield whale
 
 
@@ -113,8 +115,6 @@ def proxy():
     yield Contract("0xA420A63BbEFfbda3B147d0585F1852C358e2C152")
 
 
-
-
 @pytest.fixture(scope="module")
 def curve_registry():
     yield Contract("0x90E00ACe148ca3b23Ac1bC8C240C2a7Dd9c2d7f5")
@@ -124,27 +124,26 @@ def curve_registry():
 def healthCheck():
     yield Contract("0xDDCea799fF1699e98EDF118e0629A974Df7DF012")
 
+
 @pytest.fixture(scope="function")
 def live_spell_strat(trade_factory, ymechs_safe):
-    strategy =  Contract("0xeDB4B647524FC2B9985019190551b197c6AB6C5c")
-    trade_factory.grantRole(
-        trade_factory.STRATEGY(), strategy, {"from": ymechs_safe}
-    )
+    strategy = Contract("0xeDB4B647524FC2B9985019190551b197c6AB6C5c")
+    trade_factory.grantRole(trade_factory.STRATEGY(), strategy, {"from": ymechs_safe})
     yield strategy
+
 
 @pytest.fixture(scope="function")
 def live_yfi_strat(trade_factory, ymechs_safe):
     network.gas_limit(6_000_000)
-    #network.gas_price(0)
-    #network.max_fee(0)
-    #network.priority_fee(0)
-    #, "allow_revert": True
-    strategy =  Contract("0xa04947059831783C561e59A43B93dCB5bEE7cab2")
-    
-    trade_factory.grantRole(
-        trade_factory.STRATEGY(), strategy, {"from": ymechs_safe}
-    )
+    # network.gas_price(0)
+    # network.max_fee(0)
+    # network.priority_fee(0)
+    # , "allow_revert": True
+    strategy = Contract("0xa04947059831783C561e59A43B93dCB5bEE7cab2")
+
+    trade_factory.grantRole(trade_factory.STRATEGY(), strategy, {"from": ymechs_safe})
     yield strategy
+
 
 @pytest.fixture(scope="module")
 def farmed():
@@ -182,7 +181,7 @@ def token(pid, booster):
 
 @pytest.fixture
 def trade_factory():
-    #yield Contract("0xBf26Ff7C7367ee7075443c4F95dEeeE77432614d")
+    # yield Contract("0xBf26Ff7C7367ee7075443c4F95dEeeE77432614d")
     yield Contract("0x99d8679bE15011dEAD893EB4F5df474a4e6a8b29")
 
 
@@ -235,7 +234,7 @@ def gasOracle():
 # normal gov is ychad, 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52
 @pytest.fixture(scope="module")
 def gov(accounts):
-    
+
     yield accounts.at("0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52", force=True)
 
 
@@ -273,7 +272,7 @@ def ymechs_safe():
 @pytest.fixture(scope="module")
 def multicall_swapper(interface):
     yield interface.MultiCallOptimizedSwapper(
-        #"0xceB202F25B50e8fAF212dE3CA6C53512C37a01D2"
+        # "0xceB202F25B50e8fAF212dE3CA6C53512C37a01D2"
         "0xB2F65F254Ab636C96fb785cc9B4485cbeD39CDAA"
     )
 
@@ -301,20 +300,21 @@ def vault(
 
     vault.acceptGovernance({"from": gov})
 
-
     vault.setManagementFee(0, {"from": gov})
     yield vault
+
 
 @pytest.fixture(scope="module")
 def toke_gauge(Contract):
     yield Contract("0xa0C08C0Aede65a0306F7dD042D2560dA174c91fC")
+
 
 @pytest.fixture(scope="function")
 def v2(pm, gov, rewards, guardian, management, token, chain):
     Vault = pm(config["dependencies"][0]).Vault
     vault = guardian.deploy(Vault)
     vault.initialize(token, gov, rewards, "", "", guardian, {"from": guardian})
-    vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
+    vault.setDepositLimit(2**256 - 1, {"from": gov})
     vault.setManagement(management, {"from": gov})
     chain.sleep(1)
     yield vault
@@ -352,7 +352,7 @@ def strategy(
     gasOracle,
     new_registry,
     strategist_ms,
-    toke_gauge
+    toke_gauge,
 ):
 
     curveGlobal = strategist.deploy(CurveGlobal, new_registry, gasOracle)
@@ -360,17 +360,17 @@ def strategy(
     pid = curveGlobal.getPid(toke_gauge)
     print(pid)
     print(toke_gauge.lp_token())
-    
-    s = strategist.deploy(
-        StrategyConvexFactoryClonable, v2, trade_factory, pid
-    )
-    curveGlobal.setConvexStratImplementation(s, {'from': gov})
-    
-    registry_owner = accounts.at(new_registry.owner(), force=True)
-    new_registry.setApprovedVaultsOwner(curveGlobal, True, {'from': registry_owner})
-    new_registry.setRole(curveGlobal, False, True, {'from': registry_owner})
 
-    t11 = curveGlobal.createNewCurveVaultsAndStrategies(toke_gauge, {"from": strategist})
+    s = strategist.deploy(StrategyConvexFactoryClonable, v2, trade_factory, pid, 25_000*1e6)
+    curveGlobal.setConvexStratImplementation(s, {"from": gov})
+
+    registry_owner = accounts.at(new_registry.owner(), force=True)
+    new_registry.setApprovedVaultsOwner(curveGlobal, True, {"from": registry_owner})
+    new_registry.setRole(curveGlobal, False, True, {"from": registry_owner})
+
+    t11 = curveGlobal.createNewCurveVaultsAndStrategies(
+        toke_gauge, {"from": strategist}
+    )
     (vault, strat) = t11.return_value
     print("endorsed")
 
@@ -378,12 +378,15 @@ def strategy(
         curveGlobal.createNewCurveVaultsAndStrategies(toke_gauge, {"from": strategist})
 
     # test a default type
-    assert curveGlobal.alreadyExistsFromToken("0xC4C319E2D4d66CcA4464C0c2B32c9Bd23ebe784e") == '0x718AbE90777F5B778B52D553a5aBaa148DD0dc5D'
+    assert (
+        curveGlobal.alreadyExistsFromToken("0xC4C319E2D4d66CcA4464C0c2B32c9Bd23ebe784e")
+        == "0x718AbE90777F5B778B52D553a5aBaa148DD0dc5D"
+    )
 
     # make sure to include all constructor parameters needed here
     strategy = StrategyConvexFactoryClonable.at(strat)
-    #print(strategy.rewards())
-    #print("contributors: ", sharer.viewContributors(strategy))
+    # print(strategy.rewards())
+    # print("contributors: ", sharer.viewContributors(strategy))
 
     trade_factory.grantRole(
         trade_factory.STRATEGY(), strategy, {"from": ymechs_safe, "gas_price": "0 gwei"}
