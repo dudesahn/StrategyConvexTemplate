@@ -10,7 +10,6 @@ enum VaultType {
     }
 
 interface Registry{
-    
 
     function newVault(
         address _token,
@@ -122,6 +121,9 @@ interface ISharerV4{
 }
 
 contract CurveGlobal{
+
+    event NewAutomatedCurveVault(address indexed lpToken, address indexed gauge, address indexed vault, address convexStrategy, uint256 timestamp);
+
 
 
     ///////////////////////////////////
@@ -326,6 +328,8 @@ contract CurveGlobal{
         IStrategy(convexStrategy).setHealthCheck(healthCheck);
 
         Vault(vault).addStrategy(convexStrategy, 10_000, 0, type(uint256).max, 0);
+
+        emit NewAutomatedCurveVault(lptoken, _gauge, vault, convexStrategy, block.timestamp);
 
     }
 }
