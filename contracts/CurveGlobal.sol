@@ -153,8 +153,7 @@ contract CurveGlobal {
         address indexed lpToken,
         address indexed gauge,
         address indexed vault,
-        address convexStrategy,
-        uint256 timestamp
+        address convexStrategy
     );
 
     ///////////////////////////////////
@@ -452,12 +451,6 @@ contract CurveGlobal {
             0
         );
 
-        emit NewAutomatedCurveVault(
-            lptoken,
-            _gauge,
-            vault,
-            convexStrategy,
-            block.timestamp
-        );
+        emit NewAutomatedCurveVault(lptoken, _gauge, vault, convexStrategy);
     }
 }
