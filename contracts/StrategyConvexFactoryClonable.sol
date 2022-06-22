@@ -10,7 +10,6 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/Math.sol";
 
 import "./interfaces/curve.sol";
-import {IUniswapV2Router02} from "./interfaces/uniswap.sol";
 import {BaseStrategy} from "@yearnvaults/contracts/BaseStrategy.sol";
 
 interface ITradeFactory {
@@ -19,23 +18,12 @@ interface ITradeFactory {
     function disable(address, address) external;
 }
 
-interface IBaseFee {
-    function isCurrentBaseFeeAcceptable() external view returns (bool);
+interface IOracle {
+    function latestAnswer() external view returns (uint256);
 }
 
-interface IUniV3 {
-    struct ExactInputParams {
-        bytes path;
-        address recipient;
-        uint256 deadline;
-        uint256 amountIn;
-        uint256 amountOutMinimum;
-    }
-
-    function exactInput(ExactInputParams calldata params)
-        external
-        payable
-        returns (uint256 amountOut);
+interface IBaseFee {
+    function isCurrentBaseFeeAcceptable() external view returns (bool);
 }
 
 interface IConvexRewards {
@@ -125,9 +113,6 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
 
-    address internal constant sushiswap =
-        0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // default to sushiswap, more CRV and CVX liquidity there
-
     IERC20 internal constant crv =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
     IERC20 internal constant convexToken =
@@ -136,6 +121,12 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     IERC20 internal constant usdt =
         IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
+
+    // use Curve to simulate selling our CVX and CRV rewards to WETH
+    ICurveFi internal constant crveth =
+        ICurveFi(0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511); // use curve's new CRV-ETH crypto pool to sell our CRV
+    ICurveFi internal constant cvxeth =
+        ICurveFi(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4); // use curve's new CVX-ETH crypto pool to sell our CVX
 
     /* ========== STATE VARIABLES ========== */
     // these will likely change across different wants.
@@ -426,31 +417,14 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
             }
         }
 
-        address[] memory usd_path = new address[](3);
-        usd_path[0] = address(crv);
-        usd_path[1] = address(weth);
-        usd_path[2] = address(usdt);
+        // our chainlink oracle returns prices normalized to 8 decimals, we convert it to 6
+        IOracle ethOracle = IOracle(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
+        uint256 ethPrice = ethOracle.latestAnswer().div(1e2); // 1e8 div 1e2 = 1e6
+        uint256 crvPrice = crveth.price_oracle().mul(ethPrice).div(1e18); // 1e18 mul 1e6 div 1e18 = 1e6
+        uint256 cvxPrice = cvxeth.price_oracle().mul(ethPrice).div(1e18); // 1e18 mul 1e6 div 1e18 = 1e6
 
-        uint256 crvValue;
-        if (_claimableBal > 0) {
-            uint256[] memory crvSwap =
-                IUniswapV2Router02(sushiswap).getAmountsOut(
-                    _claimableBal,
-                    usd_path
-                );
-            crvValue = crvSwap[crvSwap.length - 1];
-        }
-
-        usd_path[0] = address(convexToken);
-        uint256 cvxValue;
-        if (mintableCvx > 0) {
-            uint256[] memory cvxSwap =
-                IUniswapV2Router02(sushiswap).getAmountsOut(
-                    mintableCvx,
-                    usd_path
-                );
-            cvxValue = cvxSwap[cvxSwap.length - 1];
-        }
+        uint256 crvValue = crvPrice.mul(_claimableBal).div(1e18); // 1e6 mul 1e18 div 1e18 = 1e6
+        uint256 cvxValue = cvxPrice.mul(mintableCvx).div(1e18); // 1e6 mul 1e18 div 1e18 = 1e6
 
         return crvValue.add(cvxValue);
     }

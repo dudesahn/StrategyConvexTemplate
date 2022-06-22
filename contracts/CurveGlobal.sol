@@ -164,11 +164,17 @@ contract CurveGlobal {
     ////////////////////////////////////
 
     // always owned by ychad
-    address owner = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
+    address public owner = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
+    address internal pendingOwner;
 
     function setOwner(address newOwner) external {
         require(msg.sender == owner);
-        owner = newOwner;
+        pendingOwner = newOwner;
+    }
+
+    function acceptOwner() external {
+        require(msg.sender == pendingOwner);
+        owner = pendingOwner;
     }
 
     address public convexPoolManager =
@@ -194,18 +200,18 @@ contract CurveGlobal {
         convexDeposit = IConvexDeposit(_convexDeposit);
     }
 
-    address public sms = 0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7;
+    address public management = 0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7;
 
-    function setSms(address _sms) external {
+    function setManagement(address _management) external {
         require(msg.sender == owner);
-        sms = _sms;
+        management = _management;
     }
 
-    address public devms = 0x846e211e8ba920B353FB717631C015cf04061Cc9;
+    address public gaurdian = 0x846e211e8ba920B353FB717631C015cf04061Cc9;
 
-    function setDevms(address _devms) external {
+    function setGaurdian(address _gaurdian) external {
         require(msg.sender == owner);
-        devms = _devms;
+        gaurdian = _gaurdian;
     }
 
     address public treasury = 0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde;
@@ -239,14 +245,14 @@ contract CurveGlobal {
     address public tradeFactory = 0x99d8679bE15011dEAD893EB4F5df474a4e6a8b29;
 
     function setTradeFactory(address _tradeFactory) external {
-        require(msg.sender == owner || msg.sender == sms);
+        require(msg.sender == owner || msg.sender == management);
         tradeFactory = _tradeFactory;
     }
 
     uint256 public depositLimit = 10_000_000 * 1e18; // some large number
 
     function setDepositLimit(uint256 _depositLimit) external {
-        require(msg.sender == owner || msg.sender == sms);
+        require(msg.sender == owner || msg.sender == management);
         depositLimit = _depositLimit;
     }
 
@@ -262,11 +268,11 @@ contract CurveGlobal {
     bool public allConvex = true;
 
     function setAllConvex(bool _allConvex) external {
-        require(msg.sender == owner || msg.sender == sms);
+        require(msg.sender == owner || msg.sender == management);
         allConvex = _allConvex;
     }
 
-    uint256 public keepCRV = 0; // the percentage of CRV we re-lock for boost (in basis points).Default is 10%.
+    uint256 public keepCRV = 0; // the percentage of CRV we re-lock for boost (in basis points).Default is 0%.
 
     // Set the amount of CRV to be locked in Yearn's veCRV voter from each harvest.
     function setKeepCRV(uint256 _keepCRV) external {
@@ -277,11 +283,10 @@ contract CurveGlobal {
 
     uint256 public harvestProfitMaxInUsdt = 25_000 * 1e6; // what profit do we need to harvest
 
-    // Set the amount of CRV to be locked in Yearn's veCRV voter from each harvest.
     function setHarvestProfitMaxInUsdt(uint256 _harvestProfitMaxInUsdt)
         external
     {
-        require(msg.sender == owner || msg.sender == sms);
+        require(msg.sender == owner || msg.sender == management);
         harvestProfitMaxInUsdt = _harvestProfitMaxInUsdt;
     }
 
@@ -364,7 +369,7 @@ contract CurveGlobal {
         address _gauge,
         bool _allowDuplicate
     ) external returns (address vault, address convexStrategy) {
-        require(msg.sender == owner || msg.sender == sms);
+        require(msg.sender == owner || msg.sender == management);
 
         return _createNewCurveVaultsAndStrategies(_gauge, _allowDuplicate);
     }
@@ -404,7 +409,7 @@ contract CurveGlobal {
         vault = registry.newVault(
             lptoken,
             address(this),
-            devms,
+            gaurdian,
             treasury,
             "",
             "",
@@ -412,7 +417,7 @@ contract CurveGlobal {
             VaultType.AUTOMATED
         );
         Vault v = Vault(vault);
-        v.setManagement(sms);
+        v.setManagement(management);
         //set governance to owner who needs to accept before it is finalised. until then governance is this factory
         v.setGovernance(owner);
         v.setDepositLimit(depositLimit);
@@ -430,7 +435,7 @@ contract CurveGlobal {
         convexStrategy = IStrategy(convexStratImplementation)
             .cloneStrategyConvex(
             vault,
-            sms,
+            management,
             rewardsStrat,
             keeper,
             pid,

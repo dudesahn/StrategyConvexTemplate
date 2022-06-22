@@ -24,6 +24,8 @@ interface IGauge {
 interface ICurveFi {
     function get_virtual_price() external view returns (uint256);
 
+    function price_oracle() external view returns (uint256);
+
     function add_liquidity(
         // EURt
         uint256[2] calldata amounts,
