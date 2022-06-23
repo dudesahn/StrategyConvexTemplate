@@ -4,6 +4,13 @@ pragma experimental ABIEncoderV2;
 
 enum VaultType {DEFAULT, AUTOMATED, FIXED_TERM, EXPERIMENTAL}
 
+interface IDetails {
+    // get details from curve
+    function name() external view returns (string memory);
+
+    function symbol() external view returns (string memory);
+}
+
 interface Registry {
     function newVault(
         address _token,
@@ -206,11 +213,11 @@ contract CurveGlobal {
         management = _management;
     }
 
-    address public gaurdian = 0x846e211e8ba920B353FB717631C015cf04061Cc9;
+    address public guardian = 0x846e211e8ba920B353FB717631C015cf04061Cc9;
 
-    function setGaurdian(address _gaurdian) external {
+    function setGuardian(address _guardian) external {
         require(msg.sender == owner);
-        gaurdian = _gaurdian;
+        guardian = _guardian;
     }
 
     address public treasury = 0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde;
@@ -408,10 +415,18 @@ contract CurveGlobal {
         vault = registry.newVault(
             lptoken,
             address(this),
-            gaurdian,
+            guardian,
             treasury,
-            "",
-            "",
+            string(
+                abi.encodePacked(
+                    "Curve ",
+                    IDetails(address(lptoken)).symbol(),
+                    " Auto-Compounding yVault"
+                )
+            ),
+            string(
+                abi.encodePacked("yvCurve", IDetails(address(lptoken)).symbol())
+            ),
             0,
             VaultType.AUTOMATED
         );

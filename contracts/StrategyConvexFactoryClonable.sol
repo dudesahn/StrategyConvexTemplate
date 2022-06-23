@@ -247,9 +247,10 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
 
         require(address(lptoken) == address(want));
 
-        _updateRewards();
-
         tradeFactory = _tradeFactory;
+
+        _updateRewards();
+        _setUpTradeFactory();
 
         // set our strategy's name
         stratName = string(
@@ -293,10 +294,6 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
             uint256 _debtPayment
         )
     {
-        if (tradesEnabled == false && tradeFactory != address(0)) {
-            _setUpTradeFactory();
-        }
-
         // this claims our CRV, CVX, and any extra tokens like SNX or ANKR. no harm leaving this true even if no extra rewards currently.
         rewardsContract.getReward(address(this), true);
 
@@ -619,7 +616,9 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         }
 
         tradeFactory = _newTradeFactory;
-        _setUpTradeFactory();
+        if (_newTradeFactory != address(0)) {
+            _setUpTradeFactory();
+        }
     }
 
     // once this is called setupTradefactory must be called to get things working again

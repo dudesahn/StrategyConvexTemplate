@@ -298,6 +298,9 @@ def vault(
     Vault = pm(config["dependencies"][0]).Vault
     vault = Vault.at(strategy.vault())
 
+    print(vault.symbol())
+    print(vault.name())
+
     vault.acceptGovernance({"from": gov})
 
     vault.setManagementFee(0, {"from": gov})
@@ -361,12 +364,31 @@ def strategy(
     print(pid)
     print(toke_gauge.lp_token())
 
+    next_contract = strategist.get_deployment_address()
+    trade_factory.grantRole(
+        trade_factory.STRATEGY(), next_contract, {"from": ymechs_safe, "gas_price": "0 gwei"}
+    )
+    # print(next_contract)
+
     s = strategist.deploy(StrategyConvexFactoryClonable, v2, trade_factory, pid, 25_000*1e6)
     curveGlobal.setConvexStratImplementation(s, {"from": gov})
+    print("convex impl: ", s)
+    assert next_contract == s.address
 
     registry_owner = accounts.at(new_registry.owner(), force=True)
     new_registry.setApprovedVaultsOwner(curveGlobal, True, {"from": registry_owner})
     new_registry.setRole(curveGlobal, False, True, {"from": registry_owner})
+
+    curve_acount_wrapper = accounts.at(s, force=True)
+    next_contract = curve_acount_wrapper.get_deployment_address(1)
+    print("curve gloval next: ", curve_acount_wrapper.get_deployment_address(0))
+    print("curve gloval next2: ", curve_acount_wrapper.get_deployment_address(1))
+    print("curve gloval: ", curveGlobal)
+    print("toke guage: ", toke_gauge)
+    print("strategist: ", strategist)
+    trade_factory.grantRole(
+        trade_factory.STRATEGY(), next_contract, {"from": ymechs_safe, "gas_price": "0 gwei"}
+    )
 
     t11 = curveGlobal.createNewCurveVaultsAndStrategies(
         toke_gauge, {"from": strategist}
@@ -388,9 +410,7 @@ def strategy(
     # print(strategy.rewards())
     # print("contributors: ", sharer.viewContributors(strategy))
 
-    trade_factory.grantRole(
-        trade_factory.STRATEGY(), strategy, {"from": ymechs_safe, "gas_price": "0 gwei"}
-    )
+    
     strategy.setKeeper(keeper, {"from": strategist_ms})
     gasOracle.setMaxAcceptableBaseFee(20000000000000, {"from": strategist_ms})
     # set our management fee to zero so it doesn't mess with our profit checking
