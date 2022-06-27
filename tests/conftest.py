@@ -184,6 +184,10 @@ def trade_factory():
     # yield Contract("0xBf26Ff7C7367ee7075443c4F95dEeeE77432614d")
     yield Contract("0x99d8679bE15011dEAD893EB4F5df474a4e6a8b29")
 
+@pytest.fixture
+def new_trade_factory():
+    # yield Contract("0xBf26Ff7C7367ee7075443c4F95dEeeE77432614d")
+    yield Contract("0xd6a8ae62f4d593DAf72E2D7c9f7bDB89AB069F06")
 
 # zero address
 @pytest.fixture(scope="module")
@@ -332,6 +336,12 @@ def v2(pm, gov, rewards, guardian, management, token, chain):
 def ymechs_safe():
     yield Contract("0x2C01B4AD51a67E2d8F02208F54dF9aC4c0B778B6")
 
+@pytest.fixture(scope="function")
+def curve_global(CurveGlobal, StrategyConvexFactoryClonable, new_trade_factory, strategist, new_registry, gov):
+    s = strategist.deploy(StrategyConvexFactoryClonable, '0x6B5ce31AF687a671a804d8070Ddda99Cab926dfE', new_trade_factory, 87, 25_000*1e6, '0xF403C135812408BFbE8713b5A23a04b3D48AAE31', '0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B')
+    bg = strategist.deploy(CurveGlobal, new_registry, s, gov)
+    
+    yield bg
 
 # replace the first value with the name of your strategy
 @pytest.fixture(scope="function")
@@ -341,7 +351,7 @@ def strategy(
     keeper,
     ymechs_safe,
     v2,
-    trade_factory,
+    curve_global,
     gov,
     accounts,
     CurveGlobal,
@@ -358,50 +368,32 @@ def strategy(
     toke_gauge,
 ):
 
-    curveGlobal = strategist.deploy(CurveGlobal, new_registry, gasOracle)
-
-    pid = curveGlobal.getPid(toke_gauge)
+    pid = curve_global.getPid(toke_gauge)
     print(pid)
     print(toke_gauge.lp_token())
 
-    next_contract = strategist.get_deployment_address()
-    trade_factory.grantRole(
-        trade_factory.STRATEGY(), next_contract, {"from": ymechs_safe, "gas_price": "0 gwei"}
-    )
-    # print(next_contract)
-
-    s = strategist.deploy(StrategyConvexFactoryClonable, v2, trade_factory, pid, 25_000*1e6)
-    curveGlobal.setConvexStratImplementation(s, {"from": gov})
-    print("convex impl: ", s)
-    assert next_contract == s.address
 
     registry_owner = accounts.at(new_registry.owner(), force=True)
-    new_registry.setApprovedVaultsOwner(curveGlobal, True, {"from": registry_owner})
-    new_registry.setRole(curveGlobal, False, True, {"from": registry_owner})
+    new_registry.setApprovedVaultsOwner(curve_global, True, {"from": registry_owner})
+    new_registry.setRole(curve_global, False, True, {"from": registry_owner})
 
-    curve_acount_wrapper = accounts.at(s, force=True)
-    next_contract = curve_acount_wrapper.get_deployment_address(1)
-    print("curve gloval next: ", curve_acount_wrapper.get_deployment_address(0))
-    print("curve gloval next2: ", curve_acount_wrapper.get_deployment_address(1))
-    print("curve gloval: ", curveGlobal)
+
+    print("curve gloval: ", curve_global)
     print("toke guage: ", toke_gauge)
     print("strategist: ", strategist)
-    trade_factory.grantRole(
-        trade_factory.STRATEGY(), next_contract, {"from": ymechs_safe, "gas_price": "0 gwei"}
-    )
-
-    t11 = curveGlobal.createNewCurveVaultsAndStrategies(
+    
+    t11 = curve_global.createNewVaultsAndStrategies(
         toke_gauge, {"from": strategist}
     )
     (vault, strat) = t11.return_value
     print("endorsed")
 
     with brownie.reverts("Vault already exists"):
-        curveGlobal.createNewCurveVaultsAndStrategies(toke_gauge, {"from": strategist})
+        curve_global.createNewVaultsAndStrategies(toke_gauge, {"from": strategist})
 
     # test a default type
     assert (
-        curveGlobal.alreadyExistsFromToken("0xC4C319E2D4d66CcA4464C0c2B32c9Bd23ebe784e")
+        curve_global.alreadyExistsFromToken("0xC4C319E2D4d66CcA4464C0c2B32c9Bd23ebe784e")
         == "0x718AbE90777F5B778B52D553a5aBaa148DD0dc5D"
     )
 

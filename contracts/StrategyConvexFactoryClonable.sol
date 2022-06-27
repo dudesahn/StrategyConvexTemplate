@@ -22,6 +22,13 @@ interface IOracle {
     function latestAnswer() external view returns (uint256);
 }
 
+interface IUniswapV2Router02 {
+    function getAmountsOut(uint256 amountIn, address[] calldata path)
+        external
+        view
+        returns (uint256[] memory amounts);
+}
+
 interface IBaseFee {
     function isCurrentBaseFeeAcceptable() external view returns (bool);
 }
@@ -80,6 +87,8 @@ interface IConvexDeposit {
 
     function poolLength() external view returns (uint256);
 
+    function crv() external view returns (address);
+
     // give us info about a pool based on its pid
     function poolInfo(uint256)
         external
@@ -103,30 +112,26 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     // these should stay the same across different wants.
 
     // convex stuff
-    address internal constant depositContract =
-        0xF403C135812408BFbE8713b5A23a04b3D48AAE31; // this is the deposit contract that all pools use, aka booster
+    address public depositContract;
+    // this is the deposit contract that all pools use, aka booster
     IConvexRewards public rewardsContract; // This is unique to each curve pool
 
     uint256 public pid; // this is unique to each pool
     uint256 public localKeepCRV;
+    uint256 public localKeepCVX;
 
-    address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
+    address public curveVoter; // Yearn's veCRV voter, we send some extra CRV here
+    address public convexVoter; // Yearn's veCVX voter, we send some extra CVX here
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
 
-    IERC20 internal constant crv =
-        IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
-    IERC20 internal constant convexToken =
-        IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
+    IERC20 public crv;
+    IERC20 public convexToken;
     IERC20 internal constant weth =
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     IERC20 internal constant usdt =
         IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
-
-    // use Curve to simulate selling our CVX and CRV rewards to WETH
-    ICurveFi internal constant crveth =
-        ICurveFi(0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511); // use curve's new CRV-ETH crypto pool to sell our CRV
-    ICurveFi internal constant cvxeth =
-        ICurveFi(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4); // use curve's new CVX-ETH crypto pool to sell our CVX
+    address internal constant sushiswap =
+        0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // default to sushiswap, more CRV and CVX liquidity there
 
     /* ========== STATE VARIABLES ========== */
     // these will likely change across different wants.
@@ -161,9 +166,17 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         address _vault,
         address _tradeFactory,
         uint256 _pid,
-        uint256 _harvestProfitMax
+        uint256 _harvestProfitMax,
+        address _booster,
+        address _convexToken
     ) public BaseStrategy(_vault) {
-        _initializeStrat(_pid, _tradeFactory, _harvestProfitMax);
+        _initializeStrat(
+            _pid,
+            _tradeFactory,
+            _harvestProfitMax,
+            _booster,
+            _convexToken
+        );
     }
 
     /* ========== CLONING ========== */
@@ -178,7 +191,9 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         address _keeper,
         uint256 _pid,
         address _tradeFactory,
-        uint256 _harvestProfitMax
+        uint256 _harvestProfitMax,
+        address _booster,
+        address _convexToken
     ) external returns (address newStrategy) {
         require(isOriginal);
         // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
@@ -205,7 +220,9 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
             _keeper,
             _pid,
             _tradeFactory,
-            _harvestProfitMax
+            _harvestProfitMax,
+            _booster,
+            _convexToken
         );
 
         emit Cloned(newStrategy);
@@ -219,28 +236,42 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         address _keeper,
         uint256 _pid,
         address _tradeFactory,
-        uint256 _harvestProfitMax
+        uint256 _harvestProfitMax,
+        address _booster,
+        address _convexToken
     ) public {
         _initialize(_vault, _strategist, _rewards, _keeper);
-        _initializeStrat(_pid, _tradeFactory, _harvestProfitMax);
+        _initializeStrat(
+            _pid,
+            _tradeFactory,
+            _harvestProfitMax,
+            _booster,
+            _convexToken
+        );
     }
 
     // this is called by our original strategy, as well as any clones
     function _initializeStrat(
         uint256 _pid,
         address _tradeFactory,
-        uint256 _harvestProfitMax
+        uint256 _harvestProfitMax,
+        address _booster,
+        address _convexToken
     ) internal {
         // make sure that we haven't initialized this before
         require(address(tradeFactory) == address(0)); // already initialized.
+        depositContract = _booster;
+        convexToken = IERC20(_convexToken);
 
         // want = Curve LP
         want.approve(address(depositContract), type(uint256).max);
 
         // harvest profit max set to 25k usdt. will trigger harvest in this situation
         harvestProfitMax = _harvestProfitMax;
+        harvestProfitMin = _harvestProfitMax;
 
         IConvexDeposit dp = IConvexDeposit(depositContract);
+        crv = IERC20(dp.crv());
         pid = _pid;
         (address lptoken, , , address _rewardsContract, , ) = dp.poolInfo(_pid);
         rewardsContract = IConvexRewards(_rewardsContract);
@@ -297,12 +328,20 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         // this claims our CRV, CVX, and any extra tokens like SNX or ANKR. no harm leaving this true even if no extra rewards currently.
         rewardsContract.getReward(address(this), true);
 
-        if (localKeepCRV > 0) {
+        if (localKeepCRV > 0 && curveVoter != address(0)) {
             uint256 crvBalance = crv.balanceOf(address(this));
             uint256 _sendToVoter =
                 crvBalance.mul(localKeepCRV).div(FEE_DENOMINATOR);
             if (_sendToVoter > 0) {
-                crv.safeTransfer(voter, _sendToVoter);
+                crv.safeTransfer(curveVoter, _sendToVoter);
+            }
+        }
+        if (localKeepCVX > 0 && convexVoter != address(0)) {
+            uint256 cvxBalance = convexToken.balanceOf(address(this));
+            uint256 _sendToVoter =
+                cvxBalance.mul(localKeepCVX).div(FEE_DENOMINATOR);
+            if (_sendToVoter > 0) {
+                convexToken.safeTransfer(convexVoter, _sendToVoter);
             }
         }
 
@@ -389,41 +428,26 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         return false;
     }
 
-    // only checks crv and cvx
+    // only checks crv
     function claimableProfitInUsdt() public view returns (uint256) {
-        // calculations pulled directly from CVX's contract for minting CVX per CRV claimed
-        uint256 totalCliffs = 1_000;
-        uint256 maxSupply = 100 * 1_000_000 * 1e18; // 100mil
-        uint256 reductionPerCliff = 100_000 * 1e18; // 100,000
-        uint256 supply = convexToken.totalSupply();
-        uint256 mintableCvx;
-
-        uint256 cliff = supply.div(reductionPerCliff);
         uint256 _claimableBal = claimableBalance();
-        //mint if below total cliffs
-        if (cliff < totalCliffs) {
-            //for reduction% take inverse of current cliff
-            uint256 reduction = totalCliffs.sub(cliff);
-            //reduce
-            mintableCvx = _claimableBal.mul(reduction).div(totalCliffs);
 
-            //supply cap check
-            uint256 amtTillMax = maxSupply.sub(supply);
-            if (mintableCvx > amtTillMax) {
-                mintableCvx = amtTillMax;
-            }
+        address[] memory usd_path = new address[](3);
+        usd_path[0] = address(crv);
+        usd_path[1] = address(weth);
+        usd_path[2] = address(usdt);
+
+        uint256 crvValue;
+        if (_claimableBal > 0) {
+            uint256[] memory crvSwap =
+                IUniswapV2Router02(sushiswap).getAmountsOut(
+                    _claimableBal,
+                    usd_path
+                );
+            crvValue = crvSwap[crvSwap.length - 1];
         }
 
-        // our chainlink oracle returns prices normalized to 8 decimals, we convert it to 6
-        IOracle ethOracle = IOracle(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
-        uint256 ethPrice = ethOracle.latestAnswer().div(1e2); // 1e8 div 1e2 = 1e6
-        uint256 crvPrice = crveth.price_oracle().mul(ethPrice).div(1e18); // 1e18 mul 1e6 div 1e18 = 1e6
-        uint256 cvxPrice = cvxeth.price_oracle().mul(ethPrice).div(1e18); // 1e18 mul 1e6 div 1e18 = 1e6
-
-        uint256 crvValue = crvPrice.mul(_claimableBal).div(1e18); // 1e6 mul 1e18 div 1e18 = 1e6
-        uint256 cvxValue = cvxPrice.mul(mintableCvx).div(1e18); // 1e6 mul 1e18 div 1e18 = 1e6
-
-        return crvValue.add(cvxValue);
+        return crvValue;
     }
 
     // convert our keeper's eth cost into want, we don't need this anymore since we don't use baseStrategy harvestTrigger
@@ -471,7 +495,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         delete rewardsTokens; //empty the rewardsTokens and rebuild
 
         for (uint256 i; i < rewardsContract.extraRewardsLength(); i++) {
-            address virtualRewardsPool = rewardsContract.extraRewards(0);
+            address virtualRewardsPool = rewardsContract.extraRewards(i);
             address _rewardsToken =
                 IConvexRewards(virtualRewardsPool).rewardToken();
 
@@ -482,10 +506,16 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         }
     }
 
-    function updateLocalKeepcrv(uint256 _keep) external onlyGovernance {
-        require(_keep <= 10_000);
+    function updateLocalKeepCrvs(uint256 _keepCrv, uint256 _keepCvx)
+        external
+        onlyGovernance
+    {
+        require(_keepCrv <= 10_000);
 
-        localKeepCRV = _keep;
+        localKeepCRV = _keepCrv;
+        require(_keepCvx <= 10_000);
+
+        localKeepCVX = _keepCvx;
     }
 
     // Use to turn off extra rewards claiming and selling. set our allowance to zero on the router and set address to zero address.
@@ -619,6 +649,14 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         if (_newTradeFactory != address(0)) {
             _setUpTradeFactory();
         }
+    }
+
+    function updateVoters(address _curveVoter, address _convexVoter)
+        external
+        onlyGovernance
+    {
+        curveVoter = _curveVoter;
+        convexVoter = _convexVoter;
     }
 
     // once this is called setupTradefactory must be called to get things working again

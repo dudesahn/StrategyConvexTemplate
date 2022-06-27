@@ -88,13 +88,19 @@ interface IStrategy {
         address _keeper,
         uint256 _pid,
         address _tradeFactory,
-        uint256 _harvestProfitMax
+        uint256 _harvestProfitMax,
+        address _booster,
+        address _convexToken
     ) external returns (address newStrategy);
+
+    function updateVoters(address _curveVoter, address _convexVoter) external;
+
+    function updateLocalKeepCrvs(uint256 _keepCrv, uint256 _keepCvx) external;
 
     function setHealthCheck(address) external;
 }
 
-interface IConvexDeposit {
+interface IBooster {
     function gaugeMap(address) external view returns (bool);
 
     // deposit into convex, receive a tokenized deposit.  parameter to stake immediately (we always do this).
@@ -147,20 +153,13 @@ interface Vault {
     ) external;
 }
 
-interface ISharerV4 {
-    function setContributors(
-        address,
-        address[] memory,
-        uint256[] memory
-    ) external;
-}
-
 contract CurveGlobal {
-    event NewAutomatedCurveVault(
+    event NewAutomatedVault(
+        uint256 indexed category,
         address indexed lpToken,
-        address indexed gauge,
         address indexed vault,
-        address convexStrategy
+        address gauge,
+        address strategy
     );
 
     ///////////////////////////////////
@@ -169,9 +168,15 @@ contract CurveGlobal {
     //
     ////////////////////////////////////
 
+    address[] public deployedVaults;
+    uint256 public numVaults;
+
+    address public constant cvx = 0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B;
+    uint256 public constant category = 0; // 0 for curve
+
     // always owned by ychad
-    address public owner = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
-    address internal pendingOwner;
+    address public owner;
+    address internal pendingOwner = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
 
     function setOwner(address newOwner) external {
         require(msg.sender == owner);
@@ -198,12 +203,19 @@ contract CurveGlobal {
         registry = Registry(_registry);
     }
 
-    IConvexDeposit public convexDeposit =
-        IConvexDeposit(0xF403C135812408BFbE8713b5A23a04b3D48AAE31);
+    IBooster public booster =
+        IBooster(0xF403C135812408BFbE8713b5A23a04b3D48AAE31);
 
-    function setConvexDeposit(address _convexDeposit) external {
+    function setBooster(address _booster) external {
         require(msg.sender == owner);
-        convexDeposit = IConvexDeposit(_convexDeposit);
+        booster = IBooster(_booster);
+    }
+
+    address public governance = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
+
+    function setGovernance(address _governance) external {
+        require(msg.sender == owner);
+        governance = _governance;
     }
 
     address public management = 0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7;
@@ -230,32 +242,25 @@ contract CurveGlobal {
     address public keeper = 0x736D7e3c5a6CB2CE3B764300140ABF476F6CFCCF;
 
     function setKeeper(address _keeper) external {
-        require(msg.sender == owner);
+        require(msg.sender == owner || msg.sender == management);
         keeper = _keeper;
-    }
-
-    address public rewardsStrat = 0xc491599b9A20c3A2F0A85697Ee6D9434EFa9f503;
-
-    function setStratRewards(address _rewards) external {
-        require(msg.sender == owner);
-        rewardsStrat = _rewards;
     }
 
     address public healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012;
 
     function setHealthcheck(address _health) external {
-        require(msg.sender == owner);
+        require(msg.sender == owner || msg.sender == management);
         healthCheck = _health;
     }
 
-    address public tradeFactory = 0x99d8679bE15011dEAD893EB4F5df474a4e6a8b29;
+    address public tradeFactory = 0xd6a8ae62f4d593DAf72E2D7c9f7bDB89AB069F06;
 
     function setTradeFactory(address _tradeFactory) external {
-        require(msg.sender == owner || msg.sender == management);
+        require(msg.sender == owner);
         tradeFactory = _tradeFactory;
     }
 
-    uint256 public depositLimit = 10_000_000 * 1e18; // some large number
+    uint256 public depositLimit = 10_000_000_000_000 * 1e18; // some large number
 
     function setDepositLimit(uint256 _depositLimit) external {
         require(msg.sender == owner || msg.sender == management);
@@ -271,20 +276,33 @@ contract CurveGlobal {
         convexStratImplementation = _convexStratImplementation;
     }
 
-    bool public allConvex = true;
-
-    function setAllConvex(bool _allConvex) external {
-        require(msg.sender == owner || msg.sender == management);
-        allConvex = _allConvex;
-    }
-
     uint256 public keepCRV = 0; // the percentage of CRV we re-lock for boost (in basis points).Default is 0%.
+    address public voterCRV;
 
     // Set the amount of CRV to be locked in Yearn's veCRV voter from each harvest.
-    function setKeepCRV(uint256 _keepCRV) external {
+    function setKeepCRV(uint256 _keepCRV, address _voterCRV) external {
         require(msg.sender == owner);
         require(_keepCRV <= 10_000);
+        if (_keepCRV > 0) {
+            require(_voterCRV != address(0));
+        }
         keepCRV = _keepCRV;
+        voterCRV = _voterCRV;
+    }
+
+    uint256 public keepCVX = 0; // the percentage of CVX we re-lock for boost (in basis points).Default is 0%.
+    address public voterCVX;
+
+    // Set the amount of CVX to be locked in Yearn's veCVX voter from each harvest.
+    function setKeepCVX(uint256 _keepCVX, address _voterCVX) external {
+        require(msg.sender == owner);
+        require(_keepCVX <= 10_000);
+        if (_keepCVX > 0) {
+            require(_voterCVX != address(0));
+        }
+
+        keepCVX = _keepCVX;
+        voterCVX = _voterCVX;
     }
 
     uint256 public harvestProfitMaxInUsdt = 25_000 * 1e6; // what profit do we need to harvest
@@ -318,9 +336,14 @@ contract CurveGlobal {
     //
     ////////////////////////////////////
 
-    constructor(address _registry, address _convexStratImplementation) public {
+    constructor(
+        address _registry,
+        address _convexStratImplementation,
+        address _owner
+    ) public {
         registry = Registry(_registry);
         convexStratImplementation = _convexStratImplementation;
+        owner = _owner;
     }
 
     function alreadyExistsFromGauge(address _gauge)
@@ -356,13 +379,13 @@ contract CurveGlobal {
     function getPid(address _gauge) public view returns (uint256 pid) {
         pid = type(uint256).max;
 
-        if (!convexDeposit.gaugeMap(_gauge)) {
+        if (!booster.gaugeMap(_gauge)) {
             return pid;
         }
 
-        for (uint256 i = convexDeposit.poolLength(); i > 0; i--) {
+        for (uint256 i = booster.poolLength(); i > 0; i--) {
             //we start at the end and work back for most recent
-            (, , address gauge, , , ) = convexDeposit.poolInfo(i - 1);
+            (, , address gauge, , , ) = booster.poolInfo(i - 1);
 
             if (_gauge == gauge) {
                 return i - 1;
@@ -371,26 +394,26 @@ contract CurveGlobal {
     }
 
     // only permissioned users can deploy if there is already one endorsed
-    function createNewCurveVaultsAndStrategies(
-        address _gauge,
-        bool _allowDuplicate
-    ) external returns (address vault, address convexStrategy) {
-        require(msg.sender == owner || msg.sender == management);
-
-        return _createNewCurveVaultsAndStrategies(_gauge, _allowDuplicate);
-    }
-
-    function createNewCurveVaultsAndStrategies(address _gauge)
+    function createNewVaultsAndStrategies(address _gauge, bool _allowDuplicate)
         external
         returns (address vault, address convexStrategy)
     {
-        return _createNewCurveVaultsAndStrategies(_gauge, false);
+        require(msg.sender == owner || msg.sender == management);
+
+        return _createNewVaultsAndStrategies(_gauge, _allowDuplicate);
     }
 
-    function _createNewCurveVaultsAndStrategies(
-        address _gauge,
-        bool _allowDuplicate
-    ) internal returns (address vault, address convexStrategy) {
+    function createNewVaultsAndStrategies(address _gauge)
+        external
+        returns (address vault, address convexStrategy)
+    {
+        return _createNewVaultsAndStrategies(_gauge, false);
+    }
+
+    function _createNewVaultsAndStrategies(address _gauge, bool _allowDuplicate)
+        internal
+        returns (address vault, address strategy)
+    {
         if (!_allowDuplicate) {
             require(
                 alreadyExistsFromGauge(_gauge) == address(0),
@@ -403,7 +426,7 @@ contract CurveGlobal {
         uint256 pid = getPid(_gauge);
         if (pid == type(uint256).max) {
             //when we add the new pool it will be added to the end of the pools in convexDeposit.
-            pid = convexDeposit.poolLength();
+            pid = booster.poolLength();
             //add pool
             require(
                 IPoolManager(convexPoolManager).addPool(_gauge),
@@ -430,10 +453,13 @@ contract CurveGlobal {
             0,
             VaultType.AUTOMATED
         );
+        deployedVaults.push(vault);
+        numVaults = deployedVaults.length;
+
         Vault v = Vault(vault);
         v.setManagement(management);
-        //set governance to owner who needs to accept before it is finalised. until then governance is this factory
-        v.setGovernance(owner);
+        //set governance to ychad who needs to accept before it is finalised. until then governance is this factory
+        v.setGovernance(governance);
         v.setDepositLimit(depositLimit);
 
         if (v.managementFee() != managementFee) {
@@ -446,26 +472,26 @@ contract CurveGlobal {
         Vault(vault).setDepositLimit(depositLimit);
 
         //now we create the convex strat
-        convexStrategy = IStrategy(convexStratImplementation)
-            .cloneStrategyConvex(
+        strategy = IStrategy(convexStratImplementation).cloneStrategyConvex(
             vault,
             management,
-            rewardsStrat,
+            management,
             keeper,
             pid,
             tradeFactory,
-            harvestProfitMaxInUsdt
+            harvestProfitMaxInUsdt,
+            address(booster),
+            cvx
         );
-        IStrategy(convexStrategy).setHealthCheck(healthCheck);
+        IStrategy(strategy).setHealthCheck(healthCheck);
 
-        Vault(vault).addStrategy(
-            convexStrategy,
-            10_000,
-            0,
-            type(uint256).max,
-            0
-        );
+        if (keepCRV > 0 || keepCVX > 0) {
+            IStrategy(strategy).updateVoters(voterCRV, voterCVX);
+            IStrategy(strategy).updateLocalKeepCrvs(keepCRV, keepCVX);
+        }
 
-        emit NewAutomatedCurveVault(lptoken, _gauge, vault, convexStrategy);
+        Vault(vault).addStrategy(strategy, 10_000, 0, type(uint256).max, 0);
+
+        emit NewAutomatedVault(category, lptoken, _gauge, vault, strategy);
     }
 }
