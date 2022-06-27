@@ -96,7 +96,6 @@ def test_emergency_exit_with_no_gain_or_loss(
     strategy,
     chain,
     gauge,
-    voter,
     cvxDeposit,
     amount,
 ):
@@ -110,7 +109,7 @@ def test_emergency_exit_with_no_gain_or_loss(
     chain.sleep(1)
 
     # send away all funds, will need to alter this based on strategy
-    strategy.withdrawToConvexDepositTokens()
+    strategy.withdrawToConvexDepositTokens({"from": gov})
     to_send = cvxDeposit.balanceOf(strategy)
     print("cvxToken Balance of Strategy", to_send)
     cvxDeposit.transfer(gov, to_send, {"from": strategy})

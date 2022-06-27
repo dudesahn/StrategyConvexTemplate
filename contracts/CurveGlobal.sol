@@ -171,6 +171,10 @@ contract CurveGlobal {
     address[] public deployedVaults;
     uint256 public numVaults;
 
+    function allDeployedVaults() external view returns (address[] memory) {
+        return deployedVaults;
+    }
+
     address public constant cvx = 0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B;
     uint256 public constant category = 0; // 0 for curve
 
@@ -239,7 +243,7 @@ contract CurveGlobal {
         treasury = _treasury;
     }
 
-    address public keeper = 0x736D7e3c5a6CB2CE3B764300140ABF476F6CFCCF;
+    address public keeper = 0x256e6a486075fbAdbB881516e9b6b507fd082B5D;
 
     function setKeeper(address _keeper) external {
         require(msg.sender == owner || msg.sender == management);

@@ -6,7 +6,7 @@ import time, re, json, requests
 import web3
 from web3 import HTTPProvider
 
-# @pytest.fixture(scope="module", autouse=True)
+#@pytest.fixture(scope="module", autouse=True)
 def tenderly_fork(web3):
     fork_base_url = "https://simulate.yearn.network/fork"
     payload = {"network_id": "1"}
@@ -23,6 +23,11 @@ def tenderly_fork(web3):
 @pytest.fixture(autouse=True)
 def isolation(fn_isolation):
     pass
+
+@pytest.fixture(scope="module")
+def steth_curve_lp(Contract):
+    yield Contract("0x06325440D014e39736583c165C2963BA99fAf14E")
+
 
 
 @pytest.fixture(scope="module")
@@ -310,10 +315,16 @@ def vault(
     vault.setManagementFee(0, {"from": gov})
     yield vault
 
+@pytest.fixture(scope="module")
+def keeper_contract(KeeperWrapper):
+    yield KeeperWrapper.at('0x256e6a486075fbAdbB881516e9b6b507fd082B5D')
 
 @pytest.fixture(scope="module")
 def toke_gauge(Contract):
     yield Contract("0xa0C08C0Aede65a0306F7dD042D2560dA174c91fC")
+@pytest.fixture(scope="module")
+def other_gauge(Contract):
+    yield Contract("0xa9A9BC60fc80478059A83f516D5215185eeC2fc0")
 
 
 @pytest.fixture(scope="function")
@@ -385,25 +396,16 @@ def strategy(
     t11 = curve_global.createNewVaultsAndStrategies(
         toke_gauge, {"from": strategist}
     )
-    (vault, strat) = t11.return_value
+    strat = t11.events['NewAutomatedVault']['strategy']
     print("endorsed")
 
-    with brownie.reverts("Vault already exists"):
-        curve_global.createNewVaultsAndStrategies(toke_gauge, {"from": strategist})
 
-    # test a default type
-    assert (
-        curve_global.alreadyExistsFromToken("0xC4C319E2D4d66CcA4464C0c2B32c9Bd23ebe784e")
-        == "0x718AbE90777F5B778B52D553a5aBaa148DD0dc5D"
-    )
 
     # make sure to include all constructor parameters needed here
     strategy = StrategyConvexFactoryClonable.at(strat)
     # print(strategy.rewards())
     # print("contributors: ", sharer.viewContributors(strategy))
 
-    
-    strategy.setKeeper(keeper, {"from": strategist_ms})
     gasOracle.setMaxAcceptableBaseFee(20000000000000, {"from": strategist_ms})
     # set our management fee to zero so it doesn't mess with our profit checking
 

@@ -13,9 +13,9 @@ def test_simple_harvest(
     strategy,
     chain,
     strategist_ms,
+    interface,
     gauge,
     booster,
-    voter,
     rewardsContract,
     amount,
 ):
@@ -55,6 +55,12 @@ def test_simple_harvest(
     assert claimable_crv > 0
     print("\nPending claimable in USDT after 1 day: ", pending_rewards / 1e6)
     strategy.harvest({"from": gov})
+
+    crv = interface.ERC20(strategy.crv())
+    cvx = interface.ERC20(strategy.convexToken())
+
+    assert crv.balanceOf(strategy) > 0
+    assert cvx.balanceOf(strategy) > 0
     assert strategy.claimableProfitInUsdt() == 0
     chain.sleep(1)
     new_assets = vault.totalAssets()
