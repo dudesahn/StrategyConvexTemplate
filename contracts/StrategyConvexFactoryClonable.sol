@@ -287,7 +287,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         stratName = string(
             abi.encodePacked(
                 IDetails(address(want)).name(),
-                "Auto-Compounding Convex Strategy"
+                " Auto-Compounding Convex Strategy"
             )
         );
     }
