@@ -38,15 +38,15 @@ def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0xAE653682Dee958914A82C9628de794dCbbEe3D04", force=True
-    )  # 0xAE653682Dee958914A82C9628de794dCbbEe3D04 for 3Crypto (1400 total)
+        "0xfE4d9D4F102b40193EeD8aA6C52BD87a328177fc", force=True
+    )  # 0xAE653682Dee958914A82C9628de794dCbbEe3D04 for 3Crypto (438 total)
     yield whale
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 500e18
+    amount = 200e18
     yield amount
 
 
