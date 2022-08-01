@@ -537,7 +537,7 @@ def test_weird_amounts(
     chain.mine(1)
 
     # take 100% of our CRV to the voter
-    strategy.setKeep(10000, 0, gov, {"from": gov})
+    strategy.setKeep(10000, {"from": gov})
     chain.sleep(1)
     chain.mine(1)
     strategy.harvest({"from": gov})
@@ -563,7 +563,7 @@ def test_weird_amounts(
     chain.mine(1)
 
     # take 0% of our CRV to the voter
-    strategy.setKeep(0, 0, gov, {"from": gov})
+    strategy.setKeep(0, {"from": gov})
     chain.sleep(1)
     chain.mine(1)
     strategy.harvest({"from": gov})
@@ -608,9 +608,21 @@ def test_more_rewards_stuff(
     strategy.setOptimal(0, {"from": gov})
 
     # sleep for a day to get some profit
-    chain.sleep(86400)
+    chain.sleep(86400 * 15)
     chain.mine(1)
     strategy.harvest({"from": gov})
+    weth = Contract('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+    assert weth.balanceOf(strategy) < 1e15
+    cvx = Contract('0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B')
+    assert cvx.balanceOf(strategy) < 1e17
+
+    for t in tx.events["Transfer"]:
+        token = Contract(t.address)
+        sender = t.values()[0]
+        receiver = t.values()[1]
+        value = t.values()[2]
+        print(f'{token.symbol()}, {"STRATEGY" if sender == strategy.address else sender} --> {"STRATEGY" if receiver == strategy.address else receiver}')
+        print(f'    {"{:,.2f}".format(value/10**token.decimals())}')
 
     # set our optimal to USDC without rewards on
     strategy.setOptimal(1, {"from": gov})
@@ -657,7 +669,7 @@ def test_more_rewards_stuff(
     strategy.harvest({"from": gov})
 
     # take 100% of our CRV to the voter
-    strategy.setKeep(10000, 0, gov, {"from": gov})
+    strategy.setKeep(10000, {"from": gov})
     chain.sleep(1)
     chain.mine(1)
     tx = strategy.harvest(
@@ -729,7 +741,7 @@ def test_more_rewards_stuff(
         strategy.setOptimal(4, {"from": gov})
 
     # take 0% of our CRV to the voter
-    strategy.setKeep(0, 0, gov, {"from": gov})
+    strategy.setKeep(0, {"from": gov})
     chain.sleep(1)
     chain.mine(1)
     strategy.harvest({"from": gov})
