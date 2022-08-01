@@ -610,12 +610,13 @@ def test_more_rewards_stuff(
     # sleep for a day to get some profit
     chain.sleep(86400 * 15)
     chain.mine(1)
-    strategy.harvest({"from": gov})
+    tx = strategy.harvest({"from": gov})
     weth = Contract('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
     assert weth.balanceOf(strategy) < 1e15
     cvx = Contract('0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B')
     assert cvx.balanceOf(strategy) < 1e17
 
+    # Print all token transfers
     for t in tx.events["Transfer"]:
         token = Contract(t.address)
         sender = t.values()[0]

@@ -529,7 +529,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         uint256 _wethBalance = weth.balanceOf(address(this));
         if (_wethBalance > 1e15) {
             // don't want to swap dust or we might revert
-            return crveth.exchange(0, 1, _wethBalance, 0, false);
+            crveth.exchange(0, 1, _wethBalance, 0, false);
         }
     }
 
