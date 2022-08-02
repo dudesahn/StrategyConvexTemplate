@@ -22,6 +22,15 @@ interface IOracle {
     function latestAnswer() external view returns (uint256);
 }
 
+interface IYveCRV {
+    function deposit(uint256 _amount) external;
+    function transfer(address _recipeint, uint256 _amount) external;
+}
+
+interface IVaultRewards {
+    function rewards() external view returns (address);
+}
+
 interface IUniV3 {
     struct ExactInputParams {
         bytes path;
@@ -113,8 +122,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
 
     // keepCRV stuff
     uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points)
-    address internal constant voter =
-        0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
+    IYveCRV internal constant yveCRV = IYveCRV(0xc5bDdf9843308380375a611c18B50Fb9341f502A); // Yearn's liquid token through which CRV is locked
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
 
     // Swap stuff
@@ -237,7 +245,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
 
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
-    // Set the amount of CRV to be locked in Yearn's veCRV voter from each harvest. Default is 10%. Option to keep CVX as well.
+    // Set the percentage of total profit to lock to veCRV (via yveCRV). Default is 10%.
     function setKeep(
         uint256 _keepCRV
     ) external onlyGovernance {
@@ -387,6 +395,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         want.approve(address(depositContract), type(uint256).max);
         convexToken.approve(address(cvxeth), type(uint256).max);
         crv.approve(address(crveth), type(uint256).max);
+        crv.approve(address(yveCRV), type(uint256).max);
         weth.approve(address(crveth), type(uint256).max);
         weth.approve(uniswapv3, type(uint256).max);
 
@@ -444,10 +453,11 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         _buyCRV();
 
         uint256 crvBalance = crv.balanceOf(address(this));
-        uint256 _sendToVoter = crvBalance.mul(keepCRV).div(FEE_DENOMINATOR);
-        if (_sendToVoter > 0) {
-            crv.safeTransfer(voter, _sendToVoter);
-            crvBalance -= _sendToVoter;
+        uint256 amountToLock = crvBalance.mul(keepCRV).div(FEE_DENOMINATOR);
+        if (amountToLock > 0) {
+            yveCRV.deposit(amountToLock);
+            yveCRV.transfer(IVaultRewards(address(vault)).rewards(), amountToLock);
+            crvBalance -= amountToLock;
         }
 
         _sellCrv(crvBalance);

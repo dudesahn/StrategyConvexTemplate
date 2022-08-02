@@ -615,16 +615,27 @@ def test_more_rewards_stuff(
     assert weth.balanceOf(strategy) < 1e15
     cvx = Contract('0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B')
     assert cvx.balanceOf(strategy) < 1e17
+    crv = Contract('0xD533a949740bb3306d119CC777fa900bA034cd52')
+    assert crv.balanceOf(strategy) < 1e17
+    yvecrv = Contract('0xc5bDdf9843308380375a611c18B50Fb9341f502A')
 
     # Print all token transfers
+    crv_amount = 0
+    yvecrv_minted = 0
     for t in tx.events["Transfer"]:
         token = Contract(t.address)
         sender = t.values()[0]
         receiver = t.values()[1]
         value = t.values()[2]
+        if token.address == crv.address and receiver == strategy.address:
+            crv_amount += value
+        if token.address == yvecrv.address and receiver == vault.rewards():
+            yvecrv_minted += value
         print(f'{token.symbol()}, {"STRATEGY" if sender == strategy.address else sender} --> {"STRATEGY" if receiver == strategy.address else receiver}')
         print(f'    {"{:,.2f}".format(value/10**token.decimals())}')
-
+    assert yvecrv_minted > 0
+    # Make sure the amount of CRV locked on harvest roughly matches the keepCRV amount
+    assert crv_amount * strategy.keepCRV() / 10_000 / 1e18 == pytest.approx(yvecrv_minted / 1e18, 0.1)
     # set our optimal to USDC without rewards on
     strategy.setOptimal(1, {"from": gov})
 
