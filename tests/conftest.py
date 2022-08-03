@@ -29,7 +29,7 @@ def tenderly_fork(web3, chain):
 # put our pool's convex pid here; this is the only thing that should need to change up here **************
 @pytest.fixture(scope="module")
 def pid():
-    pid = 13  # 13 USDN, 28 USDP
+    pid = 55  # 13 USDN, 28 USDP, 55 EURT
     yield pid
 
 
@@ -38,9 +38,10 @@ def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0x9899c2c49f5eF2f37fbA6F9F8E7557E7A945c964", force=True
+        "0xc065653dD4fd6fD97E7134b7B6daAb6fC221FD23", force=True
     )  # 0x1B5eb1173D2Bf770e50F10410C9a96F7a8eB6e75 for USDP
     # 0x9899c2c49f5eF2f37fbA6F9F8E7557E7A945c964 for USDN
+    # for 0xc065653dD4fd6fD97E7134b7B6daAb6fC221FD23 EURT
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -51,16 +52,27 @@ def whale(accounts, amount, token):
 # use this if your vault is already deployed
 @pytest.fixture(scope="function")
 def vault_address():
-    vault_address = "0x3B96d491f067912D18563d56858Ba7d6EC67a6fa"
+    vault_address = "0xBCBB5b54Fa51e7b7Dc920340043B203447842A6b"
     # USDN 0x3B96d491f067912D18563d56858Ba7d6EC67a6fa
     # USDP 0xC4dAf3b5e2A9e93861c3FBDd25f1e943B8D87417
+    # EURT 0xBCBB5b54Fa51e7b7Dc920340043B203447842A6b
     yield vault_address
+
+
+# curve deposit pool, for old curve pools set this manually
+@pytest.fixture(scope="module")
+def pool():
+    poolAddress = Contract("0x5D0F47B32fDd343BfA74cE221808e2abE4A53827")
+    # USDN 0x094d12e5b541784701FD8d65F11fc0598FBC6332
+    # USDP 0x3c8caee4e09296800f8d29a68fa3837e2dae4940
+    # EURT 0x5D0F47B32fDd343BfA74cE221808e2abE4A53827, not actually the pool but the zap contract for individual token deposits
+    yield poolAddress
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 20_000e18
+    amount = 7_000e18 # can do 20k for others, 7k for EURT
     yield amount
 
 
@@ -78,19 +90,10 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 2
+    hours_to_sleep = 6
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
-
-
-# curve deposit pool, for old curve pools set this manually
-@pytest.fixture(scope="module")
-def pool():
-    poolAddress = Contract("0x094d12e5b541784701FD8d65F11fc0598FBC6332")
-    # USDN 0x094d12e5b541784701FD8d65F11fc0598FBC6332
-    # USDP 0x3c8caee4e09296800f8d29a68fa3837e2dae4940
-    yield poolAddress
 
 
 # use this when we might lose a few wei on conversions between want and another deposit token (sometimes even want -> vault token we can lose a few wei)
@@ -103,7 +106,7 @@ def is_slippery():
 # use this to test our strategy in case there are no (or very low) profits
 @pytest.fixture(scope="module")
 def no_profit():
-    no_profit = False
+    no_profit = True
     yield
 
 
