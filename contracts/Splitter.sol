@@ -128,13 +128,12 @@ contract Splitter {
         if(period.userSlope == 0) return (0, 10_000);
         uint relativeSlope = userSlope * precision / period.globalSlope;
         uint lpSupply = liquidityPool.totalSupply();
-        if (lpSupply == 0){
-            return (10_000, 0);
-        }
+        if (lpSupply == 0) return (10_000, 0); // @dev: avoid div by 0
         uint gaugeDominance = 
             IStrategy(strategy).estimatedTotalAssets() 
             * _precision 
             / lpSupply;
+        if (gaugeDominance == 0) return (10_000, 0); // @dev: avoid div by 0
         yRatio = relativeSlope 
             * _precision 
             / gaugeDominance;
