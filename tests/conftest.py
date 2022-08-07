@@ -1,5 +1,5 @@
 import pytest
-from brownie import config, Wei, Contract
+from brownie import config, Wei, Contract, Splitter
 import requests
 
 # Snapshots the chain before each test and reverts after test completion.
@@ -26,6 +26,11 @@ def tenderly_fork(web3, chain):
 
 ################################################ UPDATE THINGS BELOW HERE ################################################
 
+@pytest.fixture(scope="function")
+def splitter(strategist):
+    splitter = strategist.deploy(Splitter)
+    yield splitter
+
 # for this strategy, set this if we want to test CVX or CRV-ETH LPs. shouldn't need to touch anything else
 @pytest.fixture(scope="module")
 def use_crv():
@@ -36,26 +41,24 @@ def use_crv():
 # for these LPs, we only use this to generate the correct want token. 61 CRV-ETH, 64 CVX-ETH
 @pytest.fixture(scope="module")
 def pid(use_crv):
-    if use_crv:
-        pid = 61
-    else:
-        pid = 64
-    yield pid
+    # if use_crv:
+    #     pid = 61
+    # else:
+    #     pid = 64
+    yield 109
 
 
 @pytest.fixture(scope="module")
-def whale(accounts, use_crv):
+def whale(accounts, use_crv, rewardsContract, vault, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    if use_crv:
-        whale = accounts.at(
-            "0xc75441D085d73983d8659635251dCf528DFB9Be2", force=True
-        )  # 0xc75441D085d73983d8659635251dCf528DFB9Be2 for CRV-ETH (400 total)
-    else:
-        whale = accounts.at(
-            "0x38eE5F5A39c01cB43473992C12936ba1219711ab", force=True
-        )  # 0x38eE5F5A39c01cB43473992C12936ba1219711ab for cvx-eth (~630 total)
-    yield whale
+    temple_ms = accounts.at('0x5C8898f8E0F9468D4A677887bC03EE2659321012', force=True)
+    b = token.balanceOf(temple_ms)
+    amt = rewardsContract.balanceOf(temple_ms)
+    rewardsContract.withdrawAndUnwrap(amt, True, {'from': temple_ms})
+    assert token.balanceOf(temple_ms) > b
+    token.approve(vault, 2**256-1, {'from': temple_ms})
+    yield temple_ms
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
@@ -249,26 +252,25 @@ def strategist(accounts):
 
 
 # use this if you need to deploy the vault
-# @pytest.fixture(scope="function")
-# def vault(pm, gov, rewards, guardian, management, token, chain):
-#     Vault = pm(config["dependencies"][0]).Vault
-#     vault = guardian.deploy(Vault)
-#     vault.initialize(token, gov, rewards, "", "", guardian)
-#     vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
-#     vault.setManagement(management, {"from": gov})
-#     chain.sleep(1)
-#     yield vault
-
-
-# use this if your vault is already deployed
-@pytest.fixture(scope="function")
-def vault(pm, gov, rewards, guardian, management, token, chain, use_crv):
-    if use_crv:
-        vault = Contract("0x6A5468752f8DB94134B6508dAbAC54D3b45efCE6")
-    else:
-        vault = Contract("0x1635b506a88fBF428465Ad65d00e8d6B6E5846C3")
+@pytest.fixture(scope="module")
+def vault(pm, gov, rewards, guardian, management, token, chain):
+    Vault = pm(config["dependencies"][0]).Vault
+    vault = guardian.deploy(Vault)
+    vault.initialize(token, gov, rewards, "", "", guardian)
+    vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
+    vault.setManagement(management, {"from": gov})
+    chain.sleep(1)
     yield vault
 
+
+# # use this if your vault is already deployed
+# @pytest.fixture(scope="function")
+# def vault(pm, gov, rewards, guardian, management, token, chain, use_crv):
+#     if use_crv:
+#         vault = Contract("0x6A5468752f8DB94134B6508dAbAC54D3b45efCE6")
+#     else:
+#         vault = Contract("0x1635b506a88fBF428465Ad65d00e8d6B6E5846C3")
+#     yield vault
 
 # replace the first value with the name of your strategy
 @pytest.fixture(scope="function")
@@ -290,12 +292,13 @@ def strategy(
     strategist_ms,
     booster,
     use_crv,
+    splitter
 ):
     # make sure to include all constructor parameters needed here
     strategy = strategist.deploy(
         StrategyConvexCrvCvxPairsClonable,
         vault,
-        use_crv,
+        splitter,
     )
     strategy.setKeeper(keeper, {"from": gov})
 
@@ -303,11 +306,12 @@ def strategy(
     vault.setManagementFee(0, {"from": gov})
 
     # we will be migrating on our live vault instead of adding it directly
-    old_strategy = Contract(vault.withdrawalQueue(0))
-    vault.migrateStrategy(old_strategy, strategy, {"from": gov})
+    # old_strategy = Contract(vault.withdrawalQueue(0))
+    # vault.migrateStrategy(old_strategy, strategy, {"from": gov})
+    vault.addStrategy(strategy, 10_000, 0, 2**256-1, 0, {"from": gov})
     strategy.setHealthCheck(healthCheck, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
-    vault.updateStrategyDebtRatio(strategy, 10000, {"from": gov})
+    # vault.updateStrategyDebtRatio(strategy, 10000, {"from": gov})
 
     # earmark rewards if we are using a convex strategy
     booster.earmarkRewards(pid, {"from": gov})
