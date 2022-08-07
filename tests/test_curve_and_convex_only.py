@@ -33,7 +33,7 @@ def test_update_to_zero_then_back(
         return
 
     ## clone our strategy, set our rewards to none
-    tx = strategy.cloneConvex3CrvRewards(
+    tx = strategy.cloneConvexSBTCFactory(
         vault,
         strategist,
         rewards,
@@ -224,7 +224,7 @@ def test_update_from_zero_to_off(
         return
 
     ## clone our strategy, set our rewards to none
-    tx = strategy.cloneConvex3CrvRewards(
+    tx = strategy.cloneConvexSBTCFactory(
         vault,
         strategist,
         rewards,
@@ -410,7 +410,7 @@ def test_change_rewards(
         return
 
     ## clone our strategy, set our rewards to none
-    tx = strategy.cloneConvex3CrvRewards(
+    tx = strategy.cloneConvexSBTCFactory(
         vault,
         strategist,
         rewards,

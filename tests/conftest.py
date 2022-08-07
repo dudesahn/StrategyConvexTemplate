@@ -1,5 +1,5 @@
 import pytest
-from brownie import config, Wei, Contract, chain
+from brownie import config, Wei, Contract, chain, ZERO_ADDRESS
 import requests
 
 # Snapshots the chain before each test and reverts after test completion.
@@ -67,10 +67,10 @@ def whale(accounts, amount, token):
     yield whale
 
 
-# use this if your vault is already deployed
+# set address if already deployed, use ZERO_ADDRESS if not
 @pytest.fixture(scope="function")
 def vault_address():
-    vault_address = "0x2DfB14E32e2F8156ec15a2c21c3A6c053af52Be8"
+    vault_address = ZERO_ADDRESS
     # MIM 0x2DfB14E32e2F8156ec15a2c21c3A6c053af52Be8
     # FRAX 0xB4AdA607B9d6b2c9Ee07A275e9616B84AC560139
     yield vault_address
@@ -79,15 +79,15 @@ def vault_address():
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexMIM"
+    strategy_name = "StrategyConvexpBTC"
     yield strategy_name
 
 
 # we need these next two fixtures for deploying our curve strategy, but not for convex. for convex we can pull them programmatically.
 # this is the address of our rewards token, in this case it's a dummy (ALCX) that our whale happens to hold just used to test stuff
 @pytest.fixture(scope="module")
-def rewards_token():  # pBTC
-    yield Contract("0x090185f2135308BaD17527004364eBcC2D37e5F6")
+def rewards_token():  # PNT (pBTC) 0x89Ab32156e46F46D02ade3FEcbe5Fc4243B9AAeD
+    yield Contract("0x89Ab32156e46F46D02ade3FEcbe5Fc4243B9AAeD")
 
 
 # this is whether our pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
@@ -260,22 +260,18 @@ if chain_used == 1:  # mainnet
     @pytest.fixture(scope="module")
     def strategist(accounts):
         yield accounts.at("0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7", force=True)
-
-    # use this if you need to deploy the vault
-    #     @pytest.fixture(scope="function")
-    #     def vault(pm, gov, rewards, guardian, management, token, chain):
-    #         Vault = pm(config["dependencies"][0]).Vault
-    #         vault = guardian.deploy(Vault)
-    #         vault.initialize(token, gov, rewards, "", "", guardian)
-    #         vault.setDepositLimit(2**256 - 1, {"from": gov})
-    #         vault.setManagement(management, {"from": gov})
-    #         chain.sleep(1)
-    #         yield vault
-
-    # use this if your vault is already deployed
+        
     @pytest.fixture(scope="function")
-    def vault(pm, gov, rewards, guardian, management, token, chain, vault_address):
-        vault = Contract(vault_address)
+    def vault(pm, gov, rewards, guardian, management, token, chain, vault_address, ZERO_ADDRESS):
+        if vault_address == ZERO_ADDRESS:
+            Vault = pm(config["dependencies"][0]).Vault
+            vault = guardian.deploy(Vault)
+            vault.initialize(token, gov, rewards, "", "", guardian)
+            vault.setDepositLimit(2**256 - 1, {"from": gov})
+            vault.setManagement(management, {"from": gov})
+            chain.sleep(1)
+        else:
+            vault = Contract(vault_address)
         yield vault
 
     # replace the first value with the name of your strategy
@@ -337,8 +333,8 @@ if chain_used == 1:  # mainnet
         chain.mine(1)
 
         # for MIM we use index 0
-        if pid == 40:
-            strategy.updateRewards(True, 0, {"from": gov})
+        if pid in [40, 77]:
+            strategy.updateRewards(True, 0, False, {"from": gov})
 
         yield strategy
 

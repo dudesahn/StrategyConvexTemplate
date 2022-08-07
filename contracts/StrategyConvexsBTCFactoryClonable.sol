@@ -288,6 +288,8 @@ contract StrategyConvexsBTCFactoryClonable is StrategyConvexBase {
     // we use these to deposit to our curve pool
     address internal constant uniswapv3 =
         0xE592427A0AEce92De3Edee1F18E0157C05861564;
+    IERC20 internal constant usdt =
+        IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
     IERC20 internal constant wbtc =
         IERC20(0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599);
     uint24 public uniWbtcFee; // this is equal to 0.05%, can change this later if a different path becomes more optimal
@@ -316,7 +318,7 @@ contract StrategyConvexsBTCFactoryClonable is StrategyConvexBase {
     event Cloned(address indexed clone);
 
     // we use this to clone our original strategy to other vaults
-    function cloneConvex3CrvRewards(
+    function cloneConvexSBTCFactory(
         address _vault,
         address _strategist,
         address _rewards,
@@ -343,7 +345,7 @@ contract StrategyConvexsBTCFactoryClonable is StrategyConvexBase {
             newStrategy := create(0, clone_code, 0x37)
         }
 
-        StrategyConvex3CrvRewardsClonable(newStrategy).initialize(
+        StrategyConvexsBTCFactoryClonable(newStrategy).initialize(
             _vault,
             _strategist,
             _rewards,
@@ -704,19 +706,6 @@ contract StrategyConvexsBTCFactoryClonable is StrategyConvexBase {
     /* ========== SETTERS ========== */
 
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
-
-    /// @notice Set optimal token to sell harvested funds for depositing to Curve.
-    function setOptimal(uint256 _optimal) external onlyVaultManagers {
-        if (_optimal == 0) {
-            targetStable = address(dai);
-        } else if (_optimal == 1) {
-            targetStable = address(usdc);
-        } else if (_optimal == 2) {
-            targetStable = address(usdt);
-        } else {
-            revert("incorrect token");
-        }
-    }
 
     // Use to add, update or remove rewards
     function updateRewards(
