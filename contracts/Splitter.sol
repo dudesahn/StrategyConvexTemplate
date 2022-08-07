@@ -38,9 +38,10 @@ interface IYveCRV {
 }
 
 contract Splitter {
+
     event Split(uint yearnAmount, uint keep, uint templAmount, uint period);
-    event Stats(uint yRatio, uint tRatio, uint crvBalance);
     event PeriodUpdated(uint period, uint globalSlope, uint userSlope);
+
     struct Yearn{
         address recipient;
         address voter;
@@ -55,19 +56,15 @@ contract Splitter {
 
     uint constant precision = 10_000;
     uint constant WEEK = 86400 * 7;
-
-    
     IERC20 constant crv = IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
     IYveCRV constant yvecrv = IYveCRV(0xc5bDdf9843308380375a611c18B50Fb9341f502A);
-
-    IGauge gaugeController = IGauge(0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB);
-    address gauge = 0xdaDfD00A2bBEb1abc4936b1644a3033e1B653228;
-    address public strategy;
-    IERC20 liquidityPool = IERC20(0xdaDfD00A2bBEb1abc4936b1644a3033e1B653228);
-
+    IERC20 constant liquidityPool = IERC20(0xdaDfD00A2bBEb1abc4936b1644a3033e1B653228);
+    IGauge constant gaugeController = IGauge(0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB);
+    address constant gauge = 0xdaDfD00A2bBEb1abc4936b1644a3033e1B653228;
+    
     Yearn yearn;
     Period period;
-    address public temple;
+    address public strategy;
     address templeRecipient = 0x5C8898f8E0F9468D4A677887bC03EE2659321012;
     address owner;
     
@@ -96,7 +93,6 @@ contract Splitter {
         if (crvBalance == 0) return;
         if (block.timestamp / WEEK * WEEK > period.period) _updatePeriod();
         (uint yRatio, uint tRatio) = _computeSplitRatios();
-        emit Stats(yRatio, tRatio, crvBalance);
         if (yRatio == 0) {
             crv.transferFrom(strategy, templeRecipient, crvBalance);
             emit Split(0, 0, crvBalance, period.period);
