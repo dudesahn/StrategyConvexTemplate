@@ -72,10 +72,10 @@ contract Splitter {
         owner = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
         crv.approve(address(yvecrv), type(uint256).max);
         yearn = Yearn(
-            address(0xF147b8125d2ef93FB6965Db97D6746952a133934),
-            address(0xF147b8125d2ef93FB6965Db97D6746952a133934),
-            7_000,
-            5_000
+            address(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52), // recipient
+            address(0xF147b8125d2ef93FB6965Db97D6746952a133934), // voter
+            7_000, // profit factor (terms)
+            5_000 // Yearn discretionary % of CRV to lock as veCRV on each split
         );
     }
 
