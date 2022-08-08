@@ -60,7 +60,10 @@ def whale(accounts, use_crv, rewardsContract, vault, token):
     token.approve(vault, 2**256-1, {'from': temple_ms})
     yield temple_ms
 
-
+@pytest.fixture(scope="module")
+def crv_whale(accounts, crv):
+    yield accounts.at('0xF89501B77b2FA6329F94F5A05FE84cEbb5c8b1a0', force=True)
+    # crv.transfer()
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount(use_crv):
@@ -140,7 +143,7 @@ def convexToken():
     yield Contract("0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B")
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def crv():
     yield Contract("0xD533a949740bb3306d119CC777fa900bA034cd52")
 
@@ -256,7 +259,7 @@ def strategist(accounts):
 def vault(pm, gov, rewards, guardian, management, token, chain):
     Vault = pm(config["dependencies"][0]).Vault
     vault = guardian.deploy(Vault)
-    vault.initialize(token, gov, rewards, "", "", guardian)
+    vault.initialize(token, gov, rewards, "", "", guardian, {"from": gov})
     vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
     vault.setManagement(management, {"from": gov})
     chain.sleep(1)

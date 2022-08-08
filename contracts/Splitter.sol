@@ -39,7 +39,7 @@ interface IYveCRV {
 
 contract Splitter {
 
-    event Split(uint yearnAmount, uint keep, uint templAmount, uint period);
+    event Split(uint yearnAmount, uint keep, uint templeAmount, uint period);
     event PeriodUpdated(uint period, uint globalSlope, uint userSlope);
 
     struct Yearn{
@@ -60,7 +60,8 @@ contract Splitter {
     IYveCRV constant yvecrv = IYveCRV(0xc5bDdf9843308380375a611c18B50Fb9341f502A);
     IERC20 constant liquidityPool = IERC20(0xdaDfD00A2bBEb1abc4936b1644a3033e1B653228);
     IGauge constant gaugeController = IGauge(0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB);
-    address constant gauge = 0xdaDfD00A2bBEb1abc4936b1644a3033e1B653228;
+    address constant gauge = 0x8f162742a7BCDb87EB52d83c687E43356055a68B;
+    mapping(address => uint) pendingShare; 
     
     Yearn yearn;
     Period period;
@@ -70,7 +71,7 @@ contract Splitter {
     
     constructor() public {
         owner = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
-        crv.approve(address(yvecrv), type(uint256).max);
+        crv.approve(address(yvecrv), type(uint).max);
         yearn = Yearn(
             address(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52), // recipient
             address(0xF147b8125d2ef93FB6965Db97D6746952a133934), // voter
@@ -88,9 +89,13 @@ contract Splitter {
         _split();
     }
 
+    // @notice split all 
     function _split() internal {
-        uint256 crvBalance = crv.balanceOf(strategy);
-        if (crvBalance == 0) return;
+        uint crvBalance = crv.balanceOf(strategy);
+        if (crvBalance == 0) {
+            emit Split(0, 0, 0, period.period);
+            return;
+        }
         if (block.timestamp / WEEK * WEEK > period.period) _updatePeriod();
         (uint yRatio, uint tRatio) = _computeSplitRatios();
         if (yRatio == 0) {
@@ -98,9 +103,10 @@ contract Splitter {
             emit Split(0, 0, crvBalance, period.period);
             return;
         }
-        uint yearnAmount = crvBalance * yRatio / precision;
-        uint templeAmount = crvBalance * tRatio / precision;
-        uint keep = yearnAmount * yearn.keepCRV / precision;
+        uint _precision = precision;
+        uint yearnAmount = crvBalance * yRatio / _precision;
+        uint templeAmount = crvBalance * tRatio / _precision;
+        uint keep = yearnAmount * yearn.keepCRV / _precision;
         if (keep > 0) {
             crv.transferFrom(strategy, address(this), keep);
             yvecrv.deposit(keep);
@@ -110,7 +116,7 @@ contract Splitter {
         emit Split(yearnAmount, keep, templeAmount, period.period);
     }
 
-    // @dev: updates all period data to present week
+    // @dev updates all period data to present week
     function _updatePeriod() internal {
         uint _period = block.timestamp / WEEK * WEEK;
         period.period = _period;
@@ -123,28 +129,29 @@ contract Splitter {
     }
 
     function _computeSplitRatios() internal view returns (uint yRatio, uint tRatio) {
-        uint _precision = precision; // @dev: Move value into memory
+        uint _precision = precision; // @dev Move value into memory
         uint userSlope = period.userSlope;
         if(period.userSlope == 0) return (0, 10_000);
         uint relativeSlope = userSlope * precision / period.globalSlope;
         uint lpSupply = liquidityPool.totalSupply();
-        if (lpSupply == 0) return (10_000, 0); // @dev: avoid div by 0
+        if (lpSupply == 0) return (10_000, 0); // @dev avoid div by 0
         uint gaugeDominance = 
             IStrategy(strategy).estimatedTotalAssets() 
             * _precision 
             / lpSupply;
-        if (gaugeDominance == 0) return (10_000, 0); // @dev: avoid div by 0
+        if (gaugeDominance == 0) return (10_000, 0); // @dev avoid div by 0
         yRatio = relativeSlope 
             * _precision 
             / gaugeDominance;
-        // Cannot return > 100%
+        // Should not return > 100%
         if (yRatio > 10_000){
             return (10_000, 0);
         }
         tRatio = _precision - yRatio;
     }
 
-    // @dev: Estimate only. Only guaranteed to be accuarate when period data is not stale.
+    // @dev Estimate only. 
+    // @dev Only measures against strategy's current CRV balance, and will be inaccurate if period data is stale.
     function estimateSplit() external view returns (uint ySplit, uint tSplit) {
         (uint y, uint t) = _computeSplitRatios();
         uint bal = crv.balanceOf(strategy);
@@ -152,13 +159,53 @@ contract Splitter {
         tSplit = bal - ySplit;
     }
 
-    // @dev: Estimate only. Only guaranteed to be accuarate when period data is not stale.
+    // @dev Estimate only.
+    // @dev Only measures against strategy's current CRV balance, and will be inaccurate if period data is stale.
     function estimateSplitRatios() external view returns (uint ySplit, uint tSplit) {
         (ySplit, tSplit) = _computeSplitRatios();
+    }
+
+    function updatePeriod() external {
+        _updatePeriod();
     }
 
     function setStrategy(address _strategy) external {
         require(msg.sender == owner);
         strategy = _strategy;
     }
+
+
+    function setYearn(address _recipient, uint _keepCRV) external {
+        require(_keepCRV <= 10_000, "!tooHigh");
+        yearn = Yearn(
+            _recipient,
+            yearn.voter, // Cannot update this value
+            yearn.share, // Cannot update this value
+            _keepCRV
+        );
+    }
+
+    function setTemple(address _recipient) external {
+        require(msg.sender == templeRecipient);
+        templeRecipient = _recipient;
+    }
+
+    // @notice update share if both parties agree.
+    function updateYearnShare(uint _share) external {
+        require(_share <= 10_000, "!tooHigh");
+        require(msg.sender == yearn.recipient || msg.sender == templeRecipient);
+        if(msg.sender == yearn.recipient){
+            pendingShare[msg.sender] = _share;
+            if (pendingShare[templeRecipient] == _share) {
+                yearn.share = _share;
+            }
+        }
+        if(msg.sender == templeRecipient){
+            pendingShare[msg.sender] = _share;
+            if (pendingShare[yearn.recipient] == _share) {
+                yearn.share = _share;
+            }
+        }
+    }
+
 }
