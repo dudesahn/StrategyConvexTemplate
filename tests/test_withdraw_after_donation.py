@@ -1,5 +1,5 @@
 import brownie
-from brownie import chain, Contract
+from brownie import chain, Contract, ZERO_ADDRESS
 import math
 
 # these tests all assess whether a strategy will hit accounting errors following donations to the strategy.
@@ -466,6 +466,7 @@ def test_withdraw_after_donation_7(
     amount,
     is_slippery,
     no_profit,
+    vault_address,
 ):
 
     ## deposit to the vault after approving
@@ -524,7 +525,10 @@ def test_withdraw_after_donation_7(
 
     # assert that our strategy has no debt
     assert new_params["totalDebt"] == 0
-    assert vault.totalDebt() > 0
+    if vault_address == ZERO_ADDRESS:
+        assert vault.totalDebt() == 0
+    else:
+        assert vault.totalDebt() > 0
 
     # sleep to allow share price to normalize
     chain.sleep(86400)
@@ -560,6 +564,7 @@ def test_withdraw_after_donation_8(
     amount,
     is_slippery,
     no_profit,
+    vault_address,
 ):
 
     ## deposit to the vault after approving
@@ -618,7 +623,10 @@ def test_withdraw_after_donation_8(
 
     # assert that our strategy has no debt
     assert new_params["totalDebt"] == 0
-    assert vault.totalDebt() > 0
+    if vault_address == ZERO_ADDRESS:
+        assert vault.totalDebt() == 0
+    else:
+        assert vault.totalDebt() > 0
 
     # sleep to allow share price to normalize
     chain.sleep(86400)
