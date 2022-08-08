@@ -14,7 +14,7 @@ def test_odds_and_ends(
     chain,
     strategist_ms,
     voter,
-    StrategyConvexsBTCMetapoolsOldClonable,
+    StrategyConvexsBTC,
     cvxDeposit,
     rewardsContract,
     pid,
@@ -84,7 +84,7 @@ def test_odds_and_ends(
     # deploy our new strategy
     if is_convex:
         new_strategy = strategist.deploy(
-            StrategyConvexsBTCMetapoolsOldClonable,
+            StrategyConvexsBTC,
             vault,
             pid,
             pool,
@@ -92,7 +92,7 @@ def test_odds_and_ends(
         )
     else:
         new_strategy = strategist.deploy(
-            StrategyConvexsBTCMetapoolsOldClonable,
+            StrategyConvexsBTC,
             vault,
             gauge,
             pool,
@@ -198,7 +198,7 @@ def test_odds_and_ends_2(
 
 
 def test_odds_and_ends_migration(
-    StrategyConvexsBTCMetapoolsOldClonable,
+    StrategyConvexsBTC,
     gov,
     token,
     vault,
@@ -228,7 +228,7 @@ def test_odds_and_ends_migration(
     # deploy our new strategy
     if is_convex:
         new_strategy = strategist.deploy(
-            StrategyConvexsBTCMetapoolsOldClonable,
+            StrategyConvexsBTC,
             vault,
             pid,
             pool,
@@ -236,7 +236,7 @@ def test_odds_and_ends_migration(
         )
     else:
         new_strategy = strategist.deploy(
-            StrategyConvexsBTCMetapoolsOldClonable,
+            StrategyConvexsBTC,
             vault,
             gauge,
             pool,

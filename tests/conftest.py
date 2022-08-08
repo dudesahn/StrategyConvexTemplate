@@ -43,14 +43,14 @@ chain_used = 1
 # If testing a Convex strategy, set this equal to your PID
 @pytest.fixture(scope="module")
 def pid():
-    pid = 20  # tBTC 16, oBTC 20. tBTC not working well currently since yield is so low
+    pid = 7
     yield pid
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 0.25e18  # tBTC has >10, oBTC has 0.5
+    amount = 6e18  # has over 12
     yield amount
 
 
@@ -58,8 +58,7 @@ def amount():
 def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    # tBTC 0x3d24D77bEC08549D7Ea86c4e9937204C11E153f1, oBTC 0x806ed321E5D8255Ff1478b9171bDC97ae09b2d37
-    whale = accounts.at("0x806ed321E5D8255Ff1478b9171bDC97ae09b2d37", force=True)
+    whale = accounts.at("0x5Ec3f59397498ceE61d71399D15458ECc171b783", force=True)
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -70,16 +69,14 @@ def whale(accounts, amount, token):
 # set address if already deployed, use ZERO_ADDRESS if not
 @pytest.fixture(scope="module")
 def vault_address():
-    vault_address = "0xe9Dc63083c464d6EDcCFf23444fF3CFc6886f6FB"
-    # tBTC 0x23D3D0f1c697247d5e0a9efB37d8b0ED0C464f7f
-    # oBTC 0xe9Dc63083c464d6EDcCFf23444fF3CFc6886f6FB
+    vault_address = "0x8414Db07a7F743dEbaFb402070AB01a4E0d2E45e"
     yield vault_address
 
 
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexoBTC"
+    strategy_name = "StrategyConvexsBTC"
     yield strategy_name
 
 
@@ -92,16 +89,28 @@ def rewards_token():  # oBTC has one but don't worry about it for now
 # curve deposit pool for old metapools, set to ZERO_ADDRESS otherwise
 @pytest.fixture(scope="module")
 def old_pool():
-    old_pool = "0xd5BCf53e2C81e1991570f33Fa881c49EEa570C8D"
-    # tBTC 0xaa82ca713D94bBA7A89CEAB55314F9EfFEdDc78c
-    # oBTC 0xd5BCf53e2C81e1991570f33Fa881c49EEa570C8D
+    old_pool = ZERO_ADDRESS
     yield old_pool
+
+
+# whether or not a strategy is clonable
+@pytest.fixture(scope="module")
+def is_clonable():
+    is_clonable = False
+    yield is_clonable
+
+
+# whether or not a strategy template can possibly have rewards
+@pytest.fixture(scope="module")
+def rewards_template():
+    rewards_template = False
+    yield rewards_template
 
 
 # this is whether our pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
 @pytest.fixture(scope="module")
 def has_rewards():
-    has_rewards = False  # new pBTC true, all else false
+    has_rewards = False
     yield has_rewards
 
 
@@ -141,7 +150,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 6 # oBTC 6 hours
+    hours_to_sleep = 6
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
@@ -281,7 +290,7 @@ if chain_used == 1:  # mainnet
     # replace the first value with the name of your strategy
     @pytest.fixture(scope="module")
     def strategy(
-        StrategyConvexsBTCMetapoolsOldClonable,
+        StrategyConvexsBTC,
         strategist,
         keeper,
         vault,
@@ -308,7 +317,7 @@ if chain_used == 1:  # mainnet
         if is_convex:
             # make sure to include all constructor parameters needed here
             strategy = strategist.deploy(
-                StrategyConvexsBTCMetapoolsOldClonable,
+                StrategyConvexsBTC,
                 vault,
                 pid,
                 pool,
@@ -318,7 +327,7 @@ if chain_used == 1:  # mainnet
         else:
             # make sure to include all constructor parameters needed here
             strategy = strategist.deploy(
-                StrategyConvexsBTCMetapoolsOldClonable,
+                StrategyConvexsBTC,
                 vault,
                 gauge,
                 pool,
