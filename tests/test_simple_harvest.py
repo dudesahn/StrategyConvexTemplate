@@ -76,7 +76,8 @@ def test_simple_harvest(
         ),
     )
     print("Harvest info:", tx.events["Harvested"])
-    assert tx.events["Harvested"]["profit"] > 0
+    if not no_profit:
+        assert tx.events["Harvested"]["profit"] > 0
 
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)

@@ -1,6 +1,7 @@
 import brownie
 from brownie import Wei, accounts, Contract, config, ZERO_ADDRESS
 import pytest
+import math
 
 # set our rewards to nothing, then turn them back on
 def test_update_to_zero_then_back(
@@ -13,7 +14,7 @@ def test_update_to_zero_then_back(
     keeper,
     rewards,
     chain,
-    StrategyConvexsBTCFactoryClonable,
+    StrategyConvexsBTCMetapoolsOldClonable,
     voter,
     proxy,
     pid,
@@ -27,10 +28,12 @@ def test_update_to_zero_then_back(
     rewards_token,
     sleep_time,
     vault_address,
+    no_profit,
+    is_slippery,
 ):
     if is_convex:
         ## clone our strategy
-        tx = strategy.cloneConvexSBTCFactory(
+        tx = strategy.cloneConvexSBTCOld(
             vault,
             strategist,
             rewards,
@@ -40,7 +43,7 @@ def test_update_to_zero_then_back(
             strategy_name,
             {"from": gov},
         )
-        newStrategy = StrategyConvexsBTCFactoryClonable.at(tx.return_value)
+        newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
     else:
         ## clone our strategy
         tx = strategy.cloneCurve3CrvRewards(
@@ -53,7 +56,7 @@ def test_update_to_zero_then_back(
             strategy_name,
             {"from": gov},
         )
-        newStrategy = StrategyConvexsBTCFactoryClonable.at(tx.return_value)
+        newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
 
     # revoke and send all funds back to vault
     startingDebtRatio = vault.strategies(strategy)["debtRatio"]
@@ -197,11 +200,17 @@ def test_update_to_zero_then_back(
     chain.sleep(sleep_time)
     chain.mine(1)
 
-    # withdraw and confirm we made money
+    # withdraw and confirm what happened
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) >= startingWhale
-    assert vault.pricePerShare() > before_pps
-    assert vault.pricePerShare() > new_pps
+
+    if no_profit and is_slippery:
+        assert math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
+        assert vault.pricePerShare() >= before_pps
+        assert vault.pricePerShare() >= new_pps
+    else:
+        assert token.balanceOf(whale) >= startingWhale
+        assert vault.pricePerShare() > before_pps
+        assert vault.pricePerShare() > new_pps
 
 
 # test updating from on, then off, and still off
@@ -215,7 +224,7 @@ def test_update_from_zero_to_off(
     keeper,
     rewards,
     chain,
-    StrategyConvexsBTCFactoryClonable,
+    StrategyConvexsBTCMetapoolsOldClonable,
     voter,
     proxy,
     pid,
@@ -229,11 +238,13 @@ def test_update_from_zero_to_off(
     rewards_token,
     sleep_time,
     vault_address,
+    no_profit,
+    is_slippery,
 ):
 
     if is_convex:
         ## clone our strategy
-        tx = strategy.cloneConvexSBTCFactory(
+        tx = strategy.cloneConvexSBTCOld(
             vault,
             strategist,
             rewards,
@@ -243,7 +254,7 @@ def test_update_from_zero_to_off(
             strategy_name,
             {"from": gov},
         )
-        newStrategy = StrategyConvexsBTCFactoryClonable.at(tx.return_value)
+        newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
     else:
         ## clone our strategy
         tx = strategy.cloneCurve3CrvRewards(
@@ -256,7 +267,7 @@ def test_update_from_zero_to_off(
             strategy_name,
             {"from": gov},
         )
-        newStrategy = StrategyConvexsBTCFactoryClonable.at(tx.return_value)
+        newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
 
     # revoke and send all funds back to vault
     startingDebtRatio = vault.strategies(strategy)["debtRatio"]
@@ -398,10 +409,17 @@ def test_update_from_zero_to_off(
     chain.sleep(sleep_time)
     chain.mine(1)
 
-    # withdraw and confirm we made money
+    # withdraw and confirm what happened
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) >= startingWhale
-    assert vault.pricePerShare() > before_pps
+
+    if no_profit and is_slippery:
+        assert math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
+        assert vault.pricePerShare() >= before_pps
+        assert vault.pricePerShare() >= new_pps
+    else:
+        assert token.balanceOf(whale) >= startingWhale
+        assert vault.pricePerShare() > before_pps
+        assert vault.pricePerShare() > new_pps
 
 
 # test changing our rewards to something else
@@ -415,7 +433,7 @@ def test_change_rewards(
     keeper,
     rewards,
     chain,
-    StrategyConvexsBTCFactoryClonable,
+    StrategyConvexsBTCMetapoolsOldClonable,
     voter,
     proxy,
     pid,
@@ -430,7 +448,7 @@ def test_change_rewards(
 
     if is_convex:
         ## clone our strategy
-        tx = strategy.cloneConvexSBTCFactory(
+        tx = strategy.cloneConvexSBTCOld(
             vault,
             strategist,
             rewards,
@@ -440,7 +458,7 @@ def test_change_rewards(
             strategy_name,
             {"from": gov},
         )
-        newStrategy = StrategyConvexsBTCFactoryClonable.at(tx.return_value)
+        newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
     else:
         ## clone our strategy
         tx = strategy.cloneCurve3CrvRewards(
@@ -453,7 +471,7 @@ def test_change_rewards(
             strategy_name,
             {"from": gov},
         )
-        newStrategy = StrategyConvexsBTCFactoryClonable.at(tx.return_value)
+        newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
 
     # revoke and send all funds back to vault
     startingDebtRatio = vault.strategies(strategy)["debtRatio"]
@@ -518,7 +536,7 @@ def test_check_rewards(
     keeper,
     rewards,
     chain,
-    StrategyConvexsBTCFactoryClonable,
+    StrategyConvexsBTCMetapoolsOldClonable,
     voter,
     proxy,
     pid,

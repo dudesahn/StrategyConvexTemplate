@@ -246,10 +246,12 @@ def test_emergency_exit_with_no_loss(
     print("Whale profit from other strat PPS increase:", whale_profit / 1e18)
     vault.withdraw({"from": whale})
     profit = token.balanceOf(whale) - startingWhale
-    assert math.isclose(
-        whale_profit, token.balanceOf(whale) - startingWhale, abs_tol=10
-    )
-    assert profit >= 0
+    if no_profit and is_slippery:
+        assert math.isclose(
+            whale_profit, token.balanceOf(whale) - startingWhale, abs_tol=10
+        )
+    else:
+        assert profit > 0
     print("Whale profit, should be low:", profit / 1e18)
 
 

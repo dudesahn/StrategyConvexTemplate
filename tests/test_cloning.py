@@ -14,7 +14,7 @@ def test_cloning(
     rewards,
     chain,
     proxy,
-    StrategyConvexsBTCFactoryClonable,
+    StrategyConvexsBTCMetapoolsOldClonable,
     rewardsContract,
     pid,
     amount,
@@ -33,7 +33,7 @@ def test_cloning(
     if tests_using_tenderly:
         if is_convex:
             ## clone our strategy
-            tx = strategy.cloneConvexSBTCFactory(
+            tx = strategy.cloneConvexSBTCOld(
                 vault,
                 strategist,
                 rewards,
@@ -43,10 +43,10 @@ def test_cloning(
                 strategy_name,
                 {"from": gov},
             )
-            newStrategy = StrategyConvexsBTCFactoryClonable.at(tx.return_value)
+            newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
         else:
             ## clone our strategy
-            tx = strategy.cloneConvexSBTCFactory(
+            tx = strategy.cloneConvexSBTCOld(
                 vault,
                 strategist,
                 rewards,
@@ -56,7 +56,7 @@ def test_cloning(
                 strategy_name,
                 {"from": gov},
             )
-            newStrategy = StrategyConvexsBTCFactoryClonable.at(tx.return_value)
+            newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
     else:
         if is_convex:
             # Shouldn't be able to call initialize again
@@ -73,7 +73,7 @@ def test_cloning(
                 )
 
             ## clone our strategy
-            tx = strategy.cloneConvexSBTCFactory(
+            tx = strategy.cloneConvexSBTCOld(
                 vault,
                 strategist,
                 rewards,
@@ -83,7 +83,7 @@ def test_cloning(
                 strategy_name,
                 {"from": gov},
             )
-            newStrategy = StrategyConvexsBTCFactoryClonable.at(tx.return_value)
+            newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
 
             # Shouldn't be able to call initialize again
             with brownie.reverts():
@@ -100,7 +100,7 @@ def test_cloning(
 
             ## shouldn't be able to clone a clone
             with brownie.reverts():
-                newStrategy.cloneConvexSBTCFactory(
+                newStrategy.cloneConvexSBTCOld(
                     vault,
                     strategist,
                     rewards,
@@ -126,7 +126,7 @@ def test_cloning(
                 )
 
             ## clone our strategy
-            tx = strategy.cloneConvexSBTCFactory(
+            tx = strategy.cloneConvexSBTCOld(
                 vault,
                 strategist,
                 rewards,
@@ -136,7 +136,7 @@ def test_cloning(
                 strategy_name,
                 {"from": gov},
             )
-            newStrategy = StrategyConvexsBTCFactoryClonable.at(tx.return_value)
+            newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
 
             # Shouldn't be able to call initialize again
             with brownie.reverts():
@@ -153,7 +153,7 @@ def test_cloning(
 
             ## shouldn't be able to clone a clone
             with brownie.reverts():
-                newStrategy.cloneConvexSBTCFactory(
+                newStrategy.cloneConvexSBTCOld(
                     vault,
                     strategist,
                     rewards,

@@ -479,6 +479,8 @@ def test_withdraw_after_donation_7(
     prev_params = vault.strategies(strategy)
     prev_assets = vault.totalAssets()
 
+    starting_total_vault_debt = vault.totalDebt()
+    starting_strategy_debt = vault.strategies(strategy)["totalDebt"]
     currentDebt = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
     assert vault.strategies(strategy)["debtRatio"] == 0
@@ -528,7 +530,7 @@ def test_withdraw_after_donation_7(
     if vault_address == ZERO_ADDRESS:
         assert vault.totalDebt() == 0
     else:
-        assert vault.totalDebt() > 0
+        assert starting_total_vault_debt - starting_strategy_debt <= vault.totalDebt()
 
     # sleep to allow share price to normalize
     chain.sleep(86400)
@@ -577,6 +579,8 @@ def test_withdraw_after_donation_8(
     prev_params = vault.strategies(strategy)
     prev_assets = vault.totalAssets()
 
+    starting_total_vault_debt = vault.totalDebt()
+    starting_strategy_debt = vault.strategies(strategy)["totalDebt"]
     currentDebt = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
     assert vault.strategies(strategy)["debtRatio"] == 0
@@ -626,7 +630,7 @@ def test_withdraw_after_donation_8(
     if vault_address == ZERO_ADDRESS:
         assert vault.totalDebt() == 0
     else:
-        assert vault.totalDebt() > 0
+        assert starting_total_vault_debt - starting_strategy_debt <= vault.totalDebt()
 
     # sleep to allow share price to normalize
     chain.sleep(86400)

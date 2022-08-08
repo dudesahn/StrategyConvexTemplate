@@ -268,14 +268,12 @@ abstract contract StrategyConvexBase is BaseStrategy {
     }
 }
 
-contract StrategyConvexsBTCFactoryClonable is StrategyConvexBase {
+contract StrategyConvexsBTCMetapoolsOldClonable is StrategyConvexBase {
     /* ========== STATE VARIABLES ========== */
     // these will likely change across different wants.
 
     // Curve stuff
-    address public curve; // Curve Pool, this is our pool specific to this vault
-    ICurveFi internal constant zapContract =
-        ICurveFi(0x7AbDBAf29929e7F8621B757D2a7c04d78d633834); // this is used for depositing to all sBTC metapools
+    ICurveFi public curve; // Curve Pool, this is our pool specific to this vault
 
     bool public checkEarmark; // this determines if we should check if we need to earmark rewards before harvesting
 
@@ -318,7 +316,7 @@ contract StrategyConvexsBTCFactoryClonable is StrategyConvexBase {
     event Cloned(address indexed clone);
 
     // we use this to clone our original strategy to other vaults
-    function cloneConvexSBTCFactory(
+    function cloneConvexSBTCOld(
         address _vault,
         address _strategist,
         address _rewards,
@@ -345,7 +343,7 @@ contract StrategyConvexsBTCFactoryClonable is StrategyConvexBase {
             newStrategy := create(0, clone_code, 0x37)
         }
 
-        StrategyConvexsBTCFactoryClonable(newStrategy).initialize(
+        StrategyConvexsBTCMetapoolsOldClonable(newStrategy).initialize(
             _vault,
             _strategist,
             _rewards,
@@ -396,8 +394,8 @@ contract StrategyConvexsBTCFactoryClonable is StrategyConvexBase {
         crv.approve(address(crveth), type(uint256).max);
         weth.approve(uniswapv3, type(uint256).max);
 
-        // this is the pool specific to this vault, but we only use it as an address
-        curve = address(_curvePool);
+        // this is the pool specific to this vault
+        curve = ICurveFi(_curvePool);
 
         // setup our rewards contract
         pid = _pid; // this is the pool ID on convex, we use this to determine what the reweardsContract address is
@@ -414,7 +412,7 @@ contract StrategyConvexsBTCFactoryClonable is StrategyConvexBase {
         stratName = _name;
 
         // these are our approvals and path specific to this contract
-        wbtc.approve(address(zapContract), type(uint256).max);
+        wbtc.approve(address(curve), type(uint256).max);
 
         // set our uniswap pool fees
         uniWbtcFee = 500;
@@ -463,8 +461,8 @@ contract StrategyConvexsBTCFactoryClonable is StrategyConvexBase {
 
         // deposit our balance to Curve if we have any
         uint256 _wbtcBalance = wbtc.balanceOf(address(this));
-        if (_wbtcBalance > 1e15) {
-            zapContract.add_liquidity(curve, [0, 0, _wbtcBalance, 0], 0);
+        if (_wbtcBalance > 0) {
+            curve.add_liquidity([0, 0, _wbtcBalance, 0], 0);
         }
 
         // debtOustanding will only be > 0 in the event of revoking or if we need to rebalance from a withdrawal or lowering the debtRatio
