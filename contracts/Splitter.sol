@@ -176,6 +176,7 @@ contract Splitter {
 
 
     function setYearn(address _recipient, uint _keepCRV) external {
+        require(msg.sender == yearn.recipient);
         require(_keepCRV <= 10_000, "!tooHigh");
         yearn = Yearn(
             _recipient,
