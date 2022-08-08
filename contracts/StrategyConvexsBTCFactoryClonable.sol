@@ -397,7 +397,7 @@ contract StrategyConvexsBTCFactoryClonable is StrategyConvexBase {
         weth.approve(uniswapv3, type(uint256).max);
 
         // this is the pool specific to this vault, but we only use it as an address
-        curve = address(_curvePool);
+        curve = _curvePool;
 
         // setup our rewards contract
         pid = _pid; // this is the pool ID on convex, we use this to determine what the reweardsContract address is

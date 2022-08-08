@@ -687,9 +687,9 @@ def test_odds_and_ends_keep_cvx(
     )
     chain.sleep(1)
     chain.mine(1)
-    treasury_before = convexToken.balanceOf(vault.rewards())
-    strategy.harvest({"from": gov})
-    treasury_after = convexToken.balanceOf(vault.rewards())
+    treasury_before = convexToken.balanceOf(strategy.keepCVXDestination())
+    tx = strategy.harvest({"from": gov})
+    treasury_after = convexToken.balanceOf(strategy.keepCVXDestination())
     if not no_profit:
         assert treasury_after > treasury_before
 
