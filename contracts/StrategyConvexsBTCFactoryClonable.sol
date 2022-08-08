@@ -463,7 +463,7 @@ contract StrategyConvexsBTCFactoryClonable is StrategyConvexBase {
 
         // deposit our balance to Curve if we have any
         uint256 _wbtcBalance = wbtc.balanceOf(address(this));
-        if (_wbtcBalance > 0) {
+        if (_wbtcBalance > 1e15) {
             zapContract.add_liquidity(curve, [0, 0, _wbtcBalance, 0], 0);
         }
 

@@ -43,14 +43,14 @@ chain_used = 1
 # If testing a Convex strategy, set this equal to your PID
 @pytest.fixture(scope="module")
 def pid():
-    pid = 77  # new pBTC 77
+    pid = 16  # new pBTC 77, tBTC 16
     yield pid
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 0.1e18  # new pBTC only has 0.236160916790470771
+    amount = 5e18  # new pBTC only has 0.236160916790470771, tBTC has >10
     yield amount
 
 
@@ -58,8 +58,8 @@ def amount():
 def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    # new pBTC 0xf324Dca1Dc621FCF118690a9c6baE40fbD8f09b7,
-    whale = accounts.at("0xf324Dca1Dc621FCF118690a9c6baE40fbD8f09b7", force=True)
+    # new pBTC 0xf324Dca1Dc621FCF118690a9c6baE40fbD8f09b7, tBTC 0x3d24D77bEC08549D7Ea86c4e9937204C11E153f1
+    whale = accounts.at("0x3d24D77bEC08549D7Ea86c4e9937204C11E153f1", force=True)
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -70,9 +70,8 @@ def whale(accounts, amount, token):
 # set address if already deployed, use ZERO_ADDRESS if not
 @pytest.fixture(scope="module")
 def vault_address():
-    vault_address = ZERO_ADDRESS
-    # MIM 0x2DfB14E32e2F8156ec15a2c21c3A6c053af52Be8
-    # FRAX 0xB4AdA607B9d6b2c9Ee07A275e9616B84AC560139
+    vault_address = "0x23D3D0f1c697247d5e0a9efB37d8b0ED0C464f7f"
+    # tBTC 0x23D3D0f1c697247d5e0a9efB37d8b0ED0C464f7f
     yield vault_address
 
 
@@ -93,7 +92,7 @@ def rewards_token():  # PNT (pBTC) 0x89Ab32156e46F46D02ade3FEcbe5Fc4243B9AAeD
 # this is whether our pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
 @pytest.fixture(scope="module")
 def has_rewards():
-    has_rewards = True  # new pBTC true, all else false
+    has_rewards = False  # new pBTC true, all else false
     yield has_rewards
 
 
@@ -121,7 +120,7 @@ def is_slippery():
 # use this to test our strategy in case there are no profits
 @pytest.fixture(scope="module")
 def no_profit():
-    no_profit = True  # pBTC has no CRV/CVX yield
+    no_profit = False  # pBTC has no CRV/CVX yield
     yield no_profit
 
 
@@ -364,16 +363,14 @@ if chain_used == 1:  # mainnet
                 vault.migrateStrategy(old_strategy, strategy, {"from": gov})
                 vault.updateStrategyDebtRatio(strategy, 5000, {"from": gov})
 
-        # make all harvests permissive unless we change the value lower, turn on health check
+        # make all harvests permissive unless we change the value lower
         gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})
         strategy.setHealthCheck(healthCheck, {"from": gov})
-        strategy.setDoHealthCheck(True, {"from": gov})
 
         # set up custom params and setters
         strategy.setMaxReportDelay(86400 * 21, {"from": gov})
 
         # harvest to send our funds into the strategy and fix any triggers already true
-        assert strategy.estimatedTotalAssets() == 0
         strategy.harvest({"from": gov})
         chain.sleep(1)
         chain.mine(1)
