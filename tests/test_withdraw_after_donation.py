@@ -28,7 +28,7 @@ def test_withdraw_after_donation_1(
 
     currentDebt = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, currentDebt / 2, {"from": gov})
-    assert vault.strategies(strategy)["debtRatio"] == 5000
+    assert vault.strategies(strategy)["debtRatio"] == currentDebt / 2
 
     # our whale donates dust to the vault, what a nice person!
     donation = amount / 2
@@ -254,7 +254,7 @@ def test_withdraw_after_donation_4(
 
     currentDebt = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, currentDebt / 2, {"from": gov})
-    assert vault.strategies(strategy)["debtRatio"] == 5000
+    assert vault.strategies(strategy)["debtRatio"] == currentDebt / 2
 
     # our whale donates dust to the vault, what a nice person!
     donation = amount / 2
@@ -524,7 +524,7 @@ def test_withdraw_after_donation_7(
 
     # assert that our strategy has no debt
     assert new_params["totalDebt"] == 0
-    assert vault.totalDebt() == 0
+    assert vault.totalDebt() > 0
 
     # sleep to allow share price to normalize
     chain.sleep(86400)
@@ -618,7 +618,7 @@ def test_withdraw_after_donation_8(
 
     # assert that our strategy has no debt
     assert new_params["totalDebt"] == 0
-    assert vault.totalDebt() == 0
+    assert vault.totalDebt() > 0
 
     # sleep to allow share price to normalize
     chain.sleep(86400)

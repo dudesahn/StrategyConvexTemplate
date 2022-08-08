@@ -124,7 +124,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
         0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // we use this to sell our bonus token mostly
     address internal constant uniswapV2 =
         0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D; // use this for weird tokens with more liquidity on UniV2
-    address router; // the router selected to sell our bonus token
+    address public router; // the router selected to sell our bonus token
 
     IERC20 internal constant crv =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
@@ -717,7 +717,7 @@ contract StrategyConvexsBTCFactoryClonable is StrategyConvexBase {
             address(rewardsToken) != address(0) &&
             address(rewardsToken) != address(convexToken)
         ) {
-            rewardsToken.approve(sushiswap, uint256(0));
+            rewardsToken.approve(router, uint256(0));
         }
         if (_hasRewards == false) {
             hasRewards = false;
