@@ -119,6 +119,13 @@ abstract contract StrategyConvexBase is BaseStrategy {
         0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
 
+    // Swap stuff
+    address internal constant sushiswap =
+        0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // we use this to sell our bonus token mostly
+    address internal constant uniswapV2 =
+        0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D; // use this for weird tokens with more liquidity on UniV2
+    address public router; // the router selected to sell our bonus token
+
     IERC20 internal constant crv =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
     IERC20 internal constant convexToken =
@@ -261,7 +268,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     }
 }
 
-contract StrategyConvexsBTC is StrategyConvexBase {
+contract StrategyConvex2BTCClonable is StrategyConvexBase {
     /* ========== STATE VARIABLES ========== */
     // these will likely change across different wants.
 
@@ -283,6 +290,9 @@ contract StrategyConvexsBTC is StrategyConvexBase {
         IERC20(0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599);
     uint24 public uniWbtcFee; // this is equal to 0.05%, can change this later if a different path becomes more optimal
 
+    // check for cloning
+    bool internal isOriginal = true;
+
     /* ========== CONSTRUCTOR ========== */
 
     constructor(
@@ -291,6 +301,77 @@ contract StrategyConvexsBTC is StrategyConvexBase {
         address _curvePool,
         string memory _name
     ) public StrategyConvexBase(_vault) {
+        _initializeStrat(_pid, _curvePool, _name);
+    }
+
+    /* ========== CLONING ========== */
+
+    event Cloned(address indexed clone);
+
+    // we use this to clone our original strategy to other vaults
+    function cloneConvex2BTC(
+        address _vault,
+        address _strategist,
+        address _rewards,
+        address _keeper,
+        uint256 _pid,
+        address _curvePool,
+        string memory _name
+    ) external returns (address newStrategy) {
+        require(isOriginal);
+        // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
+        bytes20 addressBytes = bytes20(address(this));
+        assembly {
+            // EIP-1167 bytecode
+            let clone_code := mload(0x40)
+            mstore(
+                clone_code,
+                0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000
+            )
+            mstore(add(clone_code, 0x14), addressBytes)
+            mstore(
+                add(clone_code, 0x28),
+                0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000
+            )
+            newStrategy := create(0, clone_code, 0x37)
+        }
+
+        StrategyConvex2BTCClonable(newStrategy).initialize(
+            _vault,
+            _strategist,
+            _rewards,
+            _keeper,
+            _pid,
+            _curvePool,
+            _name
+        );
+
+        emit Cloned(newStrategy);
+    }
+
+    // this will only be called by the clone function above
+    function initialize(
+        address _vault,
+        address _strategist,
+        address _rewards,
+        address _keeper,
+        uint256 _pid,
+        address _curvePool,
+        string memory _name
+    ) public {
+        _initialize(_vault, _strategist, _rewards, _keeper);
+        _initializeStrat(_pid, _curvePool, _name);
+    }
+
+    // this is called by our original strategy, as well as any clones
+    function _initializeStrat(
+        uint256 _pid,
+        address _curvePool,
+        string memory _name
+    ) internal {
+        // make sure that we haven't initialized this before
+        require(address(curve) == address(0)); // already initialized.
+
         // You can set these parameters on deployment to whatever you want
         maxReportDelay = 100 days; // 21 days in seconds, if we hit this then harvestTrigger = True
         healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; // health.ychad.eth
@@ -365,7 +446,7 @@ contract StrategyConvexsBTC is StrategyConvexBase {
         // deposit our balance to Curve if we have any
         uint256 _wbtcBalance = wbtc.balanceOf(address(this));
         if (_wbtcBalance > 0) {
-            curve.add_liquidity([0, _wbtcBalance, 0], 0);
+            curve.add_liquidity([0, _wbtcBalance], 0);
         }
 
         // debtOustanding will only be > 0 in the event of revoking or if we need to rebalance from a withdrawal or lowering the debtRatio

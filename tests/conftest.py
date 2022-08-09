@@ -43,14 +43,14 @@ chain_used = 1
 # If testing a Convex strategy, set this equal to your PID
 @pytest.fixture(scope="module")
 def pid():
-    pid = 7
+    pid = 6  # 6 renBTC , 8 HBTC
     yield pid
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 6e18  # has over 12
+    amount = 5e18  # 11 renBTC , 2 HBTC
     yield amount
 
 
@@ -58,7 +58,8 @@ def amount():
 def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    whale = accounts.at("0x5Ec3f59397498ceE61d71399D15458ECc171b783", force=True)
+    # 0x647481c033A4A2E816175cE115a0804adf793891 renBTC , HBTC 0x7a7A599D2384ed203cFEA49721628aA851E0DA16
+    whale = accounts.at("0x647481c033A4A2E816175cE115a0804adf793891", force=True)
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -69,14 +70,16 @@ def whale(accounts, amount, token):
 # set address if already deployed, use ZERO_ADDRESS if not
 @pytest.fixture(scope="module")
 def vault_address():
-    vault_address = "0x8414Db07a7F743dEbaFb402070AB01a4E0d2E45e"
+    vault_address = "0x7047F90229a057C13BF847C0744D646CFb6c9E1A"
+    # renBTC 0x7047F90229a057C13BF847C0744D646CFb6c9E1A
+    # HBTC 0x625b7DF2fa8aBe21B0A976736CDa4775523aeD1E
     yield vault_address
 
 
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexsBTC"
+    strategy_name = "StrategyConvex2BTCClonable"
     yield strategy_name
 
 
@@ -89,14 +92,16 @@ def rewards_token():  # oBTC has one but don't worry about it for now
 # curve deposit pool for old metapools, set to ZERO_ADDRESS otherwise
 @pytest.fixture(scope="module")
 def old_pool():
-    old_pool = ZERO_ADDRESS
+    old_pool = "0x93054188d876f558f4a66B2EF1d97d16eDf0895B"
+    # renBTC 0x93054188d876f558f4a66B2EF1d97d16eDf0895B
+    # HBTC 0x4CA9b3063Ec5866A4B82E437059D2C43d1be596F
     yield old_pool
 
 
 # whether or not a strategy is clonable
 @pytest.fixture(scope="module")
 def is_clonable():
-    is_clonable = False
+    is_clonable = True
     yield is_clonable
 
 
@@ -150,7 +155,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 6
+    hours_to_sleep = 48  # 6 HBTC, 48 renBTC
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
@@ -290,7 +295,7 @@ if chain_used == 1:  # mainnet
     # replace the first value with the name of your strategy
     @pytest.fixture(scope="module")
     def strategy(
-        StrategyConvexsBTC,
+        StrategyConvex2BTCClonable,
         strategist,
         keeper,
         vault,
@@ -317,7 +322,7 @@ if chain_used == 1:  # mainnet
         if is_convex:
             # make sure to include all constructor parameters needed here
             strategy = strategist.deploy(
-                StrategyConvexsBTC,
+                StrategyConvex2BTCClonable,
                 vault,
                 pid,
                 pool,
@@ -327,7 +332,7 @@ if chain_used == 1:  # mainnet
         else:
             # make sure to include all constructor parameters needed here
             strategy = strategist.deploy(
-                StrategyConvexsBTC,
+                StrategyConvex2BTCClonable,
                 vault,
                 gauge,
                 pool,
