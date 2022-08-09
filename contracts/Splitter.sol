@@ -194,7 +194,8 @@ contract Splitter {
 
     // @notice update share if both parties agree.
     function updateYearnShare(uint _share) external {
-        require(_share <= 10_000, "!tooHigh");
+        // Disallow 0 setting for safety
+        require(_share <= 10_000 && _share != 0, "!outOfRange");
         require(msg.sender == yearn.admin || msg.sender == templeRecipient);
         if(msg.sender == yearn.admin){
             pendingShare[msg.sender] = _share;
