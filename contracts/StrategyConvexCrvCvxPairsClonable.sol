@@ -111,11 +111,6 @@ abstract contract StrategyConvexBase is BaseStrategy {
         0xF403C135812408BFbE8713b5A23a04b3D48AAE31; // this is the deposit contract that all pools use, aka booster
     IConvexRewards public rewardsContract; // This is unique to each curve pool
     uint256 public pid; // this is unique to each pool
-
-    // keepCRV stuff
-    uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points)
-    uint256 public keepCVX; // the percentage of CVX we keep for boosting yield (in basis points)
-    address public keepCVXDestination; // where we send the CVX we are keeping
     address internal constant voter =
         0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
@@ -236,14 +231,6 @@ abstract contract StrategyConvexBase is BaseStrategy {
     /* ========== SETTERS ========== */
 
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
-
-    // Set the amount of CRV to be locked in Yearn's veCRV voter from each harvest. Default is 10%. Option to keep CVX as well.
-    function setKeep(
-        uint256 _keepCRV
-    ) external onlyGovernance {
-        require(_keepCRV <= 10_000);
-        keepCRV = _keepCRV;
-    }
 
     // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
     function setClaimRewards(bool _claimRewards) external onlyVaultManagers {
@@ -366,7 +353,6 @@ contract StrategyConvexCrvCvxPairsClonable is StrategyConvexBase {
         harvestProfitMin = 60000e6;
         harvestProfitMax = 120000e6;
         creditThreshold = 1e6 * 1e18;
-        keepCRV = 1000; // default of 10%
 
         // want = Curve LP
         want.approve(address(depositContract), type(uint256).max);
