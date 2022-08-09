@@ -45,6 +45,7 @@ contract Splitter {
     struct Yearn{
         address recipient;
         address voter;
+        address admin;
         uint share;
         uint keepCRV;
     }
@@ -67,14 +68,13 @@ contract Splitter {
     Period period;
     address public strategy;
     address templeRecipient = 0x5C8898f8E0F9468D4A677887bC03EE2659321012;
-    address owner;
     
     constructor() public {
-        owner = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
         crv.approve(address(yvecrv), type(uint).max);
         yearn = Yearn(
             address(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52), // recipient
             address(0xF147b8125d2ef93FB6965Db97D6746952a133934), // voter
+            address(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52), // admin
             7_000, // profit factor (terms)
             5_000 // Yearn discretionary % of CRV to lock as veCRV on each split
         );
@@ -170,17 +170,18 @@ contract Splitter {
     }
 
     function setStrategy(address _strategy) external {
-        require(msg.sender == owner);
+        require(msg.sender == yearn.admin);
         strategy = _strategy;
     }
 
 
     function setYearn(address _recipient, uint _keepCRV) external {
-        require(msg.sender == yearn.recipient);
+        require(msg.sender == yearn.admin);
         require(_keepCRV <= 10_000, "!tooHigh");
         yearn = Yearn(
             _recipient,
             yearn.voter, // Cannot update this value
+            yearn.admin,
             yearn.share, // Cannot update this value
             _keepCRV
         );
@@ -194,8 +195,8 @@ contract Splitter {
     // @notice update share if both parties agree.
     function updateYearnShare(uint _share) external {
         require(_share <= 10_000, "!tooHigh");
-        require(msg.sender == yearn.recipient || msg.sender == templeRecipient);
-        if(msg.sender == yearn.recipient){
+        require(msg.sender == yearn.admin || msg.sender == templeRecipient);
+        if(msg.sender == yearn.admin){
             pendingShare[msg.sender] = _share;
             if (pendingShare[templeRecipient] == _share) {
                 yearn.share = _share;
@@ -203,10 +204,16 @@ contract Splitter {
         }
         if(msg.sender == templeRecipient){
             pendingShare[msg.sender] = _share;
-            if (pendingShare[yearn.recipient] == _share) {
+            if (pendingShare[yearn.admin] == _share) {
                 yearn.share = _share;
             }
         }
+    }
+
+    function sweep(address _token) external {
+        require(msg.sender == templeRecipient || msg.sender == yearn.admin);
+        IERC20 token = IERC20(_token);
+        token.transfer(msg.sender, token.balanceOf(address(this)));
     }
 
 }

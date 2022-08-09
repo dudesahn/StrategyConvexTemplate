@@ -18,33 +18,35 @@ def test_split(
     pid,
     crv,
     convexToken,
-    crv_whale
+    crv_whale,
+    pool
 ):
-    splitter.setStrategy(strategy, {'from':gov})
-    vault.deposit(token.balanceOf(whale) - 1e18, {'from':whale})
-    strategy.harvest({'from':gov})
-    # chain.sleep(24*60*60*10)
-    # tx = strategy.harvest({'from':gov})
-    # print(f'Split: {tx.events["Split"]}')
-    # assert convexToken.balanceOf(strategy) == 0
-    # chain.sleep(60*60)
-    # chain.mine()
-    # tx = splitter.claimAndSplit({'from':gov})
-
-# def test_different_weights(chain):
 
     yearn_weights_to_test = [
-        0, 1, 100, 400, 1_000, 5_000, 10_000
+        100, 1_000, 5_000
     ]
 
     convex_weights_to_test = [
-        0, 1, 10, 50, 100, 200, 300
+        10, 100, 300
+    ]
+
+    tvls = [
+        1, .85, .75, .5
     ]
 
     print_debug = False
+    x = .85
+    splitter.setStrategy(strategy, {'from':gov})
+    amount_temple = token.balanceOf(whale) * x
+    vault.deposit(amount_temple, {'from':whale})
+    token.transfer(gov, token.balanceOf(whale),{'from':whale})
+    token.approve(booster, 2**256-1,{'from':gov})
+    # vault.deposit({'from':gov})
+    booster.deposit(pid,token.balanceOf(gov),True,{'from':gov})
+    strategy.harvest({'from':gov})
+    chain.snapshot()
+
     for w in yearn_weights_to_test:
-        chain.snapshot()
-        vault.withdraw(1e18, {'from':whale})
         for c in convex_weights_to_test:
             print(f'\n------ Yearn Weight {w} -----')
             print(f'------ Convex Weight {c} -----')
@@ -55,6 +57,8 @@ def test_split(
             rewardsContract.getReward(strategy, True,{'from':accounts[1]})
             crv.transfer(strategy, 10_000e18 - 10.035993473822e18, {'from': crv_whale})
             splitter.updatePeriod({'from':accounts[1]})
+            print(f'𐄷 TVL percentage: {"{:.2%}".format(strategy.estimatedTotalAssets()/pool.totalSupply())}')
+            print(f'{strategy.estimatedTotalAssets()/1e18} {pool.totalSupply()/1e18}')
             print(f'🔎 READ-FUNCTIONS (ESTIMATES)')
             y, t = splitter.estimateSplitRatios()
             print(f'Ratios: yearn: {y} temple: {t}')

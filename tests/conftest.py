@@ -97,10 +97,7 @@ def sleep_time():
 # curve deposit pool, we don't actually need it but set it anyway
 @pytest.fixture(scope="module")
 def pool(use_crv):
-    if use_crv:
-        poolAddress = Contract("0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511")
-    else:
-        poolAddress = Contract("0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4")
+    poolAddress = Contract("0xdaDfD00A2bBEb1abc4936b1644a3033e1B653228")
     yield poolAddress
 
 
