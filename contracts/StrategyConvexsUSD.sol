@@ -119,6 +119,13 @@ abstract contract StrategyConvexBase is BaseStrategy {
         0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
 
+    // Swap stuff
+    address internal constant sushiswap =
+        0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // we use this to sell our bonus token mostly
+    address internal constant uniswapV2 =
+        0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D; // use this for weird tokens with more liquidity on UniV2
+    address public router; // the router selected to sell our bonus token
+
     IERC20 internal constant crv =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
     IERC20 internal constant convexToken =
@@ -261,7 +268,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     }
 }
 
-contract StrategyConvexsBTC is StrategyConvexBase {
+contract StrategyConvexsUSD is StrategyConvexBase {
     /* ========== STATE VARIABLES ========== */
     // these will likely change across different wants.
 
@@ -270,18 +277,26 @@ contract StrategyConvexsBTC is StrategyConvexBase {
 
     bool public checkEarmark; // this determines if we should check if we need to earmark rewards before harvesting
 
-    // use Curve to sell our CVX and CRV rewards to WETH
+    // we use these to deposit to our curve pool
+    address public targetStable;
+    address internal constant uniswapv3 =
+        0xE592427A0AEce92De3Edee1F18E0157C05861564;
     ICurveFi internal constant crveth =
         ICurveFi(0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511); // use curve's new CRV-ETH crypto pool to sell our CRV
     ICurveFi internal constant cvxeth =
         ICurveFi(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4); // use curve's new CVX-ETH crypto pool to sell our CVX
+    IERC20 internal constant usdt =
+        IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
+    IERC20 internal constant usdc =
+        IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+    IERC20 internal constant dai =
+        IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+    uint24 public uniStableFee; // this is equal to 0.05%, can change this later if a different path becomes more optimal
 
-    // we use these to deposit to our curve pool
-    address internal constant uniswapv3 =
-        0xE592427A0AEce92De3Edee1F18E0157C05861564;
-    IERC20 internal constant wbtc =
-        IERC20(0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599);
-    uint24 public uniWbtcFee; // this is equal to 0.05%, can change this later if a different path becomes more optimal
+    // rewards token info. we can have more than 1 reward token but this is rare, so we don't include this in the template
+    IERC20 public rewardsToken;
+    bool public hasRewards;
+    address[] internal rewardsPath;
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -292,11 +307,11 @@ contract StrategyConvexsBTC is StrategyConvexBase {
         string memory _name
     ) public StrategyConvexBase(_vault) {
         // You can set these parameters on deployment to whatever you want
-        maxReportDelay = 100 days; // 21 days in seconds, if we hit this then harvestTrigger = True
+        maxReportDelay = 21 days; // 21 days in seconds, if we hit this then harvestTrigger = True
         healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; // health.ychad.eth
         harvestProfitMin = 10000e6;
         harvestProfitMax = 120000e6;
-        creditThreshold = 10 * 1e18; // 10 BTC
+        creditThreshold = 1e6 * 1e18;
         keepCRV = 1000; // default of 10%
         keepCVXDestination = 0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde; // default to treasury
 
@@ -306,7 +321,7 @@ contract StrategyConvexsBTC is StrategyConvexBase {
         crv.approve(address(crveth), type(uint256).max);
         weth.approve(uniswapv3, type(uint256).max);
 
-        // this is the pool specific to this vault
+        // this is the pool specific to this vault, but we only use it as an address
         curve = ICurveFi(_curvePool);
 
         // setup our rewards contract
@@ -324,10 +339,15 @@ contract StrategyConvexsBTC is StrategyConvexBase {
         stratName = _name;
 
         // these are our approvals and path specific to this contract
-        wbtc.approve(address(curve), type(uint256).max);
+        dai.approve(address(curve), type(uint256).max);
+        usdt.safeApprove(address(curve), type(uint256).max); // USDT requires safeApprove(), funky token
+        usdc.approve(address(curve), type(uint256).max);
+
+        // start with usdt
+        targetStable = address(usdt);
 
         // set our uniswap pool fees
-        uniWbtcFee = 500;
+        uniStableFee = 500;
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
@@ -359,13 +379,28 @@ contract StrategyConvexsBTC is StrategyConvexBase {
             convexBalance = convexToken.balanceOf(address(this));
         }
 
-        // do this even if we have zero balances
+        // claim and sell our rewards if we have them
+        if (hasRewards) {
+            uint256 _rewardsBalance =
+                IERC20(rewardsToken).balanceOf(address(this));
+            if (_rewardsBalance > 0) {
+                _sellRewards(_rewardsBalance);
+            }
+        }
+
         _sellCrvAndCvx(crvBalance, convexBalance);
 
+        // check for balances of tokens to deposit
+        uint256 _daiBalance = dai.balanceOf(address(this));
+        uint256 _usdcBalance = usdc.balanceOf(address(this));
+        uint256 _usdtBalance = usdt.balanceOf(address(this));
+
         // deposit our balance to Curve if we have any
-        uint256 _wbtcBalance = wbtc.balanceOf(address(this));
-        if (_wbtcBalance > 0) {
-            curve.add_liquidity([0, _wbtcBalance, 0], 0);
+        if (_daiBalance > 0 || _usdcBalance > 0 || _usdtBalance > 0) {
+            curve.add_liquidity(
+                [_daiBalance, _usdcBalance, _usdtBalance, 0],
+                0
+            );
         }
 
         // debtOustanding will only be > 0 in the event of revoking or if we need to rebalance from a withdrawal or lowering the debtRatio
@@ -417,7 +452,7 @@ contract StrategyConvexsBTC is StrategyConvexBase {
         );
     }
 
-    // Sells our CRV and CVX on Curve, then WETH -> WBTC together on UniV3
+    // Sells our CRV and CVX on Curve, then WETH -> stables together on UniV3
     function _sellCrvAndCvx(uint256 _crvAmount, uint256 _convexAmount)
         internal
     {
@@ -438,8 +473,8 @@ contract StrategyConvexsBTC is StrategyConvexBase {
                 IUniV3.ExactInputParams(
                     abi.encodePacked(
                         address(weth),
-                        uint24(uniWbtcFee),
-                        address(wbtc)
+                        uint24(uniStableFee),
+                        address(targetStable)
                     ),
                     address(this),
                     block.timestamp,
@@ -448,6 +483,17 @@ contract StrategyConvexsBTC is StrategyConvexBase {
                 )
             );
         }
+    }
+
+    // Sells our harvested reward token into the selected output.
+    function _sellRewards(uint256 _amount) internal {
+        IUniswapV2Router02(sushiswap).swapExactTokensForTokens(
+            _amount,
+            uint256(0),
+            rewardsPath,
+            address(this),
+            block.timestamp
+        );
     }
 
     /* ========== KEEP3RS ========== */
@@ -572,6 +618,56 @@ contract StrategyConvexsBTC is StrategyConvexBase {
 
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
+    /// @notice Set optimal token to sell harvested funds for depositing to Curve.
+    function setOptimal(uint256 _optimal) external onlyVaultManagers {
+        if (_optimal == 0) {
+            targetStable = address(dai);
+        } else if (_optimal == 1) {
+            targetStable = address(usdc);
+        } else if (_optimal == 2) {
+            targetStable = address(usdt);
+        } else {
+            revert("incorrect token");
+        }
+    }
+
+    // Use to add, update or remove rewards
+    function updateRewards(
+        bool _hasRewards,
+        uint256 _rewardsIndex,
+        bool useSushi
+    ) external onlyGovernance {
+        if (
+            address(rewardsToken) != address(0) &&
+            address(rewardsToken) != address(convexToken)
+        ) {
+            rewardsToken.approve(router, uint256(0));
+        }
+        if (_hasRewards == false) {
+            hasRewards = false;
+            rewardsToken = IERC20(address(0));
+            virtualRewardsPool = address(0);
+        } else {
+            // update with our new token. get this via our virtualRewardsPool
+            virtualRewardsPool = rewardsContract.extraRewards(_rewardsIndex);
+            address _rewardsToken =
+                IConvexRewards(virtualRewardsPool).rewardToken();
+            rewardsToken = IERC20(_rewardsToken);
+
+            // set which router we will be using
+            if (useSushi) {
+                router = sushiswap;
+            } else {
+                router = uniswapV2;
+            }
+
+            // approve, setup our path, and turn on rewards
+            rewardsToken.approve(router, type(uint256).max);
+            rewardsPath = [address(rewardsToken), address(weth)];
+            hasRewards = true;
+        }
+    }
+
     // Min profit to start checking for harvests if gas is good, max will harvest no matter gas (both in USDT, 6 decimals). Credit threshold is in want token, and will trigger a harvest if credit is large enough. check earmark to look at convex's booster.
     function setHarvestTriggerParams(
         uint256 _harvestProfitMin,
@@ -586,7 +682,7 @@ contract StrategyConvexsBTC is StrategyConvexBase {
     }
 
     /// @notice Set the fee pool we'd like to swap through on UniV3 (1% = 10_000)
-    function setUniFees(uint24 _wbtcFee) external onlyVaultManagers {
-        uniWbtcFee = _wbtcFee;
+    function setUniFees(uint24 _stableFee) external onlyVaultManagers {
+        uniStableFee = _stableFee;
     }
 }

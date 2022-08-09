@@ -14,7 +14,7 @@ def test_update_to_zero_then_back(
     keeper,
     rewards,
     chain,
-    StrategyConvexsBTC,
+    StrategyConvexsUSD,
     voter,
     proxy,
     pid,
@@ -31,6 +31,7 @@ def test_update_to_zero_then_back(
     no_profit,
     is_slippery,
     rewards_template,
+    use_sushi,
 ):
     # skip this test if we don't use rewards in this template
     if not rewards_template:
@@ -38,7 +39,7 @@ def test_update_to_zero_then_back(
 
     if is_convex:
         newStrategy = strategist.deploy(
-            StrategyConvexsBTC,
+            StrategyConvexsUSD,
             vault,
             pid,
             pool,
@@ -47,7 +48,7 @@ def test_update_to_zero_then_back(
         print("\nConvex strategy")
     else:
         newStrategy = strategist.deploy(
-            StrategyConvexsBTC,
+            StrategyConvexsUSD,
             vault,
             gauge,
             pool,
@@ -78,9 +79,9 @@ def test_update_to_zero_then_back(
 
     # setup our rewards on our new stategy
     if is_convex:
-        newStrategy.updateRewards(True, 0, False, {"from": gov})
+        newStrategy.updateRewards(True, 0, use_sushi, {"from": gov})
     else:
-        newStrategy.updateRewards(True, rewards_token, False, {"from": gov})
+        newStrategy.updateRewards(True, rewards_token, use_sushi, {"from": gov})
 
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
@@ -124,9 +125,9 @@ def test_update_to_zero_then_back(
 
     # turn off our rewards
     if is_convex:
-        newStrategy.updateRewards(False, 0, False, {"from": gov})
+        newStrategy.updateRewards(False, 0, use_sushi, {"from": gov})
     else:
-        newStrategy.updateRewards(False, rewards_token, False, {"from": gov})
+        newStrategy.updateRewards(False, rewards_token, use_sushi, {"from": gov})
 
     assert newStrategy.rewardsToken() == ZERO_ADDRESS
     assert newStrategy.hasRewards() == False
@@ -159,9 +160,9 @@ def test_update_to_zero_then_back(
 
     # add our rewards token, harvest to take the profit from it. this should be extra high yield from this harvest
     if is_convex:
-        newStrategy.updateRewards(True, 0, False, {"from": gov})
+        newStrategy.updateRewards(True, 0, use_sushi, {"from": gov})
     else:
-        newStrategy.updateRewards(True, rewards_token, False, {"from": gov})
+        newStrategy.updateRewards(True, rewards_token, use_sushi, {"from": gov})
 
     # assert that we set things up correctly
     assert newStrategy.rewardsToken() == _rewards_token
@@ -220,7 +221,7 @@ def test_update_from_zero_to_off(
     keeper,
     rewards,
     chain,
-    StrategyConvexsBTC,
+    StrategyConvexsUSD,
     voter,
     proxy,
     pid,
@@ -237,6 +238,7 @@ def test_update_from_zero_to_off(
     no_profit,
     is_slippery,
     rewards_template,
+    use_sushi,
 ):
     # skip this test if we don't use rewards in this template
     if not rewards_template:
@@ -244,7 +246,7 @@ def test_update_from_zero_to_off(
 
     if is_convex:
         newStrategy = strategist.deploy(
-            StrategyConvexsBTC,
+            StrategyConvexsUSD,
             vault,
             pid,
             pool,
@@ -253,7 +255,7 @@ def test_update_from_zero_to_off(
         print("\nConvex strategy")
     else:
         newStrategy = strategist.deploy(
-            StrategyConvexsBTC,
+            StrategyConvexsUSD,
             vault,
             gauge,
             pool,
@@ -284,9 +286,9 @@ def test_update_from_zero_to_off(
 
     # setup our rewards on our new stategy
     if is_convex:
-        newStrategy.updateRewards(True, 0, False, {"from": gov})
+        newStrategy.updateRewards(True, 0, use_sushi, {"from": gov})
     else:
-        newStrategy.updateRewards(True, rewards_token, False, {"from": gov})
+        newStrategy.updateRewards(True, rewards_token, use_sushi, {"from": gov})
 
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
@@ -332,9 +334,9 @@ def test_update_from_zero_to_off(
     # turn off our rewards
     # setup our rewards on our new stategy
     if is_convex:
-        newStrategy.updateRewards(False, 0, False, {"from": gov})
+        newStrategy.updateRewards(False, 0, use_sushi, {"from": gov})
     else:
-        newStrategy.updateRewards(False, rewards_token, False, {"from": gov})
+        newStrategy.updateRewards(False, rewards_token, use_sushi, {"from": gov})
     assert newStrategy.rewardsToken() == ZERO_ADDRESS
     assert newStrategy.hasRewards() == False
     if (
@@ -366,9 +368,9 @@ def test_update_from_zero_to_off(
 
     # try turning off our rewards again
     if is_convex:
-        newStrategy.updateRewards(False, 0, False, {"from": gov})
+        newStrategy.updateRewards(False, 0, use_sushi, {"from": gov})
     else:
-        newStrategy.updateRewards(False, rewards_token, False, {"from": gov})
+        newStrategy.updateRewards(False, rewards_token, use_sushi, {"from": gov})
     assert newStrategy.rewardsToken() == ZERO_ADDRESS
     assert newStrategy.hasRewards() == False
     if (
@@ -424,7 +426,7 @@ def test_change_rewards(
     keeper,
     rewards,
     chain,
-    StrategyConvexsBTC,
+    StrategyConvexsUSD,
     voter,
     proxy,
     pid,
@@ -436,6 +438,7 @@ def test_change_rewards(
     rewards_token,
     sleep_time,
     rewards_template,
+    use_sushi,
 ):
     # skip this test if we don't use rewards in this template
     if not rewards_template:
@@ -443,7 +446,7 @@ def test_change_rewards(
 
     if is_convex:
         newStrategy = strategist.deploy(
-            StrategyConvexsBTC,
+            StrategyConvexsUSD,
             vault,
             pid,
             pool,
@@ -452,7 +455,7 @@ def test_change_rewards(
         print("\nConvex strategy")
     else:
         newStrategy = strategist.deploy(
-            StrategyConvexsBTC,
+            StrategyConvexsUSD,
             vault,
             gauge,
             pool,
@@ -475,9 +478,9 @@ def test_change_rewards(
 
     # setup our rewards on our new stategy
     if is_convex:
-        newStrategy.updateRewards(True, 0, False, {"from": gov})
+        newStrategy.updateRewards(True, 0, use_sushi, {"from": gov})
     else:
-        newStrategy.updateRewards(True, rewards_token, False, {"from": gov})
+        newStrategy.updateRewards(True, rewards_token, use_sushi, {"from": gov})
 
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
@@ -522,7 +525,7 @@ def test_check_rewards(
     keeper,
     rewards,
     chain,
-    StrategyConvexsBTC,
+    StrategyConvexsUSD,
     voter,
     proxy,
     pid,
@@ -621,6 +624,7 @@ def test_more_rewards_stuff(
     is_convex,
     sleep_time,
     rewards_template,
+    use_sushi,
 ):
     # skip this test if we don't use rewards in this template
     if not rewards_template:
@@ -633,11 +637,11 @@ def test_more_rewards_stuff(
 
     # we do this twice to hit both branches of the if statement
     if is_convex:
-        strategy.updateRewards(False, 0, False, {"from": gov})
-        strategy.updateRewards(False, 0, False, {"from": gov})
+        strategy.updateRewards(False, 0, use_sushi, {"from": gov})
+        strategy.updateRewards(False, 0, use_sushi, {"from": gov})
     else:
-        strategy.updateRewards(False, rewards_token, False, {"from": gov})
-        strategy.updateRewards(False, rewards_token, False, {"from": gov})
+        strategy.updateRewards(False, rewards_token, use_sushi, {"from": gov})
+        strategy.updateRewards(False, rewards_token, use_sushi, {"from": gov})
 
     # sleep for a day to get some profit
     chain.sleep(sleep_time)
@@ -646,11 +650,11 @@ def test_more_rewards_stuff(
 
     # we do this twice to hit both branches of the if statement
     if is_convex:
-        strategy.updateRewards(True, 0, False, {"from": gov})
-        strategy.updateRewards(True, 0, False, {"from": gov})
+        strategy.updateRewards(True, 0, use_sushi, {"from": gov})
+        strategy.updateRewards(True, 0, use_sushi, {"from": gov})
     else:
-        strategy.updateRewards(True, rewards_token, False, {"from": gov})
-        strategy.updateRewards(True, rewards_token, False, {"from": gov})
+        strategy.updateRewards(True, rewards_token, use_sushi, {"from": gov})
+        strategy.updateRewards(True, rewards_token, use_sushi, {"from": gov})
 
     # sleep for a day to get some profit
     chain.sleep(sleep_time)
@@ -670,11 +674,11 @@ def test_more_rewards_stuff(
 
     # we do this twice to hit both branches of the if statement
     if is_convex:
-        strategy.updateRewards(False, 0, False, {"from": gov})
-        strategy.updateRewards(False, 0, False, {"from": gov})
+        strategy.updateRewards(False, 0, use_sushi, {"from": gov})
+        strategy.updateRewards(False, 0, use_sushi, {"from": gov})
     else:
-        strategy.updateRewards(False, rewards_token, False, {"from": gov})
-        strategy.updateRewards(False, rewards_token, False, {"from": gov})
+        strategy.updateRewards(False, rewards_token, use_sushi, {"from": gov})
+        strategy.updateRewards(False, rewards_token, use_sushi, {"from": gov})
 
     # sleep for a day to get some profit
     chain.sleep(sleep_time)
@@ -683,11 +687,11 @@ def test_more_rewards_stuff(
 
     # we do this twice to hit both branches of the if statement
     if is_convex:
-        strategy.updateRewards(True, 0, False, {"from": gov})
-        strategy.updateRewards(True, 0, False, {"from": gov})
+        strategy.updateRewards(True, 0, use_sushi, {"from": gov})
+        strategy.updateRewards(True, 0, use_sushi, {"from": gov})
     else:
-        strategy.updateRewards(True, rewards_token, False, {"from": gov})
-        strategy.updateRewards(True, rewards_token, False, {"from": gov})
+        strategy.updateRewards(True, rewards_token, use_sushi, {"from": gov})
+        strategy.updateRewards(True, rewards_token, use_sushi, {"from": gov})
 
     # sleep for a day to get some profit
     chain.sleep(sleep_time)

@@ -43,14 +43,14 @@ chain_used = 1
 # If testing a Convex strategy, set this equal to your PID
 @pytest.fixture(scope="module")
 def pid():
-    pid = 7
+    pid = 4
     yield pid
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 6e18  # has over 12
+    amount = 75_000e18  # has over 150k
     yield amount
 
 
@@ -58,7 +58,7 @@ def amount():
 def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    whale = accounts.at("0x5Ec3f59397498ceE61d71399D15458ECc171b783", force=True)
+    whale = accounts.at("0x1f9bB27d0C66fEB932f3F8B02620A128d072f3d8", force=True)
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -69,21 +69,21 @@ def whale(accounts, amount, token):
 # set address if already deployed, use ZERO_ADDRESS if not
 @pytest.fixture(scope="module")
 def vault_address():
-    vault_address = "0x8414Db07a7F743dEbaFb402070AB01a4E0d2E45e"
+    vault_address = "0x5a770DbD3Ee6bAF2802D29a901Ef11501C44797A"
     yield vault_address
 
 
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexsBTC"
+    strategy_name = "StrategyConvexsUSD"
     yield strategy_name
 
 
 # this is the address of our rewards token
 @pytest.fixture(scope="module")
-def rewards_token():  # oBTC has one but don't worry about it for now
-    yield Contract("0x89Ab32156e46F46D02ade3FEcbe5Fc4243B9AAeD")
+def rewards_token():  # SNX
+    yield Contract("0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F")
 
 
 # curve deposit pool for old metapools, set to ZERO_ADDRESS otherwise
@@ -103,15 +103,22 @@ def is_clonable():
 # whether or not a strategy template can possibly have rewards
 @pytest.fixture(scope="module")
 def rewards_template():
-    rewards_template = False
+    rewards_template = True
     yield rewards_template
 
 
-# this is whether our pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
+# this is whether our specific pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
 @pytest.fixture(scope="module")
 def has_rewards():
-    has_rewards = False
+    has_rewards = True
     yield has_rewards
+
+
+# whether or not we should use sushiswap to sell our rewards token, generally always yes
+@pytest.fixture(scope="module")
+def use_sushi():
+    use_sushi = True
+    yield use_sushi
 
 
 # this is whether our strategy is convex or not
@@ -290,7 +297,7 @@ if chain_used == 1:  # mainnet
     # replace the first value with the name of your strategy
     @pytest.fixture(scope="module")
     def strategy(
-        StrategyConvexsBTC,
+        StrategyConvexsUSD,
         strategist,
         keeper,
         vault,
@@ -313,11 +320,12 @@ if chain_used == 1:  # mainnet
         rewards_token,
         has_rewards,
         vault_address,
+        use_sushi,
     ):
         if is_convex:
             # make sure to include all constructor parameters needed here
             strategy = strategist.deploy(
-                StrategyConvexsBTC,
+                StrategyConvexsUSD,
                 vault,
                 pid,
                 pool,
@@ -327,7 +335,7 @@ if chain_used == 1:  # mainnet
         else:
             # make sure to include all constructor parameters needed here
             strategy = strategist.deploy(
-                StrategyConvexsBTC,
+                StrategyConvexsUSD,
                 vault,
                 gauge,
                 pool,
@@ -409,12 +417,10 @@ if chain_used == 1:  # mainnet
 
         # add rewards token if needed
         if has_rewards:
-            if (
-                is_convex
-            ):  # pBTC is the only BTC factory token with rewards, and it needs UniV2
-                strategy.updateRewards(True, 0, False, {"from": gov})
+            if is_convex:  # sUSD uses sushiswap (SNX)
+                strategy.updateRewards(True, 0, use_sushi, {"from": gov})
             else:
-                strategy.updateRewards(True, rewards_token, False, {"from": gov})
+                strategy.updateRewards(True, rewards_token, use_sushi, {"from": gov})
 
         yield strategy
 
