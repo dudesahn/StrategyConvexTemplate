@@ -41,6 +41,11 @@ contract Splitter {
 
     event Split(uint yearnAmount, uint keep, uint templeAmount, uint period);
     event PeriodUpdated(uint period, uint globalSlope, uint userSlope);
+    event YearnUpdated(address recipient, uint keepCRV);
+    event TempleUpdated(address recipient);
+    event ShareUpdated(uint share);
+    event PendingShareUpdated(address setter, uint share);
+    event Sweep(address sweeper, address token, uint amount);
 
     struct Yearn{
         address recipient;
@@ -91,7 +96,9 @@ contract Splitter {
 
     // @notice split all 
     function _split() internal {
-        uint crvBalance = crv.balanceOf(strategy);
+        address _strategy = strategy; // Put strategy address into memory.
+        require(_strategy != address(0),"StrategyNotSet");
+        uint crvBalance = crv.balanceOf(_strategy);
         if (crvBalance == 0) {
             emit Split(0, 0, 0, period.period);
             return;
@@ -99,7 +106,7 @@ contract Splitter {
         if (block.timestamp / WEEK * WEEK > period.period) _updatePeriod();
         (uint yRatio, uint tRatio) = _computeSplitRatios();
         if (yRatio == 0) {
-            crv.transferFrom(strategy, templeRecipient, crvBalance);
+            crv.transferFrom(_strategy, templeRecipient, crvBalance);
             emit Split(0, 0, crvBalance, period.period);
             return;
         }
@@ -107,12 +114,12 @@ contract Splitter {
         uint templeAmount = crvBalance * tRatio / precision;
         uint keep = yearnAmount * yearn.keepCRV / precision;
         if (keep > 0) {
-            crv.transferFrom(strategy, address(this), keep);
+            crv.transferFrom(_strategy, address(this), keep);
             yvecrv.deposit(keep);
             IERC20(address(yvecrv)).transfer(yearn.recipient, keep);
         }
-        crv.transferFrom(strategy, yearn.recipient, yearnAmount - keep);
-        crv.transferFrom(strategy, templeRecipient, templeAmount);
+        crv.transferFrom(_strategy, yearn.recipient, yearnAmount - keep);
+        crv.transferFrom(_strategy, templeRecipient, templeAmount);
         emit Split(yearnAmount, keep, templeAmount, period.period);
     }
 
@@ -185,22 +192,27 @@ contract Splitter {
     function setTemple(address _recipient) external {
         require(msg.sender == templeRecipient);
         templeRecipient = _recipient;
+        emit TempleUpdated(_recipient);
     }
 
     // @notice update share if both parties agree.
     function updateYearnShare(uint _share) external {
         require(_share <= 10_000 && _share != 0, "OutOfRange");
         require(msg.sender == yearn.admin || msg.sender == templeRecipient);
-        if(msg.sender == yearn.admin){
+        if(msg.sender == yearn.admin && pendingShare[msg.sender] != _share){
             pendingShare[msg.sender] = _share;
+            emit PendingShareUpdated(msg.sender, _share);
             if (pendingShare[templeRecipient] == _share) {
                 yearn.share = _share;
+                emit ShareUpdated(_share);
             }
         }
-        else if(msg.sender == templeRecipient){
+        else if(msg.sender == templeRecipient && pendingShare[msg.sender] != _share){
             pendingShare[msg.sender] = _share;
+            emit PendingShareUpdated(msg.sender, _share);
             if (pendingShare[yearn.admin] == _share) {
                 yearn.share = _share;
+                emit ShareUpdated(_share);
             }
         }
     }
@@ -208,7 +220,9 @@ contract Splitter {
     function sweep(address _token) external {
         require(msg.sender == templeRecipient || msg.sender == yearn.admin);
         IERC20 token = IERC20(_token);
-        token.transfer(msg.sender, token.balanceOf(address(this)));
+        uint amt = token.balanceOf(address(this));
+        token.transfer(msg.sender, amt);
+        emit Sweep(msg.sender, _token, amt);
     }
 
 }
