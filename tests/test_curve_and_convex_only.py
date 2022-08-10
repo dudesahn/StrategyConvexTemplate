@@ -593,6 +593,22 @@ def test_weird_amounts(
     chain.sleep(sleep_time)
     chain.mine(1)
 
+    # switch to USDC, want to not have any profit tho
+    strategy.setOptimal(1, {"from": gov})
+    strategy.harvest({"from": gov})
+
+    # sleep to get some profit
+    chain.sleep(sleep_time)
+    chain.mine(1)
+
+    # switch to USDT, want to not have any profit tho
+    strategy.setOptimal(2, {"from": gov})
+    strategy.harvest({"from": gov})
+
+    # sleep to get some profit
+    chain.sleep(sleep_time)
+    chain.mine(1)
+
     # take 0% of our CRV to the voter
     if is_convex:
         strategy.setKeep(0, 0, gov, {"from": gov})
@@ -643,7 +659,26 @@ def test_more_rewards_stuff(
         strategy.updateRewards(False, rewards_token, use_sushi, {"from": gov})
         strategy.updateRewards(False, rewards_token, use_sushi, {"from": gov})
 
-    # sleep for a day to get some profit
+    # set our optimal to DAI without rewards on
+    strategy.setOptimal(0, {"from": gov})
+
+    # sleep to get some profit
+    chain.sleep(sleep_time)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # set our optimal to USDC without rewards on
+    strategy.setOptimal(1, {"from": gov})
+
+    # sleep to get some profit
+    chain.sleep(sleep_time)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # set our optimal to USDT without rewards on
+    strategy.setOptimal(2, {"from": gov})
+
+    # sleep to get some profit
     chain.sleep(sleep_time)
     chain.mine(1)
     strategy.harvest({"from": gov})
@@ -656,7 +691,26 @@ def test_more_rewards_stuff(
         strategy.updateRewards(True, rewards_token, use_sushi, {"from": gov})
         strategy.updateRewards(True, rewards_token, use_sushi, {"from": gov})
 
-    # sleep for a day to get some profit
+    # set our optimal to DAI with rewards on
+    strategy.setOptimal(0, {"from": gov})
+
+    # sleep to get some profit
+    chain.sleep(sleep_time)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # set our optimal to USDC with rewards on
+    strategy.setOptimal(1, {"from": gov})
+
+    # sleep to get some profit
+    chain.sleep(sleep_time)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # set our optimal to USDT with rewards on
+    strategy.setOptimal(2, {"from": gov})
+
+    # sleep to get some profit
     chain.sleep(sleep_time)
     chain.mine(1)
     strategy.harvest({"from": gov})
@@ -680,7 +734,26 @@ def test_more_rewards_stuff(
         strategy.updateRewards(False, rewards_token, use_sushi, {"from": gov})
         strategy.updateRewards(False, rewards_token, use_sushi, {"from": gov})
 
-    # sleep for a day to get some profit
+    # set our optimal to DAI without rewards on
+    strategy.setOptimal(0, {"from": gov})
+
+    # sleep to get some profit
+    chain.sleep(sleep_time)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # set our optimal to USDC without rewards on
+    strategy.setOptimal(1, {"from": gov})
+
+    # sleep to get some profit
+    chain.sleep(sleep_time)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # set our optimal to USDT without rewards on
+    strategy.setOptimal(2, {"from": gov})
+
+    # sleep to get some profit
     chain.sleep(sleep_time)
     chain.mine(1)
     strategy.harvest({"from": gov})
@@ -693,7 +766,26 @@ def test_more_rewards_stuff(
         strategy.updateRewards(True, rewards_token, use_sushi, {"from": gov})
         strategy.updateRewards(True, rewards_token, use_sushi, {"from": gov})
 
-    # sleep for a day to get some profit
+    # set our optimal to DAI with rewards on
+    strategy.setOptimal(0, {"from": gov})
+
+    # sleep to get some profit
+    chain.sleep(sleep_time)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # set our optimal to USDC with rewards on
+    strategy.setOptimal(1, {"from": gov})
+
+    # sleep to get some profit
+    chain.sleep(sleep_time)
+    chain.mine(1)
+    strategy.harvest({"from": gov})
+
+    # set our optimal to USDT with rewards on
+    strategy.setOptimal(2, {"from": gov})
+
+    # sleep to get some profit
     chain.sleep(sleep_time)
     chain.mine(1)
     strategy.harvest({"from": gov})
@@ -701,6 +793,10 @@ def test_more_rewards_stuff(
     # sleep to get some profit
     chain.sleep(sleep_time)
     chain.mine(1)
+
+    # can't set to 4
+    with brownie.reverts():
+        strategy.setOptimal(4, {"from": gov})
 
     # take 0% of our CRV to the voter
     if is_convex:
