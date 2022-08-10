@@ -140,8 +140,10 @@ contract Splitter {
             / lpSupply;
         if (gaugeDominance == 0) return (10_000, 0); // @dev avoid div by 0
         yRatio = relativeSlope 
-            * precision 
-            / gaugeDominance;
+            * precision
+            * yearn.share
+            / gaugeDominance
+            / precision;
         // Should not return > 100%
         if (yRatio > 10_000){
             return (10_000, 0);
