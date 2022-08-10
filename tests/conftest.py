@@ -26,7 +26,7 @@ def tenderly_fork(web3, chain):
 
 ################################################ UPDATE THINGS BELOW HERE ################################################
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def splitter(strategist):
     splitter = strategist.deploy(Splitter)
     yield splitter
@@ -150,7 +150,7 @@ def other_vault_strategy():
     yield Contract("0x8423590CD0343c4E18d35aA780DF50a5751bebae")
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def proxy():
     yield Contract("0xA420A63BbEFfbda3B147d0585F1852C358e2C152")
 
@@ -273,7 +273,7 @@ def vault(pm, gov, rewards, guardian, management, token, chain):
 #     yield vault
 
 # replace the first value with the name of your strategy
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def strategy(
     StrategyConvexCrvCvxPairsClonable,
     strategist,

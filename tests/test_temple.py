@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 from brownie import Contract, chain, accounts
 from brownie import config
 
-# test that emergency exit works properly
 def test_split(
     gov,
     token,
@@ -22,6 +21,9 @@ def test_split(
     pool
 ):
 
+
+    target_tvl_dominance = .95
+
     yearn_weights_to_test = [
         100, 1_000, 5_000
     ]
@@ -30,26 +32,28 @@ def test_split(
         10, 100, 200
     ]
 
-    tvls = [
-        1, .85, .75, .5
-    ]
+    ###########################################
+    ###########################################
+    ###########################################
 
     print_debug = False
-    x = .95
+    x = target_tvl_dominance + 0.05
     splitter.setStrategy(strategy, {'from':gov})
     amount_temple = token.balanceOf(whale) * x
     vault.deposit(amount_temple, {'from':whale})
     token.transfer(gov, token.balanceOf(whale),{'from':whale})
     token.approve(booster, 2**256-1,{'from':gov})
     # vault.deposit({'from':gov})
-    booster.deposit(pid,token.balanceOf(gov),True,{'from':gov})
+    amt = token.balanceOf(gov)
+    if amt > 0:
+        booster.deposit(pid,amt,True,{'from':gov})
     strategy.harvest({'from':gov})
     chain.snapshot()
 
     for w in yearn_weights_to_test:
         for c in convex_weights_to_test:
-            print(f'\n------ Yearn Weight {w} -----')
-            print(f'------ Convex Weight {c} -----')
+            print(f'--------------------------------------')
+            print(f'𐄷 Pool Dominance: {"{:.2%}".format(strategy.estimatedTotalAssets()/pool.totalSupply())}')
             vote(w, c, vault, whale)
             # print(f'Stratgy Assets: {strategy.estimatedTotalAssets()/1e18}')
             vault.withdraw(1e18, {'from':whale})
@@ -57,13 +61,12 @@ def test_split(
             rewardsContract.getReward(strategy, True,{'from':accounts[1]})
             crv.transfer(strategy, 10_000e18 - 10.035993473822e18, {'from': crv_whale})
             splitter.updatePeriod({'from':accounts[1]})
-            print(f'𐄷 TVL percentage: {"{:.2%}".format(strategy.estimatedTotalAssets()/pool.totalSupply())}')
-            print(f'{strategy.estimatedTotalAssets()/1e18} {pool.totalSupply()/1e18}')
+            # print(f'{strategy.estimatedTotalAssets()/1e18} {pool.totalSupply()/1e18}')
             print(f'🔎 READ-FUNCTIONS (ESTIMATES)')
             y, t = splitter.estimateSplitRatios()
-            print(f'Ratios: yearn: {y} temple: {t}')
+            print(f'Split ratios: yearn: {"{:.2%}".format(y/10_000)} temple: {"{:.2%}".format(t/10_000)}')
             y, t = splitter.estimateSplit()
-            print(f'Splits: {y/1e18} temple: {t/1e18}')
+            # print(f'Splits: {y/1e18} temple: {t/1e18}')
             tx = strategy.harvest({'from':gov})
             # debug = tx.events["Debug"]
             # for i, d in enumerate(debug):
@@ -119,5 +122,7 @@ def vote(weight, convex_weight, vault, whale):
     c_slope = gauge_controller.vote_user_slopes(convex, temple_gauge).dict()["slope"] / 1e18
 
     print('🗳 VOTE DATA')
-    print(f'yearn slope: {y_slope}  convex slope: {c_slope}   total slope: {total_slope}')
+    print(f'Yearn vote weight: {weight} slope: {y_slope}')
+    print(f'Convex vote weight: {convex_weight} slope: {c_slope}')
+    # print(f'yearn slope: {y_slope}  convex slope: {c_slope}   total slope: {total_slope}')
     print(f'Percent of overall vote weight ... Yearn: {"{:.0%}".format(y_slope/total_slope)} Convex: {"{:.0%}".format(c_slope/total_slope)}')

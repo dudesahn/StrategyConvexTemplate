@@ -97,7 +97,7 @@ contract Splitter {
     // @notice split all 
     function _split() internal {
         address _strategy = strategy; // Put strategy address into memory.
-        require(_strategy != address(0),"StrategyNotSet");
+        if(_strategy == address(0)) return;
         uint crvBalance = crv.balanceOf(_strategy);
         if (crvBalance == 0) {
             emit Split(0, 0, 0, period.period);
