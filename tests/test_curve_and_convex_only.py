@@ -14,7 +14,7 @@ def test_update_to_zero_then_back(
     keeper,
     rewards,
     chain,
-    StrategyConvexsBTCMetapoolsOldClonable,
+    StrategyConvexEURSClonable,
     voter,
     proxy,
     pid,
@@ -30,33 +30,29 @@ def test_update_to_zero_then_back(
     vault_address,
     no_profit,
     is_slippery,
+    rewards_template,
 ):
+    # skip this test if we don't use rewards in this template
+    if not rewards_template:
+        return
+
     if is_convex:
-        ## clone our strategy
-        tx = strategy.cloneConvexSBTCOld(
+        newStrategy = strategist.deploy(
+            StrategyConvexEURSClonable,
             vault,
-            strategist,
-            rewards,
-            keeper,
             pid,
             pool,
             strategy_name,
-            {"from": gov},
         )
-        newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
+        print("\nConvex strategy")
     else:
-        ## clone our strategy
-        tx = strategy.cloneCurve3CrvRewards(
+        newStrategy = strategist.deploy(
+            StrategyConvexEURSClonable,
             vault,
-            strategist,
-            rewards,
-            keeper,
             gauge,
             pool,
             strategy_name,
-            {"from": gov},
         )
-        newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
 
     # revoke and send all funds back to vault
     startingDebtRatio = vault.strategies(strategy)["debtRatio"]
@@ -224,7 +220,7 @@ def test_update_from_zero_to_off(
     keeper,
     rewards,
     chain,
-    StrategyConvexsBTCMetapoolsOldClonable,
+    StrategyConvexEURSClonable,
     voter,
     proxy,
     pid,
@@ -240,34 +236,29 @@ def test_update_from_zero_to_off(
     vault_address,
     no_profit,
     is_slippery,
+    rewards_template,
 ):
+    # skip this test if we don't use rewards in this template
+    if not rewards_template:
+        return
 
     if is_convex:
-        ## clone our strategy
-        tx = strategy.cloneConvexSBTCOld(
+        newStrategy = strategist.deploy(
+            StrategyConvexEURSClonable,
             vault,
-            strategist,
-            rewards,
-            keeper,
             pid,
             pool,
             strategy_name,
-            {"from": gov},
         )
-        newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
+        print("\nConvex strategy")
     else:
-        ## clone our strategy
-        tx = strategy.cloneCurve3CrvRewards(
+        newStrategy = strategist.deploy(
+            StrategyConvexEURSClonable,
             vault,
-            strategist,
-            rewards,
-            keeper,
             gauge,
             pool,
             strategy_name,
-            {"from": gov},
         )
-        newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
 
     # revoke and send all funds back to vault
     startingDebtRatio = vault.strategies(strategy)["debtRatio"]
@@ -433,7 +424,7 @@ def test_change_rewards(
     keeper,
     rewards,
     chain,
-    StrategyConvexsBTCMetapoolsOldClonable,
+    StrategyConvexEURSClonable,
     voter,
     proxy,
     pid,
@@ -444,34 +435,29 @@ def test_change_rewards(
     is_convex,
     rewards_token,
     sleep_time,
+    rewards_template,
 ):
+    # skip this test if we don't use rewards in this template
+    if not rewards_template:
+        return
 
     if is_convex:
-        ## clone our strategy
-        tx = strategy.cloneConvexSBTCOld(
+        newStrategy = strategist.deploy(
+            StrategyConvexEURSClonable,
             vault,
-            strategist,
-            rewards,
-            keeper,
             pid,
             pool,
             strategy_name,
-            {"from": gov},
         )
-        newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
+        print("\nConvex strategy")
     else:
-        ## clone our strategy
-        tx = strategy.cloneCurve3CrvRewards(
+        newStrategy = strategist.deploy(
+            StrategyConvexEURSClonable,
             vault,
-            strategist,
-            rewards,
-            keeper,
             gauge,
             pool,
             strategy_name,
-            {"from": gov},
         )
-        newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
 
     # revoke and send all funds back to vault
     startingDebtRatio = vault.strategies(strategy)["debtRatio"]
@@ -536,7 +522,7 @@ def test_check_rewards(
     keeper,
     rewards,
     chain,
-    StrategyConvexsBTCMetapoolsOldClonable,
+    StrategyConvexEURSClonable,
     voter,
     proxy,
     pid,
@@ -548,7 +534,11 @@ def test_check_rewards(
     convexToken,
     is_convex,
     sleep_time,
+    rewards_template,
 ):
+    # skip this test if we don't use rewards in this template
+    if not rewards_template:
+        return
 
     # check if our strategy has extra rewards
     rewards_token = strategy.rewardsToken()
@@ -630,7 +620,11 @@ def test_more_rewards_stuff(
     strategy_name,
     is_convex,
     sleep_time,
+    rewards_template,
 ):
+    # skip this test if we don't use rewards in this template
+    if not rewards_template:
+        return
 
     ## deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})

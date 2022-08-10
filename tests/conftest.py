@@ -43,14 +43,14 @@ chain_used = 1
 # If testing a Convex strategy, set this equal to your PID
 @pytest.fixture(scope="module")
 def pid():
-    pid = 20  # tBTC 16, oBTC 20. tBTC not working well currently since yield is so low
+    pid = 60  # EURS 22, EURS-USDC 54, 3EUR 60
     yield pid
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 0.25e18  # tBTC has >10, oBTC has 0.5
+    amount = 470e18
     yield amount
 
 
@@ -58,8 +58,10 @@ def amount():
 def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    # tBTC 0x3d24D77bEC08549D7Ea86c4e9937204C11E153f1, oBTC 0x806ed321E5D8255Ff1478b9171bDC97ae09b2d37
-    whale = accounts.at("0x806ed321E5D8255Ff1478b9171bDC97ae09b2d37", force=True)
+    # EURS 0xC9f9f6cfD655417AcB8D1bB00Fe77aD9a6d9cA81, 660k
+    # EURS-USDC 0xD73c787A2276a28121B5449D29A1D6b60138ffcc, 150k
+    # 3EUR 0x9770E942e19aeB9FC935980cEB5eC81C10b1D030, 945
+    whale = accounts.at("0x9770E942e19aeB9FC935980cEB5eC81C10b1D030", force=True)
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -70,16 +72,17 @@ def whale(accounts, amount, token):
 # set address if already deployed, use ZERO_ADDRESS if not
 @pytest.fixture(scope="module")
 def vault_address():
-    vault_address = "0xe9Dc63083c464d6EDcCFf23444fF3CFc6886f6FB"
-    # tBTC 0x23D3D0f1c697247d5e0a9efB37d8b0ED0C464f7f
-    # oBTC 0xe9Dc63083c464d6EDcCFf23444fF3CFc6886f6FB
+    vault_address = "0x5AB64C599FcC59f0f2726A300b03166A395578Da"
+    # EURS 0x25212Df29073FfFA7A67399AcEfC2dd75a831A1A
+    # EURS-USDC 0x801Ab06154Bf539dea4385a39f5fa8534fB53073
+    # 3EUR 0x5AB64C599FcC59f0f2726A300b03166A395578Da
     yield vault_address
 
 
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexoBTC"
+    strategy_name = "StrategyConvexEURSClonable"
     yield strategy_name
 
 
@@ -92,16 +95,29 @@ def rewards_token():  # oBTC has one but don't worry about it for now
 # curve deposit pool for old metapools, set to ZERO_ADDRESS otherwise
 @pytest.fixture(scope="module")
 def old_pool():
-    old_pool = "0xd5BCf53e2C81e1991570f33Fa881c49EEa570C8D"
-    # tBTC 0xaa82ca713D94bBA7A89CEAB55314F9EfFEdDc78c
-    # oBTC 0xd5BCf53e2C81e1991570f33Fa881c49EEa570C8D
+    old_pool = ZERO_ADDRESS # zero address for EURS and 3EUR
+    # EURS-USDC 0x98a7F18d4E56Cfe84E3D081B40001B3d5bD3eB8B
     yield old_pool
+
+
+# whether or not a strategy is clonable
+@pytest.fixture(scope="module")
+def is_clonable():
+    is_clonable = True
+    yield is_clonable
+
+
+# whether or not a strategy template can possibly have rewards
+@pytest.fixture(scope="module")
+def rewards_template():
+    rewards_template = False
+    yield rewards_template
 
 
 # this is whether our pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
 @pytest.fixture(scope="module")
 def has_rewards():
-    has_rewards = False  # new pBTC true, all else false
+    has_rewards = False
     yield has_rewards
 
 
@@ -123,14 +139,14 @@ def is_curve():
 # generally this will always be true if no_profit is true, even for curve/convex since we can lose a wei converting
 @pytest.fixture(scope="module")
 def is_slippery():
-    is_slippery = False  # tBTC getting nothing currently
+    is_slippery = False
     yield is_slippery
 
 
 # use this to test our strategy in case there are no profits
 @pytest.fixture(scope="module")
 def no_profit():
-    no_profit = False  # tBTC getting nothing currently
+    no_profit = False  # EURS getting nothing/low currently
     yield no_profit
 
 
@@ -141,7 +157,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 6 # oBTC 6 hours
+    hours_to_sleep = 48
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
@@ -281,7 +297,7 @@ if chain_used == 1:  # mainnet
     # replace the first value with the name of your strategy
     @pytest.fixture(scope="module")
     def strategy(
-        StrategyConvexsBTCMetapoolsOldClonable,
+        StrategyConvexEURSClonable,
         strategist,
         keeper,
         vault,
@@ -308,7 +324,7 @@ if chain_used == 1:  # mainnet
         if is_convex:
             # make sure to include all constructor parameters needed here
             strategy = strategist.deploy(
-                StrategyConvexsBTCMetapoolsOldClonable,
+                StrategyConvexEURSClonable,
                 vault,
                 pid,
                 pool,
@@ -318,7 +334,7 @@ if chain_used == 1:  # mainnet
         else:
             # make sure to include all constructor parameters needed here
             strategy = strategist.deploy(
-                StrategyConvexsBTCMetapoolsOldClonable,
+                StrategyConvexEURSClonable,
                 vault,
                 gauge,
                 pool,
@@ -343,11 +359,16 @@ if chain_used == 1:  # mainnet
                     strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov}
                 )
             else:
-                old_strategy = Contract(vault.withdrawalQueue(1))
-                other_strat = Contract(vault.withdrawalQueue(0))
-                vault.migrateStrategy(old_strategy, strategy, {"from": gov})
-                vault.updateStrategyDebtRatio(other_strat, 0, {"from": gov})
-                vault.updateStrategyDebtRatio(strategy, 10000, {"from": gov})
+                if pid == 60:  # only has convex
+                    old_strategy = Contract(vault.withdrawalQueue(0))
+                    vault.migrateStrategy(old_strategy, strategy, {"from": gov})
+                    vault.updateStrategyDebtRatio(strategy, 10000, {"from": gov})
+                else:
+                    old_strategy = Contract(vault.withdrawalQueue(1))
+                    other_strat = Contract(vault.withdrawalQueue(0))
+                    vault.migrateStrategy(old_strategy, strategy, {"from": gov})
+                    vault.updateStrategyDebtRatio(other_strat, 0, {"from": gov})
+                    vault.updateStrategyDebtRatio(strategy, 10000, {"from": gov})
 
             # this is the same for new or existing vaults
             strategy.setHarvestTriggerParams(
@@ -394,7 +415,7 @@ if chain_used == 1:  # mainnet
         chain.mine(1)
 
         # print assets in each strategy
-        if vault_address != ZERO_ADDRESS:
+        if vault_address != ZERO_ADDRESS and pid != 60:
             print("Other strat assets:", other_strat.estimatedTotalAssets() / 1e18)
         print("Main strat assets:", strategy.estimatedTotalAssets() / 1e18)
 

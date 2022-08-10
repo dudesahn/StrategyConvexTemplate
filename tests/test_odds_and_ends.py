@@ -14,7 +14,7 @@ def test_odds_and_ends(
     chain,
     strategist_ms,
     voter,
-    StrategyConvexsBTCMetapoolsOldClonable,
+    StrategyConvexEURSClonable,
     cvxDeposit,
     rewardsContract,
     pid,
@@ -84,7 +84,7 @@ def test_odds_and_ends(
     # deploy our new strategy
     if is_convex:
         new_strategy = strategist.deploy(
-            StrategyConvexsBTCMetapoolsOldClonable,
+            StrategyConvexEURSClonable,
             vault,
             pid,
             pool,
@@ -92,7 +92,7 @@ def test_odds_and_ends(
         )
     else:
         new_strategy = strategist.deploy(
-            StrategyConvexsBTCMetapoolsOldClonable,
+            StrategyConvexEURSClonable,
             vault,
             gauge,
             pool,
@@ -198,7 +198,7 @@ def test_odds_and_ends_2(
 
 
 def test_odds_and_ends_migration(
-    StrategyConvexsBTCMetapoolsOldClonable,
+    StrategyConvexEURSClonable,
     gov,
     token,
     vault,
@@ -228,7 +228,7 @@ def test_odds_and_ends_migration(
     # deploy our new strategy
     if is_convex:
         new_strategy = strategist.deploy(
-            StrategyConvexsBTCMetapoolsOldClonable,
+            StrategyConvexEURSClonable,
             vault,
             pid,
             pool,
@@ -236,7 +236,7 @@ def test_odds_and_ends_migration(
         )
     else:
         new_strategy = strategist.deploy(
-            StrategyConvexsBTCMetapoolsOldClonable,
+            StrategyConvexEURSClonable,
             vault,
             gauge,
             pool,
@@ -574,7 +574,7 @@ def test_odds_and_ends_empty_strat(
         print("cvxToken Balance of Strategy", to_send)
         cvxDeposit.transfer(gov, to_send, {"from": strategy})
         assert strategy.estimatedTotalAssets() == 0
-        if not (is_slippery and no_profit):
+        if not no_profit:
             assert strategy.claimableBalance() > 0
     else:
         # send all funds out of the gauge, then send back 1 wei so we can claim rewards

@@ -5,7 +5,7 @@ import math
 
 # test migrating a strategy
 def test_migration(
-    StrategyConvexsBTCMetapoolsOldClonable,
+    StrategyConvexEURSClonable,
     gov,
     token,
     vault,
@@ -37,7 +37,7 @@ def test_migration(
     if is_convex:
         # make sure to include all constructor parameters needed here
         new_strategy = strategist.deploy(
-            StrategyConvexsBTCMetapoolsOldClonable,
+            StrategyConvexEURSClonable,
             vault,
             pid,
             pool,
@@ -51,7 +51,7 @@ def test_migration(
     else:
         # make sure to include all constructor parameters needed here
         new_strategy = strategist.deploy(
-            StrategyConvexsBTCMetapoolsOldClonable,
+            StrategyConvexEURSClonable,
             vault,
             gauge,
             pool,

@@ -14,7 +14,7 @@ def test_cloning(
     rewards,
     chain,
     proxy,
-    StrategyConvexsBTCMetapoolsOldClonable,
+    StrategyConvexEURSClonable,
     rewardsContract,
     pid,
     amount,
@@ -28,12 +28,18 @@ def test_cloning(
     is_convex,
     vault_address,
     has_rewards,
+    is_clonable,
 ):
+
+    # skip this test if we don't clone
+    if not is_clonable:
+        return
+
     # tenderly doesn't work for "with brownie.reverts"
     if tests_using_tenderly:
         if is_convex:
             ## clone our strategy
-            tx = strategy.cloneConvexSBTCOld(
+            tx = strategy.cloneConvexEURS(
                 vault,
                 strategist,
                 rewards,
@@ -43,10 +49,10 @@ def test_cloning(
                 strategy_name,
                 {"from": gov},
             )
-            newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
+            newStrategy = StrategyConvexEURSClonable.at(tx.return_value)
         else:
             ## clone our strategy
-            tx = strategy.cloneConvexSBTCOld(
+            tx = strategy.cloneConvexEURS(
                 vault,
                 strategist,
                 rewards,
@@ -56,7 +62,7 @@ def test_cloning(
                 strategy_name,
                 {"from": gov},
             )
-            newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
+            newStrategy = StrategyConvexEURSClonable.at(tx.return_value)
     else:
         if is_convex:
             # Shouldn't be able to call initialize again
@@ -73,7 +79,7 @@ def test_cloning(
                 )
 
             ## clone our strategy
-            tx = strategy.cloneConvexSBTCOld(
+            tx = strategy.cloneConvexEURS(
                 vault,
                 strategist,
                 rewards,
@@ -83,7 +89,7 @@ def test_cloning(
                 strategy_name,
                 {"from": gov},
             )
-            newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
+            newStrategy = StrategyConvexEURSClonable.at(tx.return_value)
 
             # Shouldn't be able to call initialize again
             with brownie.reverts():
@@ -100,7 +106,7 @@ def test_cloning(
 
             ## shouldn't be able to clone a clone
             with brownie.reverts():
-                newStrategy.cloneConvexSBTCOld(
+                newStrategy.cloneConvexEURS(
                     vault,
                     strategist,
                     rewards,
@@ -126,7 +132,7 @@ def test_cloning(
                 )
 
             ## clone our strategy
-            tx = strategy.cloneConvexSBTCOld(
+            tx = strategy.cloneConvexEURS(
                 vault,
                 strategist,
                 rewards,
@@ -136,7 +142,7 @@ def test_cloning(
                 strategy_name,
                 {"from": gov},
             )
-            newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
+            newStrategy = StrategyConvexEURSClonable.at(tx.return_value)
 
             # Shouldn't be able to call initialize again
             with brownie.reverts():
@@ -153,7 +159,7 @@ def test_cloning(
 
             ## shouldn't be able to clone a clone
             with brownie.reverts():
-                newStrategy.cloneConvexSBTCOld(
+                newStrategy.cloneConvexEURS(
                     vault,
                     strategist,
                     rewards,
@@ -173,10 +179,16 @@ def test_cloning(
 
     # attach our new strategy
     vault.addStrategy(newStrategy, currentDebt, 0, 2 ** 256 - 1, 1_000, {"from": gov})
+    
+    
+    
     if vault_address == ZERO_ADDRESS:
         assert vault.withdrawalQueue(1) == newStrategy
     else:
-        assert vault.withdrawalQueue(2) == newStrategy
+        if pid == 60:  # only has convex
+            assert vault.withdrawalQueue(1) == newStrategy
+        else:
+            assert vault.withdrawalQueue(2) == newStrategy
     assert vault.strategies(newStrategy)["debtRatio"] == currentDebt
     assert vault.strategies(strategy)["debtRatio"] == 0
 
