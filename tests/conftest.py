@@ -76,7 +76,7 @@ def vault_address():
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexCompound"
+    strategy_name = "StrategyConvexsAave"
     yield strategy_name
 
 
@@ -297,7 +297,7 @@ if chain_used == 1:  # mainnet
     # replace the first value with the name of your strategy
     @pytest.fixture(scope="module")
     def strategy(
-        StrategyConvexCompound,
+        StrategyConvexsAave,
         strategist,
         keeper,
         vault,
@@ -325,7 +325,7 @@ if chain_used == 1:  # mainnet
         if is_convex:
             # make sure to include all constructor parameters needed here
             strategy = strategist.deploy(
-                StrategyConvexCompound,
+                StrategyConvexsAave,
                 vault,
                 pid,
                 pool,
@@ -335,7 +335,7 @@ if chain_used == 1:  # mainnet
         else:
             # make sure to include all constructor parameters needed here
             strategy = strategist.deploy(
-                StrategyConvexCompound,
+                StrategyConvexsAave,
                 vault,
                 gauge,
                 pool,

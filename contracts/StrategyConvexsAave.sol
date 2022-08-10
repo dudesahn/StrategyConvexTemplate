@@ -261,7 +261,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     }
 }
 
-contract StrategyConvexCompound is StrategyConvexBase {
+contract StrategyConvexsAave is StrategyConvexBase {
     /* ========== STATE VARIABLES ========== */
     // these will likely change across different wants.
 
@@ -271,15 +271,12 @@ contract StrategyConvexCompound is StrategyConvexBase {
     bool public checkEarmark; // this determines if we should check if we need to earmark rewards before harvesting
 
     // we use these to deposit to our curve pool
-    address public targetStable;
     address internal constant uniswapv3 =
         0xE592427A0AEce92De3Edee1F18E0157C05861564;
     ICurveFi internal constant crveth =
         ICurveFi(0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511); // use curve's new CRV-ETH crypto pool to sell our CRV
     ICurveFi internal constant cvxeth =
         ICurveFi(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4); // use curve's new CVX-ETH crypto pool to sell our CVX
-    IERC20 internal constant usdc =
-        IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
     IERC20 internal constant dai =
         IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     uint24 public uniStableFee; // this is equal to 0.05%, can change this later if a different path becomes more optimal
@@ -326,10 +323,6 @@ contract StrategyConvexCompound is StrategyConvexBase {
 
         // these are our approvals and path specific to this contract
         dai.approve(address(curve), type(uint256).max);
-        usdc.approve(address(curve), type(uint256).max);
-
-        // start with usdt
-        targetStable = address(dai);
 
         // set our uniswap pool fees
         uniStableFee = 500;
@@ -368,11 +361,10 @@ contract StrategyConvexCompound is StrategyConvexBase {
 
         // check for balances of tokens to deposit
         uint256 _daiBalance = dai.balanceOf(address(this));
-        uint256 _usdcBalance = usdc.balanceOf(address(this));
 
         // deposit our balance to Curve if we have any
-        if (_daiBalance > 0 || _usdcBalance > 0) {
-            curve.add_liquidity([_daiBalance, _usdcBalance], 0);
+        if (_daiBalance > 0) {
+            curve.add_liquidity([_daiBalance, 0], 0);
         }
 
         // debtOustanding will only be > 0 in the event of revoking or if we need to rebalance from a withdrawal or lowering the debtRatio
@@ -446,7 +438,7 @@ contract StrategyConvexCompound is StrategyConvexBase {
                     abi.encodePacked(
                         address(weth),
                         uint24(uniStableFee),
-                        address(targetStable)
+                        address(dai)
                     ),
                     address(this),
                     block.timestamp,
@@ -578,17 +570,6 @@ contract StrategyConvexCompound is StrategyConvexBase {
     /* ========== SETTERS ========== */
 
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
-
-    /// @notice Set optimal token to sell harvested funds for depositing to Curve.
-    function setOptimal(uint256 _optimal) external onlyVaultManagers {
-        if (_optimal == 0) {
-            targetStable = address(dai);
-        } else if (_optimal == 1) {
-            targetStable = address(usdc);
-        } else {
-            revert("incorrect token");
-        }
-    }
 
     // Min profit to start checking for harvests if gas is good, max will harvest no matter gas (both in USDT, 6 decimals). Credit threshold is in want token, and will trigger a harvest if credit is large enough. check earmark to look at convex's booster.
     function setHarvestTriggerParams(
