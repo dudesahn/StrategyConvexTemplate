@@ -95,7 +95,7 @@ def rewards_token():  # oBTC has one but don't worry about it for now
 # curve deposit pool for old metapools, set to ZERO_ADDRESS otherwise
 @pytest.fixture(scope="module")
 def old_pool():
-    old_pool = ZERO_ADDRESS # zero address for EURS and 3EUR
+    old_pool = ZERO_ADDRESS  # zero address for EURS and 3EUR
     # EURS-USDC 0x98a7F18d4E56Cfe84E3D081B40001B3d5bD3eB8B
     yield old_pool
 

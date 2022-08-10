@@ -179,9 +179,7 @@ def test_cloning(
 
     # attach our new strategy
     vault.addStrategy(newStrategy, currentDebt, 0, 2 ** 256 - 1, 1_000, {"from": gov})
-    
-    
-    
+
     if vault_address == ZERO_ADDRESS:
         assert vault.withdrawalQueue(1) == newStrategy
     else:
