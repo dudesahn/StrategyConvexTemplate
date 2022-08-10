@@ -119,13 +119,6 @@ abstract contract StrategyConvexBase is BaseStrategy {
         0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
 
-    // Swap stuff
-    address internal constant sushiswap =
-        0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // we use this to sell our bonus token mostly
-    address internal constant uniswapV2 =
-        0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D; // use this for weird tokens with more liquidity on UniV2
-    address public router; // the router selected to sell our bonus token
-
     IERC20 internal constant crv =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
     IERC20 internal constant convexToken =
@@ -268,7 +261,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     }
 }
 
-contract StrategyConvexsUSD is StrategyConvexBase {
+contract StrategyConvexCompound is StrategyConvexBase {
     /* ========== STATE VARIABLES ========== */
     // these will likely change across different wants.
 
@@ -285,18 +278,11 @@ contract StrategyConvexsUSD is StrategyConvexBase {
         ICurveFi(0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511); // use curve's new CRV-ETH crypto pool to sell our CRV
     ICurveFi internal constant cvxeth =
         ICurveFi(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4); // use curve's new CVX-ETH crypto pool to sell our CVX
-    IERC20 internal constant usdt =
-        IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
     IERC20 internal constant usdc =
         IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
     IERC20 internal constant dai =
         IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     uint24 public uniStableFee; // this is equal to 0.05%, can change this later if a different path becomes more optimal
-
-    // rewards token info. we can have more than 1 reward token but this is rare, so we don't include this in the template
-    IERC20 public rewardsToken;
-    bool public hasRewards;
-    address[] internal rewardsPath;
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -340,11 +326,10 @@ contract StrategyConvexsUSD is StrategyConvexBase {
 
         // these are our approvals and path specific to this contract
         dai.approve(address(curve), type(uint256).max);
-        usdt.safeApprove(address(curve), type(uint256).max); // USDT requires safeApprove(), funky token
         usdc.approve(address(curve), type(uint256).max);
 
         // start with usdt
-        targetStable = address(usdt);
+        targetStable = address(dai);
 
         // set our uniswap pool fees
         uniStableFee = 500;
@@ -379,28 +364,15 @@ contract StrategyConvexsUSD is StrategyConvexBase {
             convexBalance = convexToken.balanceOf(address(this));
         }
 
-        // claim and sell our rewards if we have them
-        if (hasRewards) {
-            uint256 _rewardsBalance =
-                IERC20(rewardsToken).balanceOf(address(this));
-            if (_rewardsBalance > 0) {
-                _sellRewards(_rewardsBalance);
-            }
-        }
-
         _sellCrvAndCvx(crvBalance, convexBalance);
 
         // check for balances of tokens to deposit
         uint256 _daiBalance = dai.balanceOf(address(this));
         uint256 _usdcBalance = usdc.balanceOf(address(this));
-        uint256 _usdtBalance = usdt.balanceOf(address(this));
 
         // deposit our balance to Curve if we have any
-        if (_daiBalance > 0 || _usdcBalance > 0 || _usdtBalance > 0) {
-            curve.add_liquidity(
-                [_daiBalance, _usdcBalance, _usdtBalance, 0],
-                0
-            );
+        if (_daiBalance > 0 || _usdcBalance > 0) {
+            curve.add_liquidity([_daiBalance, _usdcBalance], 0);
         }
 
         // debtOustanding will only be > 0 in the event of revoking or if we need to rebalance from a withdrawal or lowering the debtRatio
@@ -483,17 +455,6 @@ contract StrategyConvexsUSD is StrategyConvexBase {
                 )
             );
         }
-    }
-
-    // Sells our harvested reward token into the selected output.
-    function _sellRewards(uint256 _amount) internal {
-        IUniswapV2Router02(sushiswap).swapExactTokensForTokens(
-            _amount,
-            uint256(0),
-            rewardsPath,
-            address(this),
-            block.timestamp
-        );
     }
 
     /* ========== KEEP3RS ========== */
@@ -624,47 +585,8 @@ contract StrategyConvexsUSD is StrategyConvexBase {
             targetStable = address(dai);
         } else if (_optimal == 1) {
             targetStable = address(usdc);
-        } else if (_optimal == 2) {
-            targetStable = address(usdt);
         } else {
             revert("incorrect token");
-        }
-    }
-
-    // Use to add, update or remove rewards
-    function updateRewards(
-        bool _hasRewards,
-        uint256 _rewardsIndex,
-        bool useSushi
-    ) external onlyGovernance {
-        if (
-            address(rewardsToken) != address(0) &&
-            address(rewardsToken) != address(convexToken)
-        ) {
-            rewardsToken.approve(router, uint256(0));
-        }
-        if (_hasRewards == false) {
-            hasRewards = false;
-            rewardsToken = IERC20(address(0));
-            virtualRewardsPool = address(0);
-        } else {
-            // update with our new token. get this via our virtualRewardsPool
-            virtualRewardsPool = rewardsContract.extraRewards(_rewardsIndex);
-            address _rewardsToken =
-                IConvexRewards(virtualRewardsPool).rewardToken();
-            rewardsToken = IERC20(_rewardsToken);
-
-            // set which router we will be using
-            if (useSushi) {
-                router = sushiswap;
-            } else {
-                router = uniswapV2;
-            }
-
-            // approve, setup our path, and turn on rewards
-            rewardsToken.approve(router, type(uint256).max);
-            rewardsPath = [address(rewardsToken), address(weth)];
-            hasRewards = true;
         }
     }
 

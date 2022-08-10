@@ -122,44 +122,6 @@ def test_simple_harvest(
     if not no_profit:
         assert tx.events["Harvested"]["profit"] > 0
 
-    # change our optimal deposit asset
-    strategy.setOptimal(2, {"from": gov})
-
-    # store asset amount
-    before_usdt_assets = vault.totalAssets()
-    assert token.balanceOf(strategy) == 0
-    assert strategy.estimatedTotalAssets() > 0
-
-    # try and include custom logic here to check that funds are in the staking contract (if needed)
-    if is_convex:
-        stakingBeforeHarvest = rewardsContract.balanceOf(strategy)
-    else:
-        stakingBeforeHarvest = strategy.stakedBalance()
-
-    # simulate profits
-    chain.sleep(sleep_time)
-    chain.mine(1)
-
-    # harvest, store new asset amount
-    chain.sleep(1)
-    tx = strategy.harvest({"from": gov})
-    chain.sleep(1)
-    after_usdt_assets = vault.totalAssets()
-    # confirm we made money, or at least that we have about the same
-    assert after_usdt_assets >= before_usdt_assets
-
-    # Display estimated APR
-    print(
-        "\nEstimated USDT APR: ",
-        "{:.2%}".format(
-            ((after_usdt_assets - before_usdt_assets) * (365 * 86400 / sleep_time))
-            / (strategy.estimatedTotalAssets())
-        ),
-    )
-    print("USDT harvest info:", tx.events["Harvested"])
-    if not no_profit:
-        assert tx.events["Harvested"]["profit"] > 0
-
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
     chain.mine(1)

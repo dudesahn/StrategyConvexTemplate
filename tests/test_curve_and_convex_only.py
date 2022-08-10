@@ -14,7 +14,7 @@ def test_update_to_zero_then_back(
     keeper,
     rewards,
     chain,
-    StrategyConvexsUSD,
+    StrategyConvexCompound,
     voter,
     proxy,
     pid,
@@ -39,7 +39,7 @@ def test_update_to_zero_then_back(
 
     if is_convex:
         newStrategy = strategist.deploy(
-            StrategyConvexsUSD,
+            StrategyConvexCompound,
             vault,
             pid,
             pool,
@@ -48,7 +48,7 @@ def test_update_to_zero_then_back(
         print("\nConvex strategy")
     else:
         newStrategy = strategist.deploy(
-            StrategyConvexsUSD,
+            StrategyConvexCompound,
             vault,
             gauge,
             pool,
@@ -221,7 +221,7 @@ def test_update_from_zero_to_off(
     keeper,
     rewards,
     chain,
-    StrategyConvexsUSD,
+    StrategyConvexCompound,
     voter,
     proxy,
     pid,
@@ -246,7 +246,7 @@ def test_update_from_zero_to_off(
 
     if is_convex:
         newStrategy = strategist.deploy(
-            StrategyConvexsUSD,
+            StrategyConvexCompound,
             vault,
             pid,
             pool,
@@ -255,7 +255,7 @@ def test_update_from_zero_to_off(
         print("\nConvex strategy")
     else:
         newStrategy = strategist.deploy(
-            StrategyConvexsUSD,
+            StrategyConvexCompound,
             vault,
             gauge,
             pool,
@@ -426,7 +426,7 @@ def test_change_rewards(
     keeper,
     rewards,
     chain,
-    StrategyConvexsUSD,
+    StrategyConvexCompound,
     voter,
     proxy,
     pid,
@@ -446,7 +446,7 @@ def test_change_rewards(
 
     if is_convex:
         newStrategy = strategist.deploy(
-            StrategyConvexsUSD,
+            StrategyConvexCompound,
             vault,
             pid,
             pool,
@@ -455,7 +455,7 @@ def test_change_rewards(
         print("\nConvex strategy")
     else:
         newStrategy = strategist.deploy(
-            StrategyConvexsUSD,
+            StrategyConvexCompound,
             vault,
             gauge,
             pool,
@@ -525,7 +525,7 @@ def test_check_rewards(
     keeper,
     rewards,
     chain,
-    StrategyConvexsUSD,
+    StrategyConvexCompound,
     voter,
     proxy,
     pid,
@@ -601,14 +601,6 @@ def test_weird_amounts(
     chain.sleep(sleep_time)
     chain.mine(1)
 
-    # switch to USDT, want to not have any profit tho
-    strategy.setOptimal(2, {"from": gov})
-    strategy.harvest({"from": gov})
-
-    # sleep to get some profit
-    chain.sleep(sleep_time)
-    chain.mine(1)
-
     # take 0% of our CRV to the voter
     if is_convex:
         strategy.setKeep(0, 0, gov, {"from": gov})
@@ -675,14 +667,6 @@ def test_more_rewards_stuff(
     chain.mine(1)
     strategy.harvest({"from": gov})
 
-    # set our optimal to USDT without rewards on
-    strategy.setOptimal(2, {"from": gov})
-
-    # sleep to get some profit
-    chain.sleep(sleep_time)
-    chain.mine(1)
-    strategy.harvest({"from": gov})
-
     # we do this twice to hit both branches of the if statement
     if is_convex:
         strategy.updateRewards(True, 0, use_sushi, {"from": gov})
@@ -701,14 +685,6 @@ def test_more_rewards_stuff(
 
     # set our optimal to USDC with rewards on
     strategy.setOptimal(1, {"from": gov})
-
-    # sleep to get some profit
-    chain.sleep(sleep_time)
-    chain.mine(1)
-    strategy.harvest({"from": gov})
-
-    # set our optimal to USDT with rewards on
-    strategy.setOptimal(2, {"from": gov})
 
     # sleep to get some profit
     chain.sleep(sleep_time)
@@ -750,14 +726,6 @@ def test_more_rewards_stuff(
     chain.mine(1)
     strategy.harvest({"from": gov})
 
-    # set our optimal to USDT without rewards on
-    strategy.setOptimal(2, {"from": gov})
-
-    # sleep to get some profit
-    chain.sleep(sleep_time)
-    chain.mine(1)
-    strategy.harvest({"from": gov})
-
     # we do this twice to hit both branches of the if statement
     if is_convex:
         strategy.updateRewards(True, 0, use_sushi, {"from": gov})
@@ -776,14 +744,6 @@ def test_more_rewards_stuff(
 
     # set our optimal to USDC with rewards on
     strategy.setOptimal(1, {"from": gov})
-
-    # sleep to get some profit
-    chain.sleep(sleep_time)
-    chain.mine(1)
-    strategy.harvest({"from": gov})
-
-    # set our optimal to USDT with rewards on
-    strategy.setOptimal(2, {"from": gov})
 
     # sleep to get some profit
     chain.sleep(sleep_time)
