@@ -75,7 +75,7 @@ contract Splitter {
             address(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52), // recipient
             address(0xF147b8125d2ef93FB6965Db97D6746952a133934), // voter
             address(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52), // admin
-            7_000, // share of profit (initial terms of deal)
+            8_000, // share of profit (initial terms of deal)
             5_000 // Yearn's discretionary % of CRV to lock as veCRV on each split
         );
     }
@@ -139,11 +139,10 @@ contract Splitter {
             * precision 
             / lpSupply;
         if (gaugeDominance == 0) return (10_000, 0); // @dev avoid div by 0
-        yRatio = relativeSlope 
-            * precision
+        yRatio = 
+            relativeSlope
             * yearn.share
-            / gaugeDominance
-            / precision;
+            / gaugeDominance;
         // Should not return > 100%
         if (yRatio > 10_000){
             return (10_000, 0);

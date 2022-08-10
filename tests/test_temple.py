@@ -27,7 +27,7 @@ def test_split(
     ]
 
     convex_weights_to_test = [
-        10, 100, 300
+        10, 100, 200
     ]
 
     tvls = [
@@ -35,7 +35,7 @@ def test_split(
     ]
 
     print_debug = False
-    x = .85
+    x = .95
     splitter.setStrategy(strategy, {'from':gov})
     amount_temple = token.balanceOf(whale) * x
     vault.deposit(amount_temple, {'from':whale})
@@ -89,6 +89,8 @@ def test_split(
 
 def vote(weight, convex_weight, vault, whale):
     WEEK = 60 * 60 * 24 * 7
+    DAY = 60 * 60 * 24
+    chain.sleep(WEEK + (3*DAY))
     gauge_controller = Contract("0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB")
     temple_gauge = '0x8f162742a7BCDb87EB52d83c687E43356055a68B'
     convex = accounts.at("0x989AEb4d175e16225E39E87d0D97A3360524AD80", force=True)
