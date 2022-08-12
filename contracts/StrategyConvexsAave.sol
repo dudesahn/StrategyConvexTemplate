@@ -364,7 +364,7 @@ contract StrategyConvexsAave is StrategyConvexBase {
 
         // deposit our balance to Curve if we have any
         if (_daiBalance > 0) {
-            curve.add_liquidity([_daiBalance, 0], 0);
+            curve.add_liquidity([_daiBalance, 0], 0, true);
         }
 
         // debtOustanding will only be > 0 in the event of revoking or if we need to rebalance from a withdrawal or lowering the debtRatio
