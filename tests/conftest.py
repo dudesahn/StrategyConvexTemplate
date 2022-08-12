@@ -43,14 +43,14 @@ chain_used = 1
 # If testing a Convex strategy, set this equal to your PID
 @pytest.fixture(scope="module")
 def pid():
-    pid = 0
+    pid = 30
     yield pid
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 150_000e18  # has over 300k
+    amount = 10_000e18  # has over 20k
     yield amount
 
 
@@ -58,7 +58,7 @@ def amount():
 def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    whale = accounts.at("0x629c759D1E83eFbF63d84eb3868B564d9521C129", force=True)
+    whale = accounts.at("0x96Ea6AF74Af09522fCB4c28C269C26F59a31ced6", force=True)
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -69,14 +69,14 @@ def whale(accounts, amount, token):
 # set address if already deployed, use ZERO_ADDRESS if not
 @pytest.fixture(scope="module")
 def vault_address():
-    vault_address = "0xD6Ea40597Be05c201845c0bFd2e96A60bACde267"
+    vault_address = "0xf2db9a7c0ACd427A680D640F02d90f6186E71725"
     yield vault_address
 
 
 # this is the name we want to give our strategy
 @pytest.fixture(scope="module")
 def strategy_name():
-    strategy_name = "StrategyConvexsAave"
+    strategy_name = "StrategyConvexLINK"
     yield strategy_name
 
 
@@ -89,7 +89,7 @@ def rewards_token():  # SNX
 # curve deposit pool for old metapools, set to ZERO_ADDRESS otherwise
 @pytest.fixture(scope="module")
 def old_pool():
-    old_pool = "0xeB21209ae4C2c9FF2a86ACA31E123764A3B6Bc06"
+    old_pool = ZERO_ADDRESS
     yield old_pool
 
 
@@ -157,7 +157,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 6
+    hours_to_sleep = 48
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
@@ -297,7 +297,7 @@ if chain_used == 1:  # mainnet
     # replace the first value with the name of your strategy
     @pytest.fixture(scope="module")
     def strategy(
-        StrategyConvexsAave,
+        StrategyConvexLINK,
         strategist,
         keeper,
         vault,
@@ -325,7 +325,7 @@ if chain_used == 1:  # mainnet
         if is_convex:
             # make sure to include all constructor parameters needed here
             strategy = strategist.deploy(
-                StrategyConvexsAave,
+                StrategyConvexLINK,
                 vault,
                 pid,
                 pool,
@@ -335,7 +335,7 @@ if chain_used == 1:  # mainnet
         else:
             # make sure to include all constructor parameters needed here
             strategy = strategist.deploy(
-                StrategyConvexsAave,
+                StrategyConvexLINK,
                 vault,
                 gauge,
                 pool,

@@ -261,7 +261,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     }
 }
 
-contract StrategyConvexsAave is StrategyConvexBase {
+contract StrategyConvexLINK is StrategyConvexBase {
     /* ========== STATE VARIABLES ========== */
     // these will likely change across different wants.
 
@@ -277,9 +277,9 @@ contract StrategyConvexsAave is StrategyConvexBase {
         ICurveFi(0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511); // use curve's new CRV-ETH crypto pool to sell our CRV
     ICurveFi internal constant cvxeth =
         ICurveFi(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4); // use curve's new CVX-ETH crypto pool to sell our CVX
-    IERC20 internal constant dai =
-        IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
-    uint24 public uniStableFee; // this is equal to 0.05%, can change this later if a different path becomes more optimal
+    IERC20 internal constant link =
+        IERC20(0x514910771AF9Ca656af840dff83E8264EcF986CA);
+    uint24 public uniLinkFee; // this is equal to 0.3%, can change this later if a different path becomes more optimal
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -292,9 +292,9 @@ contract StrategyConvexsAave is StrategyConvexBase {
         // You can set these parameters on deployment to whatever you want
         maxReportDelay = 21 days; // 21 days in seconds, if we hit this then harvestTrigger = True
         healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; // health.ychad.eth
-        harvestProfitMin = 10000e6;
-        harvestProfitMax = 120000e6;
-        creditThreshold = 1e6 * 1e18;
+        harvestProfitMin = 10_000e6;
+        harvestProfitMax = 120_000e6;
+        creditThreshold = 1e5 * 1e18;
         keepCRV = 1000; // default of 10%
         keepCVXDestination = 0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde; // default to treasury
 
@@ -322,10 +322,10 @@ contract StrategyConvexsAave is StrategyConvexBase {
         stratName = _name;
 
         // these are our approvals and path specific to this contract
-        dai.approve(address(curve), type(uint256).max);
+        link.approve(address(curve), type(uint256).max);
 
         // set our uniswap pool fees
-        uniStableFee = 500;
+        uniLinkFee = 3000;
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
@@ -360,11 +360,11 @@ contract StrategyConvexsAave is StrategyConvexBase {
         _sellCrvAndCvx(crvBalance, convexBalance);
 
         // check for balances of tokens to deposit
-        uint256 _daiBalance = dai.balanceOf(address(this));
+        uint256 _linkBalance = link.balanceOf(address(this));
 
         // deposit our balance to Curve if we have any
-        if (_daiBalance > 0) {
-            curve.add_liquidity([_daiBalance, 0], 0);
+        if (_linkBalance > 0) {
+            curve.add_liquidity([_linkBalance, 0], 0);
         }
 
         // debtOustanding will only be > 0 in the event of revoking or if we need to rebalance from a withdrawal or lowering the debtRatio
@@ -437,8 +437,8 @@ contract StrategyConvexsAave is StrategyConvexBase {
                 IUniV3.ExactInputParams(
                     abi.encodePacked(
                         address(weth),
-                        uint24(uniStableFee),
-                        address(dai)
+                        uint24(uniLinkFee),
+                        address(link)
                     ),
                     address(this),
                     block.timestamp,
@@ -585,7 +585,7 @@ contract StrategyConvexsAave is StrategyConvexBase {
     }
 
     /// @notice Set the fee pool we'd like to swap through on UniV3 (1% = 10_000)
-    function setUniFees(uint24 _stableFee) external onlyVaultManagers {
-        uniStableFee = _stableFee;
+    function setUniFees(uint24 _linkFee) external onlyVaultManagers {
+        uniLinkFee = _linkFee;
     }
 }

@@ -14,7 +14,7 @@ def test_cloning(
     rewards,
     chain,
     proxy,
-    StrategyConvexsAave,
+    StrategyConvexLINK,
     rewardsContract,
     pid,
     amount,
@@ -49,7 +49,7 @@ def test_cloning(
                 strategy_name,
                 {"from": gov},
             )
-            newStrategy = StrategyConvexsAave.at(tx.return_value)
+            newStrategy = StrategyConvexLINK.at(tx.return_value)
         else:
             ## clone our strategy
             tx = strategy.cloneConvexSBTCOld(
@@ -62,7 +62,7 @@ def test_cloning(
                 strategy_name,
                 {"from": gov},
             )
-            newStrategy = StrategyConvexsAave.at(tx.return_value)
+            newStrategy = StrategyConvexLINK.at(tx.return_value)
     else:
         if is_convex:
             # Shouldn't be able to call initialize again
@@ -89,7 +89,7 @@ def test_cloning(
                 strategy_name,
                 {"from": gov},
             )
-            newStrategy = StrategyConvexsAave.at(tx.return_value)
+            newStrategy = StrategyConvexLINK.at(tx.return_value)
 
             # Shouldn't be able to call initialize again
             with brownie.reverts():
@@ -142,7 +142,7 @@ def test_cloning(
                 strategy_name,
                 {"from": gov},
             )
-            newStrategy = StrategyConvexsAave.at(tx.return_value)
+            newStrategy = StrategyConvexLINK.at(tx.return_value)
 
             # Shouldn't be able to call initialize again
             with brownie.reverts():
