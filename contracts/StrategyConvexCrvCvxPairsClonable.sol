@@ -247,11 +247,9 @@ abstract contract StrategyConvexBase is BaseStrategy {
 
     // 
     function setSplit(address _split) external onlyGovernance {
+        require(address(split) != _split);
         crv.approve(address(split), 0);
         split = ISplit(_split);
-        if (crv.allowance(address(this), _split) > 0) {
-            crv.approve(address(_split), 0);
-        }
         crv.approve(address(_split), type(uint256).max);
         emit SplitAddressUpdated(_split);
     }
