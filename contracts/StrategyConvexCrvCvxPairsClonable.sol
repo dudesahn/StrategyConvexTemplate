@@ -8,10 +8,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/math/Math.sol";
 
 import "./interfaces/curve.sol";
-import {
-    BaseStrategy,
-    StrategyParams
-} from "@yearnvaults/contracts/BaseStrategy.sol";
+import {BaseStrategy, StrategyParams} from "@yearnvaults/contracts/BaseStrategy.sol";
 
 interface IBaseFee {
     function isCurrentBaseFeeAcceptable() external view returns (bool);
@@ -72,6 +69,10 @@ interface IConvexRewards {
     function periodFinish() external view returns (uint256);
 }
 
+interface ISplit {
+    function split() external;
+}
+
 interface IConvexDeposit {
     // deposit into convex, receive a tokenized deposit.  parameter to stake immediately (we always do this).
     function deposit(
@@ -100,6 +101,8 @@ interface IConvexDeposit {
 abstract contract StrategyConvexBase is BaseStrategy {
     using Address for address;
 
+    event SplitAddressUpdated(address split);
+
     /* ========== STATE VARIABLES ========== */
     // these should stay the same across different wants.
 
@@ -108,11 +111,6 @@ abstract contract StrategyConvexBase is BaseStrategy {
         0xF403C135812408BFbE8713b5A23a04b3D48AAE31; // this is the deposit contract that all pools use, aka booster
     IConvexRewards public rewardsContract; // This is unique to each curve pool
     uint256 public pid; // this is unique to each pool
-
-    // keepCRV stuff
-    uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points)
-    uint256 public keepCVX; // the percentage of CVX we keep for boosting yield (in basis points)
-    address public keepCVXDestination; // where we send the CVX we are keeping
     address internal constant voter =
         0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
@@ -123,6 +121,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
         IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
     IERC20 internal constant weth =
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    ISplit public split;
 
     // keeper stuff
     uint256 public harvestProfitMin; // minimum size in USD (6 decimals) that we want to harvest
@@ -233,18 +232,6 @@ abstract contract StrategyConvexBase is BaseStrategy {
 
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
-    // Set the amount of CRV to be locked in Yearn's veCRV voter from each harvest. Default is 10%. Option to keep CVX as well.
-    function setKeep(
-        uint256 _keepCRV,
-        uint256 _keepCVX,
-        address _keepCVXDestination
-    ) external onlyGovernance {
-        require(_keepCRV <= 10_000 && _keepCVX <= 10_000);
-        keepCRV = _keepCRV;
-        keepCVX = _keepCVX;
-        keepCVXDestination = _keepCVXDestination;
-    }
-
     // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
     function setClaimRewards(bool _claimRewards) external onlyVaultManagers {
         claimRewards = _claimRewards;
@@ -256,6 +243,15 @@ abstract contract StrategyConvexBase is BaseStrategy {
         onlyVaultManagers
     {
         forceHarvestTriggerOnce = _forceHarvestTriggerOnce;
+    }
+
+    // 
+    function setSplit(address _split) external onlyGovernance {
+        require(address(split) != _split);
+        crv.approve(address(split), 0);
+        split = ISplit(_split);
+        crv.approve(address(_split), type(uint256).max);
+        emit SplitAddressUpdated(_split);
     }
 }
 
@@ -277,16 +273,13 @@ contract StrategyConvexCrvCvxPairsClonable is StrategyConvexBase {
     // check for cloning
     bool internal isOriginal = true;
 
-    // use this to determine if we are CRV-ETH or CVX-ETH
-    bool public isCrvEthLp;
-
     /* ========== CONSTRUCTOR ========== */
 
-    constructor(address _vault, bool _isCrvEthLp)
+    constructor(address _vault, address _split)
         public
         StrategyConvexBase(_vault)
     {
-        _initializeStrat(_isCrvEthLp);
+        _initializeStrat(_split);
     }
 
     /* ========== CLONING ========== */
@@ -299,7 +292,7 @@ contract StrategyConvexCrvCvxPairsClonable is StrategyConvexBase {
         address _strategist,
         address _rewards,
         address _keeper,
-        bool _isCrvEthLp
+        address _split
     ) external returns (address payable newStrategy) {
         require(isOriginal);
         // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
@@ -324,7 +317,7 @@ contract StrategyConvexCrvCvxPairsClonable is StrategyConvexBase {
             _strategist,
             _rewards,
             _keeper,
-            _isCrvEthLp
+            _split
         );
 
         emit Cloned(newStrategy);
@@ -336,29 +329,21 @@ contract StrategyConvexCrvCvxPairsClonable is StrategyConvexBase {
         address _strategist,
         address _rewards,
         address _keeper,
-        bool _isCrvEthLp
+        address _split
     ) public {
         _initialize(_vault, _strategist, _rewards, _keeper);
-        _initializeStrat(_isCrvEthLp);
+        _initializeStrat(_split);
     }
 
     // this is called by our original strategy, as well as any clones
-    function _initializeStrat(bool _isCrvEthLp) internal {
+    function _initializeStrat(address _split) internal {
         // make sure that we haven't initialized this before
         require(address(curve) == address(0)); // already initialized.
 
-        // set up our CRV-ETH or CVX_ETH LP
-        if (_isCrvEthLp) {
-            curve = crveth; // this is the pool specific to this vault
-            pid = 61; // this is the pool ID on convex, we use this to determine what the reweardsContract address is
-            stratName = "StrategyConvexCRVETH"; // set our strategy's name
-            isCrvEthLp = true;
-        } else {
-            curve = cvxeth;
-            pid = 64;
-            stratName = "StrategyConvexCVXETH";
-            isCrvEthLp = false;
-        }
+        curve = ICurveFi(0xdaDfD00A2bBEb1abc4936b1644a3033e1B653228);
+        pid = 109;
+        stratName = "ConvexTempleDAO-U";
+        split = ISplit(_split);
 
         // You can set these parameters on deployment to whatever you want
         maxReportDelay = 21 days; // 21 days in seconds, if we hit this then harvestTrigger = True
@@ -366,13 +351,13 @@ contract StrategyConvexCrvCvxPairsClonable is StrategyConvexBase {
         harvestProfitMin = 60000e6;
         harvestProfitMax = 120000e6;
         creditThreshold = 1e6 * 1e18;
-        keepCRV = 1000; // default of 10%
-        keepCVXDestination = 0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde; // default to treasury
 
         // want = Curve LP
         want.approve(address(depositContract), type(uint256).max);
         convexToken.approve(address(cvxeth), type(uint256).max);
+        weth.approve(address(crveth), type(uint256).max);
         crv.approve(address(crveth), type(uint256).max);
+        crv.approve(_split, type(uint256).max);
 
         // setup our rewards contract
         (address lptoken, , , address _rewardsContract, , ) =
@@ -399,40 +384,10 @@ contract StrategyConvexCrvCvxPairsClonable is StrategyConvexBase {
         // this claims our CRV, CVX, and any extra tokens like SNX or ANKR. no harm leaving this true even if no extra rewards currently.
         rewardsContract.getReward(address(this), true);
 
-        uint256 crvBalance = crv.balanceOf(address(this));
-        uint256 convexBalance = convexToken.balanceOf(address(this));
+        _sellCvx();
+        _buyCRV();
+        _splitCRV();
 
-        uint256 _sendToVoter = crvBalance.mul(keepCRV).div(FEE_DENOMINATOR);
-        if (_sendToVoter > 0) {
-            crv.safeTransfer(voter, _sendToVoter);
-            crvBalance = crv.balanceOf(address(this));
-        }
-
-        uint256 _cvxToKeep = convexBalance.mul(keepCVX).div(FEE_DENOMINATOR);
-        if (_cvxToKeep > 0) {
-            convexToken.safeTransfer(keepCVXDestination, _cvxToKeep);
-            convexBalance = convexToken.balanceOf(address(this));
-        }
-
-        _sellCrvAndCvx(crvBalance, convexBalance);
-
-        // update our balances after selling
-        uint256 toDeposit;
-        if (isCrvEthLp) {
-            toDeposit = crv.balanceOf(address(this));
-        } else {
-            toDeposit = convexToken.balanceOf(address(this));
-        }
-
-        // deposit our assets to the pool
-        uint256 ethBalance = address(this).balance;
-        if (ethBalance > 0 || toDeposit > 0) {
-            curve.add_liquidity{value: ethBalance}(
-                [ethBalance, toDeposit],
-                0,
-                true
-            );
-        }
 
         // debtOustanding will only be > 0 in the event of revoking or if we need to rebalance from a withdrawal or lowering the debtRatio
         if (_debtOutstanding > 0) {
@@ -481,23 +436,6 @@ contract StrategyConvexCrvCvxPairsClonable is StrategyConvexBase {
             _newStrategy,
             convexToken.balanceOf(address(this))
         );
-    }
-
-    // Sell our CRV or CVX for ETH on Curve
-    function _sellCrvAndCvx(uint256 _crvAmount, uint256 _convexAmount)
-        internal
-    {
-        if (isCrvEthLp) {
-            if (_convexAmount > 1e17) {
-                // don't want to swap dust or we might revert
-                cvxeth.exchange(1, 0, _convexAmount, 0, true);
-            }
-        } else {
-            if (_crvAmount > 1e17) {
-                // don't want to swap dust or we might revert
-                crveth.exchange(1, 0, _crvAmount, 0, true);
-            }
-        }
     }
 
     /* ========== KEEP3RS ========== */
@@ -555,6 +493,28 @@ contract StrategyConvexCrvCvxPairsClonable is StrategyConvexBase {
 
         // otherwise, we don't harvest
         return false;
+    }
+
+    // Sells our CRV and CVX on Curve, then WETH -> stables together on UniV3
+    function _sellCvx() internal {
+        uint256 _amount = convexToken.balanceOf(address(this));
+        if (_amount > 1e17) {
+            // don't want to swap dust or we might revert
+            cvxeth.exchange(1, 0, _amount, 0, false);
+        }
+        
+    }
+
+    function _buyCRV() internal {
+        uint256 _wethBalance = weth.balanceOf(address(this));
+        if (_wethBalance > 1e15) {
+            // don't want to swap dust or we might revert
+            crveth.exchange(0, 1, _wethBalance, 0, false);
+        }
+    }
+
+    function _splitCRV() internal {
+        split.split();
     }
 
     /// @notice The value in dollars that our claimable rewards are worth (in USDT, 6 decimals).

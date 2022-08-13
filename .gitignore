@@ -5,6 +5,7 @@ __pycache__
 build/
 reports/
 .env
+scripts/deploy2.py
 
 # Node/npm
 node_modules/
