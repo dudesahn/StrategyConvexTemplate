@@ -381,7 +381,7 @@ contract StrategyConvexOldPoolsClonable is StrategyConvexBase {
         crv.approve(address(crveth), type(uint256).max);
         weth.approve(uniswapv3, type(uint256).max);
 
-        // this is the pool specific to this vault, but we only use it as an address
+        // this is the pool specific to this vault
         curve = ICurveFi(_curvePool);
 
         // setup our rewards contract
