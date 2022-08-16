@@ -13,7 +13,7 @@ def test_update_to_zero_then_back(
     keeper,
     rewards,
     chain,
-    StrategyConvex3CrvRewardsClonable,
+    contract_name,
     voter,
     proxy,
     pid,
@@ -38,7 +38,7 @@ def test_update_to_zero_then_back(
 
     if is_convex:
         newStrategy = strategist.deploy(
-            StrategyConvex3CrvRewardsClonable,
+            contract_name,
             vault,
             pid,
             pool,
@@ -47,7 +47,7 @@ def test_update_to_zero_then_back(
         print("\nConvex strategy")
     else:
         newStrategy = strategist.deploy(
-            StrategyConvex3CrvRewardsClonable,
+            contract_name,
             vault,
             gauge,
             pool,
@@ -220,7 +220,7 @@ def test_update_from_zero_to_off(
     keeper,
     rewards,
     chain,
-    StrategyConvex3CrvRewardsClonable,
+    contract_name,
     voter,
     proxy,
     pid,
@@ -245,7 +245,7 @@ def test_update_from_zero_to_off(
 
     if is_convex:
         newStrategy = strategist.deploy(
-            StrategyConvex3CrvRewardsClonable,
+            contract_name,
             vault,
             pid,
             pool,
@@ -254,7 +254,7 @@ def test_update_from_zero_to_off(
         print("\nConvex strategy")
     else:
         newStrategy = strategist.deploy(
-            StrategyConvex3CrvRewardsClonable,
+            contract_name,
             vault,
             gauge,
             pool,
@@ -425,7 +425,7 @@ def test_change_rewards(
     keeper,
     rewards,
     chain,
-    StrategyConvex3CrvRewardsClonable,
+    contract_name,
     voter,
     proxy,
     pid,
@@ -444,7 +444,7 @@ def test_change_rewards(
 
     if is_convex:
         newStrategy = strategist.deploy(
-            StrategyConvex3CrvRewardsClonable,
+            contract_name,
             vault,
             pid,
             pool,
@@ -453,7 +453,7 @@ def test_change_rewards(
         print("\nConvex strategy")
     else:
         newStrategy = strategist.deploy(
-            StrategyConvex3CrvRewardsClonable,
+            contract_name,
             vault,
             gauge,
             pool,
@@ -523,7 +523,7 @@ def test_check_rewards(
     keeper,
     rewards,
     chain,
-    StrategyConvex3CrvRewardsClonable,
+    contract_name,
     voter,
     proxy,
     pid,

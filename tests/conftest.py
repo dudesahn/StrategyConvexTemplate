@@ -83,6 +83,13 @@ def strategy_name():
     yield strategy_name
 
 
+# this is the name of our strategy in the .sol file
+@pytest.fixture(scope="session")
+def contract_name(StrategyConvex3CrvRewardsClonable):
+    contract_name = StrategyConvex3CrvRewardsClonable
+    yield contract_name
+
+
 # we need these next two fixtures for deploying our curve strategy, but not for convex. for convex we can pull them programmatically.
 # this is the address of our rewards token, in this case it's a dummy (ALCX) that our whale happens to hold just used to test stuff
 @pytest.fixture(scope="session")
@@ -158,10 +165,11 @@ def sleep_time():
 # ----------------------------------------------------------------------- #
 
 if chain_used == 1:  # mainnet
+
     @pytest.fixture(scope="session")
     def sushi_router():  # use this to check our allowances
         yield Contract("0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F")
-        
+
     # all contracts below should be able to stay static based on the pid
     @pytest.fixture(scope="session")
     def booster():  # this is the deposit contract
@@ -290,7 +298,7 @@ if chain_used == 1:  # mainnet
     # replace the first value with the name of your strategy
     @pytest.fixture(scope="module")
     def strategy(
-        StrategyConvex3CrvRewardsClonable,
+        contract_name,
         strategist,
         keeper,
         vault,
@@ -315,7 +323,7 @@ if chain_used == 1:  # mainnet
         if is_convex:
             # make sure to include all constructor parameters needed here
             strategy = strategist.deploy(
-                StrategyConvex3CrvRewardsClonable,
+                contract_name,
                 vault,
                 pid,
                 pool,
@@ -325,7 +333,7 @@ if chain_used == 1:  # mainnet
         else:
             # make sure to include all constructor parameters needed here
             strategy = strategist.deploy(
-                StrategyConvex3CrvRewardsClonable,
+                contract_name,
                 vault,
                 gauge,
                 pool,
