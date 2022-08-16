@@ -568,10 +568,6 @@ def test_weird_amounts(
     is_convex,
     sleep_time,
 ):
-    # skip these tests if not curve or convex strategy
-    if not is_convex and not is_curve:
-        print("Don't need to do these tests if not Curve or Convex strategy")
-        return
 
     ## deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
