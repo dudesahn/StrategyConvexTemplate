@@ -41,16 +41,17 @@ chain_used = 1
 
 
 # If testing a Convex strategy, set this equal to your PID
+# tested with final version: MIM, FRAX
 @pytest.fixture(scope="session")
 def pid():
-    pid = 40  # mim 40, FRAX 32
+    pid = 32  # mim 40, FRAX 32
     yield pid
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="session")
 def amount():
-    amount = 35_000e18  # same amount for both
+    amount = 140_000e18  # use 35k for MIM, 140k for FRAX
     yield amount
 
 
@@ -58,8 +59,8 @@ def amount():
 def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    # MIM 0xe896e539e557BC751860a7763C8dD589aF1698Ce, FRAX 0xA86e412109f77c45a3BC1c5870b880492Fb86A14
-    whale = accounts.at("0xe896e539e557BC751860a7763C8dD589aF1698Ce", force=True)
+    # MIM 0xe896e539e557BC751860a7763C8dD589aF1698Ce, FRAX 0x839Bb033738510AA6B4f78Af20f066bdC824B189
+    whale = accounts.at("0x839Bb033738510AA6B4f78Af20f066bdC824B189", force=True)
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -70,7 +71,7 @@ def whale(accounts, amount, token):
 # use this if your vault is already deployed
 @pytest.fixture(scope="session")
 def vault_address():
-    vault_address = "0x2DfB14E32e2F8156ec15a2c21c3A6c053af52Be8"
+    vault_address = "0xB4AdA607B9d6b2c9Ee07A275e9616B84AC560139"
     # MIM 0x2DfB14E32e2F8156ec15a2c21c3A6c053af52Be8
     # FRAX 0xB4AdA607B9d6b2c9Ee07A275e9616B84AC560139
     yield vault_address
@@ -79,7 +80,7 @@ def vault_address():
 # this is the name we want to give our strategy
 @pytest.fixture(scope="session")
 def strategy_name():
-    strategy_name = "StrategyConvexMIM"
+    strategy_name = "StrategyConvexFRAX"
     yield strategy_name
 
 
@@ -121,7 +122,7 @@ def rewards_template():
 # this is whether our pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
 @pytest.fixture(scope="session")
 def has_rewards():
-    has_rewards = True  # MIM True, FRAX False
+    has_rewards = False  # MIM True, FRAX False
     yield has_rewards
 
 
@@ -139,18 +140,21 @@ def gauge_is_not_tokenized():
     yield gauge_is_not_tokenized
 
 
-# use this when we might lose a few wei on conversions between want and another deposit token
-@pytest.fixture(scope="session")
-def is_slippery():
-    is_slippery = False
-    yield is_slippery
-
-
 # use this to test our strategy in case there are no profits
 @pytest.fixture(scope="session")
 def no_profit():
     no_profit = False
     yield no_profit
+
+
+# use this when we might lose a few wei on conversions between want and another deposit token
+# generally this will always be true if no_profit is true, even for curve/convex since we can lose a wei converting
+@pytest.fixture(scope="session")
+def is_slippery(no_profit):
+    is_slippery = False
+    if no_profit:
+        is_slippery = True
+    yield is_slippery
 
 
 # use this to set the standard amount of time we sleep between harvests.
@@ -160,7 +164,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 2
+    hours_to_sleep = 6
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
@@ -391,20 +395,40 @@ if chain_used == 1:  # mainnet
                     strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov}
                 )
             else:
-                # remove 50% of funds from our convex strategy
-                other_strat = Contract(vault.withdrawalQueue(1))
-                vault.updateStrategyDebtRatio(other_strat, 5000, {"from": gov})
+                if vault.withdrawalQueue(1) == ZERO_ADDRESS:  # only has convex
+                    other_strat = Contract(vault.withdrawalQueue(0))
+                    vault.updateStrategyDebtRatio(other_strat, 5000, {"from": gov})
+                    vault.addStrategy(
+                        strategy, 5000, 0, 2 ** 256 - 1, 1_000, {"from": gov}
+                    )
 
-                # turn off health check just in case it's a big harvest
-                other_strat.setDoHealthCheck(False, {"from": gov})
-                other_strat.harvest({"from": gov})
-                chain.sleep(1)
-                chain.mine(1)
+                    # reorder so curve first, convex second
+                    queue = [strategy.address, other_strat.address]
+                    for x in range(18):
+                        queue.append(ZERO_ADDRESS)
+                    assert len(queue) == 20
+                    vault.setWithdrawalQueue(queue, {"from": gov})
 
-                # give our curve strategy 50% of our debt and migrate it
-                old_strategy = Contract(vault.withdrawalQueue(0))
-                vault.migrateStrategy(old_strategy, strategy, {"from": gov})
-                vault.updateStrategyDebtRatio(strategy, 5000, {"from": gov})
+                    # turn off health check just in case it's a big harvest
+                    other_strat.setDoHealthCheck(False, {"from": gov})
+                    other_strat.harvest({"from": gov})
+                    chain.sleep(1)
+                    chain.mine(1)
+                else:
+                    other_strat = Contract(vault.withdrawalQueue(1))
+                    # remove 50% of funds from our convex strategy
+                    vault.updateStrategyDebtRatio(other_strat, 5000, {"from": gov})
+
+                    # turn off health check just in case it's a big harvest
+                    other_strat.setDoHealthCheck(False, {"from": gov})
+                    other_strat.harvest({"from": gov})
+                    chain.sleep(1)
+                    chain.mine(1)
+
+                    # give our curve strategy 50% of our debt and migrate it
+                    old_strategy = Contract(vault.withdrawalQueue(0))
+                    vault.migrateStrategy(old_strategy, strategy, {"from": gov})
+                    vault.updateStrategyDebtRatio(strategy, 5000, {"from": gov})
 
             # approve our new strategy on the proxy
             proxy.approveStrategy(strategy.gauge(), strategy, {"from": gov})
