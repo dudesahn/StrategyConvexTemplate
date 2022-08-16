@@ -132,6 +132,13 @@ def is_convex():
     yield is_convex
 
 
+# if our curve gauge deposits aren't tokenized (older pools), we can't as easily do some tests and we skip them
+@pytest.fixture(scope="session")
+def gauge_is_not_tokenized():
+    gauge_is_not_tokenized = False
+    yield gauge_is_not_tokenized
+
+
 # use this when we might lose a few wei on conversions between want and another deposit token
 @pytest.fixture(scope="session")
 def is_slippery():
@@ -378,8 +385,6 @@ if chain_used == 1:  # mainnet
                 90000e6, 150000e6, 1e24, False, {"from": gov}
             )
         else:
-            proxy.approveStrategy(strategy.gauge(), strategy, {"from": gov})
-
             # do slightly different if vault is existing or not
             if vault_address == ZERO_ADDRESS:
                 vault.addStrategy(
@@ -400,6 +405,9 @@ if chain_used == 1:  # mainnet
                 old_strategy = Contract(vault.withdrawalQueue(0))
                 vault.migrateStrategy(old_strategy, strategy, {"from": gov})
                 vault.updateStrategyDebtRatio(strategy, 5000, {"from": gov})
+
+            # approve our new strategy on the proxy
+            proxy.approveStrategy(strategy.gauge(), strategy, {"from": gov})
 
         # make all harvests permissive unless we change the value lower
         gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})

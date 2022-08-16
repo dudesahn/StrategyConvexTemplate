@@ -29,6 +29,7 @@ def test_odds_and_ends(
     is_convex,
     has_rewards,
     sleep_time,
+    gauge_is_not_tokenized,
 ):
 
     ## deposit to the vault after approving. turn off health check before each harvest since we're doing weird shit
@@ -57,6 +58,8 @@ def test_odds_and_ends(
             rewards_token.transfer(gov, to_send, {"from": strategy})
         assert strategy.estimatedTotalAssets() == 0
     else:
+        if gauge_is_not_tokenized:
+            return
         # send all funds out of the gauge
         to_send = gauge.balanceOf(voter)
         print("Gauge Balance of Vault", to_send / 1e18)
@@ -158,6 +161,7 @@ def test_odds_and_ends_2(
     cvxDeposit,
     amount,
     is_convex,
+    gauge_is_not_tokenized,
 ):
 
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
@@ -177,6 +181,8 @@ def test_odds_and_ends_2(
         cvxDeposit.transfer(gov, to_send, {"from": strategy})
         assert strategy.estimatedTotalAssets() == 0
     else:
+        if gauge_is_not_tokenized:
+            return
         # send all funds out of the gauge
         to_send = gauge.balanceOf(voter)
         print("Gauge Balance of Vault", to_send / 1e18)
@@ -398,6 +404,7 @@ def test_odds_and_ends_rekt(
     gauge,
     has_rewards,
     rewards_token,
+    gauge_is_not_tokenized,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -425,6 +432,8 @@ def test_odds_and_ends_rekt(
             rewards_token.transfer(gov, to_send, {"from": strategy})
         assert strategy.estimatedTotalAssets() == 0
     else:
+        if gauge_is_not_tokenized:
+            return
         # send all funds out of the gauge
         to_send = gauge.balanceOf(voter)
         print("Gauge Balance of Vault", to_send / 1e18)
@@ -466,6 +475,7 @@ def test_odds_and_ends_liquidate_rekt(
     amount,
     gauge,
     is_convex,
+    gauge_is_not_tokenized,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -484,6 +494,8 @@ def test_odds_and_ends_liquidate_rekt(
         cvxDeposit.transfer(gov, to_send, {"from": strategy})
         assert strategy.estimatedTotalAssets() == 0
     else:
+        if gauge_is_not_tokenized:
+            return
         # send all funds out of the gauge
         to_send = gauge.balanceOf(voter)
         print("Gauge Balance of Vault", to_send / 1e18)
@@ -543,6 +555,7 @@ def test_odds_and_ends_empty_strat(
     no_profit,
     is_convex,
     gauge,
+    gauge_is_not_tokenized,
 ):
     ## deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
@@ -577,6 +590,8 @@ def test_odds_and_ends_empty_strat(
         if not no_profit:
             assert strategy.claimableBalance() > 0
     else:
+        if gauge_is_not_tokenized:
+            return
         # send all funds out of the gauge, then send back 1 wei so we can claim rewards
         to_send = gauge.balanceOf(voter)
         print("Gauge Balance of Vault", to_send / 1e18)
