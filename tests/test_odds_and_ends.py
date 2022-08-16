@@ -23,6 +23,7 @@ def test_odds_and_ends(
     convexToken,
     amount,
     pool,
+    proxy,
     strategy_name,
     rewards_token,
     is_convex,
@@ -210,6 +211,7 @@ def test_odds_and_ends_migration(
     proxy,
     pid,
     amount,
+    gauge,
     pool,
     strategy_name,
     is_convex,
@@ -393,6 +395,7 @@ def test_odds_and_ends_rekt(
     convexToken,
     amount,
     is_convex,
+    gauge,
     has_rewards,
     rewards_token,
 ):

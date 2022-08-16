@@ -153,7 +153,10 @@ def test_simple_harvest(
     assert token.balanceOf(strategy) == 0
 
     # try and include custom logic here to check that funds are in the staking contract (if needed)
-    assert rewardsContract.balanceOf(strategy) > 0
+    if is_convex:
+        stakingBeforeHarvest < rewardsContract.balanceOf(strategy)
+    else:
+        stakingBeforeHarvest < strategy.stakedBalance()
 
     # simulate profits
     chain.sleep(sleep_time)
@@ -188,7 +191,10 @@ def test_simple_harvest(
     assert strategy.estimatedTotalAssets() > 0
 
     # try and include custom logic here to check that funds are in the staking contract (if needed)
-    assert rewardsContract.balanceOf(strategy) > 0
+    if is_convex:
+        stakingBeforeHarvest < rewardsContract.balanceOf(strategy)
+    else:
+        stakingBeforeHarvest < strategy.stakedBalance()
 
     # simulate profits
     chain.sleep(sleep_time)

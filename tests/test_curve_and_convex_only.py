@@ -713,7 +713,10 @@ def test_more_rewards_stuff(
     strategy.harvest({"from": gov})
 
     # take 100% of our CRV to the voter
-    strategy.setKeep(10000, 0, gov, {"from": gov})
+    if is_convex:
+        strategy.setKeep(10000, 0, gov, {"from": gov})
+    else:
+        strategy.setKeepCRV(10000, {"from": gov})
     chain.sleep(1)
     chain.mine(1)
     tx = strategy.harvest(
@@ -793,7 +796,10 @@ def test_more_rewards_stuff(
         strategy.setOptimal(4, {"from": gov})
 
     # take 0% of our CRV to the voter
-    strategy.setKeep(0, 0, gov, {"from": gov})
+    if is_convex:
+        strategy.setKeep(0, 0, gov, {"from": gov})
+    else:
+        strategy.setKeepCRV(0, {"from": gov})
     chain.sleep(1)
     chain.mine(1)
     strategy.harvest({"from": gov})

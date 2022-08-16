@@ -18,6 +18,7 @@ def test_cloning(
     pid,
     amount,
     pool,
+    gauge,
     strategy_name,
     sleep_time,
     tests_using_tenderly,
@@ -26,7 +27,9 @@ def test_cloning(
     is_convex,
     vault_address,
     has_rewards,
+    rewards_token,
     is_clonable,
+    proxy,
 ):
 
     # skip this test if we don't clone
@@ -37,7 +40,7 @@ def test_cloning(
     if tests_using_tenderly:
         if is_convex:
             ## clone our strategy
-            tx = strategy.cloneConvex3CrvRewards(
+            tx = strategy.cloneCurve3CrvRewards(
                 vault,
                 strategist,
                 rewards,
@@ -50,7 +53,7 @@ def test_cloning(
             newStrategy = contract_name.at(tx.return_value)
         else:
             ## clone our strategy
-            tx = strategy.cloneConvex3CrvRewards(
+            tx = strategy.cloneCurve3CrvRewards(
                 vault,
                 strategist,
                 rewards,
@@ -77,7 +80,7 @@ def test_cloning(
                 )
 
             ## clone our strategy
-            tx = strategy.cloneConvex3CrvRewards(
+            tx = strategy.cloneCurve3CrvRewards(
                 vault,
                 strategist,
                 rewards,
@@ -104,7 +107,7 @@ def test_cloning(
 
             ## shouldn't be able to clone a clone
             with brownie.reverts():
-                newStrategy.cloneConvex3CrvRewards(
+                newStrategy.cloneCurve3CrvRewards(
                     vault,
                     strategist,
                     rewards,
@@ -130,7 +133,7 @@ def test_cloning(
                 )
 
             ## clone our strategy
-            tx = strategy.cloneConvex3CrvRewards(
+            tx = strategy.cloneCurve3CrvRewards(
                 vault,
                 strategist,
                 rewards,
@@ -157,7 +160,7 @@ def test_cloning(
 
             ## shouldn't be able to clone a clone
             with brownie.reverts():
-                newStrategy.cloneConvex3CrvRewards(
+                newStrategy.cloneCurve3CrvRewards(
                     vault,
                     strategist,
                     rewards,
@@ -183,7 +186,7 @@ def test_cloning(
     else:
         if (
             vault.withdrawalQueue(2) == ZERO_ADDRESS
-        ):  # only has convex, since we just attached another convex strategy
+        ):  # only has convex, since we just added our clone to position index 1
             assert vault.withdrawalQueue(1) == newStrategy
         else:
             assert vault.withdrawalQueue(2) == newStrategy
