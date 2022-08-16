@@ -181,7 +181,9 @@ def test_cloning(
     if vault_address == ZERO_ADDRESS:
         assert vault.withdrawalQueue(1) == newStrategy
     else:
-        if vault.withdrawalQueue(2) == ZERO_ADDRESS:  # only has convex, since we just attached another convex strategy
+        if (
+            vault.withdrawalQueue(2) == ZERO_ADDRESS
+        ):  # only has convex, since we just attached another convex strategy
             assert vault.withdrawalQueue(1) == newStrategy
         else:
             assert vault.withdrawalQueue(2) == newStrategy

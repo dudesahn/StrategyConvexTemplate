@@ -174,10 +174,11 @@ def sleep_time():
 # ----------------------------------------------------------------------- #
 
 if chain_used == 1:  # mainnet
+
     @pytest.fixture(scope="session")
     def sushi_router():  # use this to check our allowances
         yield Contract("0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F")
-        
+
     # all contracts below should be able to stay static based on the pid
     @pytest.fixture(scope="session")
     def booster():  # this is the deposit contract
