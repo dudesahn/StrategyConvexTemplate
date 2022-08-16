@@ -30,7 +30,7 @@ def test_change_debt(
     startingStrategy = strategy.estimatedTotalAssets()
 
     # debtRatio is in BPS (aka, max is 10,000, which represents 100%), and is a fraction of the funds that can be in the strategy
-    currentDebt = 10000
+    currentDebt = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, currentDebt / 2, {"from": gov})
     chain.sleep(sleep_time)
     strategy.harvest({"from": gov})
