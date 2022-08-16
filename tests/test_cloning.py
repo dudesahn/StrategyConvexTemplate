@@ -18,6 +18,7 @@ def test_cloning(
     pid,
     amount,
     pool,
+    gauge,
     strategy_name,
     sleep_time,
     tests_using_tenderly,
@@ -26,7 +27,9 @@ def test_cloning(
     is_convex,
     vault_address,
     has_rewards,
+    rewards_token,
     is_clonable,
+    proxy,
 ):
 
     # skip this test if we don't clone
@@ -181,7 +184,9 @@ def test_cloning(
     if vault_address == ZERO_ADDRESS:
         assert vault.withdrawalQueue(1) == newStrategy
     else:
-        if vault.withdrawalQueue(2) == ZERO_ADDRESS:  # only has convex, since we just attached another convex strategy
+        if (
+            vault.withdrawalQueue(2) == ZERO_ADDRESS
+        ):  # only has convex, since we just added our clone to position index 1
             assert vault.withdrawalQueue(1) == newStrategy
         else:
             assert vault.withdrawalQueue(2) == newStrategy
