@@ -51,11 +51,18 @@ def test_triggers(
         chain.sleep(1)
         strategy.harvest({"from": gov})
         chain.sleep(1)
+        chain.mine(1)
 
         # should trigger false, nothing is ready yet
         tx = strategy.harvestTrigger(0, {"from": gov})
         print("\nShould we harvest? Should be false.", tx)
         assert tx == False
+    else:
+        # harvest the credit
+        chain.sleep(1)
+        strategy.harvest({"from": gov})
+        chain.sleep(1)
+        chain.mine(1)
 
     # simulate earnings
     chain.sleep(sleep_time)
@@ -116,7 +123,8 @@ def test_triggers(
 
     # harvest, wait
     chain.sleep(1)
-    strategy.harvest({"from": gov})
+    tx = strategy.harvest({"from": gov})
+    print("Harvest info:", tx.events["Harvested"])
     chain.sleep(sleep_time)
     chain.mine(1)
 

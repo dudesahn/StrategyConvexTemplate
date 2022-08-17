@@ -14,6 +14,7 @@ def test_revoke_strategy_from_vault(
     amount,
     is_slippery,
     no_profit,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving
@@ -23,8 +24,8 @@ def test_revoke_strategy_from_vault(
     chain.sleep(1)
     strategy.harvest({"from": gov})
 
-    # wait a day
-    chain.sleep(86400)
+    # sleep to earn some yield
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     vaultAssets_starting = vault.totalAssets()

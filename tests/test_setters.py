@@ -100,7 +100,6 @@ def test_setters(
         strategy.setMaxReportDelay(1000, {"from": whale})
     with brownie.reverts():
         strategy.setRewards(strategist, {"from": whale})
-
     if is_convex:
         with brownie.reverts():
             strategy.setKeep(10_001, 0, gov, {"from": gov})
