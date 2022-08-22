@@ -14,6 +14,7 @@ def test_revoke_strategy_from_vault(
     amount,
     is_slippery,
     no_profit,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving

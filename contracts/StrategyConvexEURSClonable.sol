@@ -446,17 +446,20 @@ contract StrategyConvexEURSClonable is StrategyConvexBase {
         _sellCrvAndCvx(crvBalance, convexBalance);
 
         // deposit our balance to Curve if we have any
-        if (pid == 54) { // EURS-USDC
+        if (pid == 54) {
+            // EURS-USDC
             uint256 _usdcBalance = usdc.balanceOf(address(this));
             if (_usdcBalance > 0) {
                 curve.add_liquidity([_usdcBalance, 0], 0);
             }
-        } else if (pid == 22) { // EURS
+        } else if (pid == 22) {
+            // EURS
             uint256 _eursBalance = eurs.balanceOf(address(this));
             if (_eursBalance > 0) {
                 curve.add_liquidity([_eursBalance, 0], 0);
             }
-        } else { // 3EUR
+        } else {
+            // 3EUR
             uint256 _eursBalance = eurs.balanceOf(address(this));
             if (_eursBalance > 0) {
                 curve.add_liquidity([0, 0, _eursBalance], 0);
