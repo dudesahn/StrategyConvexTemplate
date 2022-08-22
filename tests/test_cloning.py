@@ -53,7 +53,7 @@ def test_cloning(
             newStrategy = contract_name.at(tx.return_value)
         else:
             ## clone our strategy
-            tx = strategy.cloneCurveUnderlying(
+            tx = strategy.cloneCurveEURS(
                 vault,
                 strategist,
                 rewards,
@@ -133,7 +133,7 @@ def test_cloning(
                 )
 
             ## clone our strategy
-            tx = strategy.cloneCurveUnderlying(
+            tx = strategy.cloneCurveEURS(
                 vault,
                 strategist,
                 rewards,
@@ -160,7 +160,7 @@ def test_cloning(
 
             ## shouldn't be able to clone a clone
             with brownie.reverts():
-                newStrategy.cloneCurveUnderlying(
+                newStrategy.cloneCurveEURS(
                     vault,
                     strategist,
                     rewards,
@@ -179,7 +179,7 @@ def test_cloning(
     chain.sleep(1)
 
     # attach our new strategy
-    vault.addStrategy(newStrategy, currentDebt, 0, 2**256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(newStrategy, currentDebt, 0, 2 ** 256 - 1, 1_000, {"from": gov})
 
     if vault_address == ZERO_ADDRESS:
         assert vault.withdrawalQueue(1) == newStrategy
@@ -195,17 +195,15 @@ def test_cloning(
 
     # add rewards token if needed
     if has_rewards:
-        if (
-            is_convex
-        ):  # pBTC is the only BTC factory token with rewards, and it needs UniV2
-            newStrategy.updateRewards(True, 0, False, {"from": gov})
+        if is_convex:
+            newStrategy.updateRewards(True, 0, {"from": gov})
         else:
-            newStrategy.updateRewards(True, rewards_token, False, {"from": gov})
+            newStrategy.updateRewards(True, rewards_token, {"from": gov})
 
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
