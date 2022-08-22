@@ -122,9 +122,6 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // Swap stuff
     address internal constant sushiswap =
         0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // we use this to sell our bonus token mostly
-    address internal constant uniswapV2 =
-        0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D; // use this for weird tokens with more liquidity on UniV2
-    address public router; // the router selected to sell our bonus token
 
     IERC20 internal constant crv =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
@@ -268,7 +265,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     }
 }
 
-contract StrategyConvexsUSD is StrategyConvexBase {
+contract StrategyConvexOriginal4Pools is StrategyConvexBase {
     /* ========== STATE VARIABLES ========== */
     // these will likely change across different wants.
 
@@ -298,6 +295,9 @@ contract StrategyConvexsUSD is StrategyConvexBase {
     bool public hasRewards;
     address[] internal rewardsPath;
 
+    // check for cloning
+    bool internal isOriginal = true;
+
     /* ========== CONSTRUCTOR ========== */
 
     constructor(
@@ -306,6 +306,77 @@ contract StrategyConvexsUSD is StrategyConvexBase {
         address _curvePool,
         string memory _name
     ) public StrategyConvexBase(_vault) {
+        _initializeStrat(_pid, _curvePool, _name);
+    }
+
+    /* ========== CLONING ========== */
+
+    event Cloned(address indexed clone);
+
+    // we use this to clone our original strategy to other vaults
+    function cloneConvexOriginals(
+        address _vault,
+        address _strategist,
+        address _rewards,
+        address _keeper,
+        uint256 _pid,
+        address _curvePool,
+        string memory _name
+    ) external returns (address newStrategy) {
+        require(isOriginal);
+        // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
+        bytes20 addressBytes = bytes20(address(this));
+        assembly {
+            // EIP-1167 bytecode
+            let clone_code := mload(0x40)
+            mstore(
+                clone_code,
+                0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000
+            )
+            mstore(add(clone_code, 0x14), addressBytes)
+            mstore(
+                add(clone_code, 0x28),
+                0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000
+            )
+            newStrategy := create(0, clone_code, 0x37)
+        }
+
+        StrategyConvexOriginal4Pools(newStrategy).initialize(
+            _vault,
+            _strategist,
+            _rewards,
+            _keeper,
+            _pid,
+            _curvePool,
+            _name
+        );
+
+        emit Cloned(newStrategy);
+    }
+
+    // this will only be called by the clone function above
+    function initialize(
+        address _vault,
+        address _strategist,
+        address _rewards,
+        address _keeper,
+        uint256 _pid,
+        address _curvePool,
+        string memory _name
+    ) public {
+        _initialize(_vault, _strategist, _rewards, _keeper);
+        _initializeStrat(_pid, _curvePool, _name);
+    }
+
+    // this is called by our original strategy, as well as any clones
+    function _initializeStrat(
+        uint256 _pid,
+        address _curvePool,
+        string memory _name
+    ) internal {
+        // make sure that we haven't initialized this before
+        require(address(curve) == address(0)); // already initialized.
+
         // You can set these parameters on deployment to whatever you want
         maxReportDelay = 21 days; // 21 days in seconds, if we hit this then harvestTrigger = True
         healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; // health.ychad.eth
@@ -587,7 +658,27 @@ contract StrategyConvexsUSD is StrategyConvexBase {
         uint256 crvValue = crvPrice.mul(_claimableBal).div(1e18); // 1e6 mul 1e18 div 1e18 = 1e6
         uint256 cvxValue = cvxPrice.mul(mintableCvx).div(1e18); // 1e6 mul 1e18 div 1e18 = 1e6
 
-        return crvValue.add(cvxValue);
+        // get the value of our rewards token if we have one
+        uint256 rewardsValue;
+        if (hasRewards) {
+            address[] memory usd_path = new address[](3);
+            usd_path[0] = address(rewardsToken);
+            usd_path[1] = address(weth);
+            usd_path[2] = address(usdt);
+
+            uint256 _claimableBonusBal =
+                IConvexRewards(virtualRewardsPool).earned(address(this));
+            if (_claimableBonusBal > 0) {
+                uint256[] memory rewardSwap =
+                    IUniswapV2Router02(sushiswap).getAmountsOut(
+                        _claimableBonusBal,
+                        usd_path
+                    );
+                rewardsValue = rewardSwap[rewardSwap.length - 1];
+            }
+        }
+
+        return crvValue.add(cvxValue).add(rewardsValue);
     }
 
     // convert our keeper's eth cost into want, we don't need this anymore since we don't use baseStrategy harvestTrigger
@@ -611,6 +702,11 @@ contract StrategyConvexsUSD is StrategyConvexBase {
         uint256 crvExpiry = rewardsContract.periodFinish();
         if (crvExpiry < block.timestamp) {
             return true;
+        } else if (hasRewards) {
+            // check if there is any bonus reward we need to earmark
+            uint256 rewardsExpiry =
+                IConvexRewards(virtualRewardsPool).periodFinish();
+            return rewardsExpiry < block.timestamp;
         }
     }
 
@@ -631,17 +727,16 @@ contract StrategyConvexsUSD is StrategyConvexBase {
         }
     }
 
-    // Use to add, update or remove rewards
-    function updateRewards(
-        bool _hasRewards,
-        uint256 _rewardsIndex,
-        bool useSushi
-    ) external onlyGovernance {
+    /// @notice Use to add, update or remove rewards tokens
+    function updateRewards(bool _hasRewards, uint256 _rewardsIndex)
+        external
+        onlyGovernance
+    {
         if (
             address(rewardsToken) != address(0) &&
             address(rewardsToken) != address(convexToken)
         ) {
-            rewardsToken.approve(router, uint256(0));
+            rewardsToken.approve(sushiswap, uint256(0));
         }
         if (_hasRewards == false) {
             hasRewards = false;
@@ -654,15 +749,8 @@ contract StrategyConvexsUSD is StrategyConvexBase {
                 IConvexRewards(virtualRewardsPool).rewardToken();
             rewardsToken = IERC20(_rewardsToken);
 
-            // set which router we will be using
-            if (useSushi) {
-                router = sushiswap;
-            } else {
-                router = uniswapV2;
-            }
-
             // approve, setup our path, and turn on rewards
-            rewardsToken.approve(router, type(uint256).max);
+            rewardsToken.approve(sushiswap, type(uint256).max);
             rewardsPath = [address(rewardsToken), address(weth)];
             hasRewards = true;
         }

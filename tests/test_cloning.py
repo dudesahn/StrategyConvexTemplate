@@ -30,7 +30,6 @@ def test_cloning(
     rewards_token,
     is_clonable,
     proxy,
-    use_sushi,
 ):
 
     # skip this test if we don't clone
@@ -41,7 +40,7 @@ def test_cloning(
     if tests_using_tenderly:
         if is_convex:
             ## clone our strategy
-            tx = strategy.cloneCurve3CrvRewards(
+            tx = strategy.cloneConvexOriginals(
                 vault,
                 strategist,
                 rewards,
@@ -54,7 +53,7 @@ def test_cloning(
             newStrategy = contract_name.at(tx.return_value)
         else:
             ## clone our strategy
-            tx = strategy.cloneCurve3CrvRewards(
+            tx = strategy.cloneCurveOriginals(
                 vault,
                 strategist,
                 rewards,
@@ -81,7 +80,7 @@ def test_cloning(
                 )
 
             ## clone our strategy
-            tx = strategy.cloneCurve3CrvRewards(
+            tx = strategy.cloneConvexOriginals(
                 vault,
                 strategist,
                 rewards,
@@ -108,7 +107,7 @@ def test_cloning(
 
             ## shouldn't be able to clone a clone
             with brownie.reverts():
-                newStrategy.cloneCurve3CrvRewards(
+                newStrategy.cloneConvexOriginals(
                     vault,
                     strategist,
                     rewards,
@@ -134,7 +133,7 @@ def test_cloning(
                 )
 
             ## clone our strategy
-            tx = strategy.cloneCurve3CrvRewards(
+            tx = strategy.cloneCurveOriginals(
                 vault,
                 strategist,
                 rewards,
@@ -161,7 +160,7 @@ def test_cloning(
 
             ## shouldn't be able to clone a clone
             with brownie.reverts():
-                newStrategy.cloneCurve3CrvRewards(
+                newStrategy.cloneCurveOriginals(
                     vault,
                     strategist,
                     rewards,
@@ -197,9 +196,9 @@ def test_cloning(
     # add rewards token if needed
     if has_rewards:
         if is_convex:
-            newStrategy.updateRewards(True, 0, use_sushi, {"from": gov})
+            newStrategy.updateRewards(True, 0, {"from": gov})
         else:
-            newStrategy.updateRewards(True, rewards_token, True, {"from": gov})
+            newStrategy.updateRewards(True, rewards_token, {"from": gov})
 
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
