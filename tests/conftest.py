@@ -138,7 +138,7 @@ def is_convex():
 # if our curve gauge deposits aren't tokenized (older pools), we can't as easily do some tests and we skip them
 @pytest.fixture(scope="session")
 def gauge_is_not_tokenized():
-    gauge_is_not_tokenized = True
+    gauge_is_not_tokenized = False
     yield gauge_is_not_tokenized
 
 
@@ -301,7 +301,7 @@ if chain_used == 1:  # mainnet
             Vault = pm(config["dependencies"][0]).Vault
             vault = guardian.deploy(Vault)
             vault.initialize(token, gov, rewards, "", "", guardian)
-            vault.setDepositLimit(2**256 - 1, {"from": gov})
+            vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
             vault.setManagement(management, {"from": gov})
             chain.sleep(1)
         else:
@@ -372,7 +372,7 @@ if chain_used == 1:  # mainnet
             # do slightly different if vault is existing or not
             if vault_address == ZERO_ADDRESS:
                 vault.addStrategy(
-                    strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov}
+                    strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov}
                 )
             else:
                 if vault.withdrawalQueue(1) == ZERO_ADDRESS:  # only has convex
@@ -394,14 +394,14 @@ if chain_used == 1:  # mainnet
             # do slightly different if vault is existing or not
             if vault_address == ZERO_ADDRESS:
                 vault.addStrategy(
-                    strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov}
+                    strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov}
                 )
             else:
                 if vault.withdrawalQueue(1) == ZERO_ADDRESS:  # only has convex
                     other_strat = Contract(vault.withdrawalQueue(0))
                     vault.updateStrategyDebtRatio(other_strat, 5000, {"from": gov})
                     vault.addStrategy(
-                        strategy, 5000, 0, 2**256 - 1, 1_000, {"from": gov}
+                        strategy, 5000, 0, 2 ** 256 - 1, 1_000, {"from": gov}
                     )
 
                     # reorder so curve first, convex second
@@ -467,6 +467,7 @@ if chain_used == 1:  # mainnet
                 strategy.updateRewards(True, rewards_token, {"from": gov})
 
         yield strategy
+
 
 elif chain_used == 250:  # only fantom so far and convex doesn't exist there
 
