@@ -119,13 +119,6 @@ abstract contract StrategyConvexBase is BaseStrategy {
         0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
 
-    // Swap stuff
-    address internal constant sushiswap =
-        0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // we use this to sell our bonus token mostly
-    address internal constant uniswapV2 =
-        0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D; // use this for weird tokens with more liquidity on UniV2
-    address public router; // the router selected to sell our bonus token
-
     IERC20 internal constant crv =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
     IERC20 internal constant convexToken =
@@ -453,17 +446,17 @@ contract StrategyConvexEURSClonable is StrategyConvexBase {
         _sellCrvAndCvx(crvBalance, convexBalance);
 
         // deposit our balance to Curve if we have any
-        if (pid == 54) {
+        if (pid == 54) { // EURS-USDC
             uint256 _usdcBalance = usdc.balanceOf(address(this));
             if (_usdcBalance > 0) {
                 curve.add_liquidity([_usdcBalance, 0], 0);
             }
-        } else if (pid == 22) {
+        } else if (pid == 22) { // EURS
             uint256 _eursBalance = eurs.balanceOf(address(this));
             if (_eursBalance > 0) {
                 curve.add_liquidity([_eursBalance, 0], 0);
             }
-        } else {
+        } else { // 3EUR
             uint256 _eursBalance = eurs.balanceOf(address(this));
             if (_eursBalance > 0) {
                 curve.add_liquidity([0, 0, _eursBalance], 0);

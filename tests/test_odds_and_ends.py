@@ -14,27 +14,28 @@ def test_odds_and_ends(
     chain,
     strategist_ms,
     voter,
-    StrategyConvexEURSClonable,
+    gauge,
+    contract_name,
     cvxDeposit,
     rewardsContract,
     pid,
     crv,
-    proxy,
     convexToken,
     amount,
-    gauge,
     pool,
+    proxy,
     strategy_name,
     rewards_token,
     is_convex,
     has_rewards,
     sleep_time,
+    gauge_is_not_tokenized,
 ):
 
     ## deposit to the vault after approving. turn off health check before each harvest since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -57,6 +58,8 @@ def test_odds_and_ends(
             rewards_token.transfer(gov, to_send, {"from": strategy})
         assert strategy.estimatedTotalAssets() == 0
     else:
+        if gauge_is_not_tokenized:
+            return
         # send all funds out of the gauge
         to_send = gauge.balanceOf(voter)
         print("Gauge Balance of Vault", to_send / 1e18)
@@ -84,7 +87,7 @@ def test_odds_and_ends(
     # deploy our new strategy
     if is_convex:
         new_strategy = strategist.deploy(
-            StrategyConvexEURSClonable,
+            contract_name,
             vault,
             pid,
             pool,
@@ -92,7 +95,7 @@ def test_odds_and_ends(
         )
     else:
         new_strategy = strategist.deploy(
-            StrategyConvexEURSClonable,
+            contract_name,
             vault,
             gauge,
             pool,
@@ -158,12 +161,13 @@ def test_odds_and_ends_2(
     cvxDeposit,
     amount,
     is_convex,
+    gauge_is_not_tokenized,
 ):
 
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -177,6 +181,8 @@ def test_odds_and_ends_2(
         cvxDeposit.transfer(gov, to_send, {"from": strategy})
         assert strategy.estimatedTotalAssets() == 0
     else:
+        if gauge_is_not_tokenized:
+            return
         # send all funds out of the gauge
         to_send = gauge.balanceOf(voter)
         print("Gauge Balance of Vault", to_send / 1e18)
@@ -198,7 +204,7 @@ def test_odds_and_ends_2(
 
 
 def test_odds_and_ends_migration(
-    StrategyConvexEURSClonable,
+    contract_name,
     gov,
     token,
     vault,
@@ -209,9 +215,9 @@ def test_odds_and_ends_migration(
     chain,
     strategist_ms,
     proxy,
-    gauge,
     pid,
     amount,
+    gauge,
     pool,
     strategy_name,
     is_convex,
@@ -219,7 +225,7 @@ def test_odds_and_ends_migration(
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -228,7 +234,7 @@ def test_odds_and_ends_migration(
     # deploy our new strategy
     if is_convex:
         new_strategy = strategist.deploy(
-            StrategyConvexEURSClonable,
+            contract_name,
             vault,
             pid,
             pool,
@@ -236,7 +242,7 @@ def test_odds_and_ends_migration(
         )
     else:
         new_strategy = strategist.deploy(
-            StrategyConvexEURSClonable,
+            contract_name,
             vault,
             gauge,
             pool,
@@ -313,7 +319,7 @@ def test_odds_and_ends_liquidatePosition(
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
 
@@ -392,17 +398,18 @@ def test_odds_and_ends_rekt(
     cvxDeposit,
     rewardsContract,
     crv,
-    gauge,
     convexToken,
     amount,
     is_convex,
+    gauge,
     has_rewards,
     rewards_token,
+    gauge_is_not_tokenized,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -425,6 +432,8 @@ def test_odds_and_ends_rekt(
             rewards_token.transfer(gov, to_send, {"from": strategy})
         assert strategy.estimatedTotalAssets() == 0
     else:
+        if gauge_is_not_tokenized:
+            return
         # send all funds out of the gauge
         to_send = gauge.balanceOf(voter)
         print("Gauge Balance of Vault", to_send / 1e18)
@@ -466,11 +475,12 @@ def test_odds_and_ends_liquidate_rekt(
     amount,
     gauge,
     is_convex,
+    gauge_is_not_tokenized,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -484,6 +494,8 @@ def test_odds_and_ends_liquidate_rekt(
         cvxDeposit.transfer(gov, to_send, {"from": strategy})
         assert strategy.estimatedTotalAssets() == 0
     else:
+        if gauge_is_not_tokenized:
+            return
         # send all funds out of the gauge
         to_send = gauge.balanceOf(voter)
         print("Gauge Balance of Vault", to_send / 1e18)
@@ -491,7 +503,7 @@ def test_odds_and_ends_liquidate_rekt(
         assert strategy.estimatedTotalAssets() == 0
 
     # we can also withdraw from an empty vault as well, but make sure we're okay with losing 100%
-    to_withdraw = 2 ** 256 - 1  # withdraw our full amount
+    to_withdraw = 2**256 - 1  # withdraw our full amount
     vault.withdraw(to_withdraw, whale, 10000, {"from": whale})
 
 
@@ -543,9 +555,10 @@ def test_odds_and_ends_empty_strat(
     no_profit,
     is_convex,
     gauge,
+    gauge_is_not_tokenized,
 ):
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -577,6 +590,8 @@ def test_odds_and_ends_empty_strat(
         if not no_profit:
             assert strategy.claimableBalance() > 0
     else:
+        if gauge_is_not_tokenized:
+            return
         # send all funds out of the gauge, then send back 1 wei so we can claim rewards
         to_send = gauge.balanceOf(voter)
         print("Gauge Balance of Vault", to_send / 1e18)
@@ -614,7 +629,7 @@ def test_odds_and_ends_no_profit(
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -673,7 +688,7 @@ def test_odds_and_ends_keep_cvx(
     if not is_convex:
         return
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     strategy.harvest({"from": gov})
 

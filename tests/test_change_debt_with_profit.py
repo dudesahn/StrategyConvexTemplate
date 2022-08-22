@@ -16,7 +16,7 @@ def test_change_debt_with_profit(
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -25,7 +25,7 @@ def test_change_debt_with_profit(
     prev_params = vault.strategies(strategy)
     currentDebt = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, currentDebt / 2, {"from": gov})
-    assert vault.strategies(strategy)["debtRatio"] == 5000
+    assert vault.strategies(strategy)["debtRatio"] == currentDebt / 2
 
     # our whale donates dust to the vault, what a nice person!
     donation = amount / 10

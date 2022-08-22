@@ -26,7 +26,7 @@ def test_simple_harvest(
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
     chain.sleep(1)
@@ -80,6 +80,7 @@ def test_simple_harvest(
     if not no_profit:
         assert tx.events["Harvested"]["profit"] > 0
 
+    # simulate some profits if we don't have any to make sure everything else works
     if no_profit:
         crv_whale = accounts.at(
             "0x32D03DB62e464c9168e41028FFa6E9a05D8C6451", force=True

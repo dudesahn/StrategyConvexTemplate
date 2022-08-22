@@ -5,7 +5,7 @@ import math
 
 # test migrating a strategy
 def test_migration(
-    StrategyConvexEURSClonable,
+    contract_name,
     gov,
     token,
     vault,
@@ -28,7 +28,7 @@ def test_migration(
 
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
@@ -37,7 +37,7 @@ def test_migration(
     if is_convex:
         # make sure to include all constructor parameters needed here
         new_strategy = strategist.deploy(
-            StrategyConvexEURSClonable,
+            contract_name,
             vault,
             pid,
             pool,
@@ -51,13 +51,12 @@ def test_migration(
     else:
         # make sure to include all constructor parameters needed here
         new_strategy = strategist.deploy(
-            StrategyConvexEURSClonable,
+            contract_name,
             vault,
             gauge,
             pool,
             strategy_name,
         )
-
         # harvestTrigger check for isActive() doesn't work if we have multiple curve strategies for the same LP
 
     total_old = strategy.estimatedTotalAssets()
