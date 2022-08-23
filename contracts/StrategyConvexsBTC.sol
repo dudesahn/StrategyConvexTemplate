@@ -266,7 +266,7 @@ contract StrategyConvexsBTC is StrategyConvexBase {
     // these will likely change across different wants.
 
     // Curve stuff
-    ICurveFi public curve; // Curve Pool, this is our pool specific to this vault
+    ICurveFi public curve; /// @notice This is our curve pool specific to this vault
 
     bool public checkEarmark; // this determines if we should check if we need to earmark rewards before harvesting
 
