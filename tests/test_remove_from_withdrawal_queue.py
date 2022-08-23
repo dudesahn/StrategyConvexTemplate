@@ -12,7 +12,6 @@ def test_remove_from_withdrawal_queue(
     strategy,
     chain,
     amount,
-    sleep_time,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -22,10 +21,9 @@ def test_remove_from_withdrawal_queue(
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    # sleep to collect earnings
-    chain.sleep(sleep_time)
+    # simulate one day of earnings
+    chain.sleep(86400)
     chain.mine(1)
-
     strategy.harvest({"from": gov})
     chain.sleep(1)
     before = strategy.estimatedTotalAssets()
