@@ -69,7 +69,10 @@ def test_setters(
         strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
     else:
         strategy.setKeepCRV(0, {"from": gov})
-    strategy.setUniFees(3000, {"from": gov})
+    try:
+        strategy.setUniFees(3000, {"from": gov})
+    except:
+        print("\nThis strategy doesn't have Uniswap fees, most likely ETH-based")
 
     strategy.setStrategist(strategist, {"from": gov})
     name = strategy.name()
@@ -100,7 +103,6 @@ def test_setters(
         strategy.setMaxReportDelay(1000, {"from": whale})
     with brownie.reverts():
         strategy.setRewards(strategist, {"from": whale})
-
     if is_convex:
         with brownie.reverts():
             strategy.setKeep(10_001, 0, gov, {"from": gov})

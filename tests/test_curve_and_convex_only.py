@@ -1,7 +1,6 @@
 import brownie
 from brownie import Wei, accounts, Contract, config, ZERO_ADDRESS
 import pytest
-import math
 
 # set our rewards to nothing, then turn them back on
 def test_update_to_zero_then_back(
@@ -14,7 +13,7 @@ def test_update_to_zero_then_back(
     keeper,
     rewards,
     chain,
-    StrategyConvexsBTCMetapoolsOldClonable,
+    contract_name,
     voter,
     proxy,
     pid,
@@ -30,33 +29,30 @@ def test_update_to_zero_then_back(
     vault_address,
     no_profit,
     is_slippery,
+    rewards_template,
+    sushi_router,
 ):
+    # skip this test if we don't use rewards in this template
+    if not rewards_template:
+        return
+
     if is_convex:
-        ## clone our strategy
-        tx = strategy.cloneConvexSBTCOld(
+        newStrategy = strategist.deploy(
+            contract_name,
             vault,
-            strategist,
-            rewards,
-            keeper,
             pid,
             pool,
             strategy_name,
-            {"from": gov},
         )
-        newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
+        print("\nConvex strategy")
     else:
-        ## clone our strategy
-        tx = strategy.cloneCurve3CrvRewards(
+        newStrategy = strategist.deploy(
+            contract_name,
             vault,
-            strategist,
-            rewards,
-            keeper,
             gauge,
             pool,
             strategy_name,
-            {"from": gov},
         )
-        newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
 
     # revoke and send all funds back to vault
     startingDebtRatio = vault.strategies(strategy)["debtRatio"]
@@ -113,7 +109,7 @@ def test_update_to_zero_then_back(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards On): ",
+        "\nEstimated APR (Rewards On): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * (86400 / sleep_time)))
             / (newStrategy.estimatedTotalAssets())
@@ -154,7 +150,7 @@ def test_update_to_zero_then_back(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards Off): ",
+        "\nEstimated APR (Rewards Off): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * (86400 / sleep_time)))
             / (newStrategy.estimatedTotalAssets())
@@ -190,7 +186,7 @@ def test_update_to_zero_then_back(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards Back On, extra rewards tokens): ",
+        "\nEstimated APR (Rewards Back On, extra rewards tokens): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * (86400 / sleep_time)))
             / (newStrategy.estimatedTotalAssets())
@@ -224,7 +220,7 @@ def test_update_from_zero_to_off(
     keeper,
     rewards,
     chain,
-    StrategyConvexsBTCMetapoolsOldClonable,
+    contract_name,
     voter,
     proxy,
     pid,
@@ -240,34 +236,30 @@ def test_update_from_zero_to_off(
     vault_address,
     no_profit,
     is_slippery,
+    rewards_template,
+    sushi_router,
 ):
+    # skip this test if we don't use rewards in this template
+    if not rewards_template:
+        return
 
     if is_convex:
-        ## clone our strategy
-        tx = strategy.cloneConvexSBTCOld(
+        newStrategy = strategist.deploy(
+            contract_name,
             vault,
-            strategist,
-            rewards,
-            keeper,
             pid,
             pool,
             strategy_name,
-            {"from": gov},
         )
-        newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
+        print("\nConvex strategy")
     else:
-        ## clone our strategy
-        tx = strategy.cloneCurve3CrvRewards(
+        newStrategy = strategist.deploy(
+            contract_name,
             vault,
-            strategist,
-            rewards,
-            keeper,
             gauge,
             pool,
             strategy_name,
-            {"from": gov},
         )
-        newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
 
     # revoke and send all funds back to vault
     startingDebtRatio = vault.strategies(strategy)["debtRatio"]
@@ -325,7 +317,7 @@ def test_update_from_zero_to_off(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards On): ",
+        "\nEstimated APR (Rewards On): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * (86400 / sleep_time)))
             / (newStrategy.estimatedTotalAssets())
@@ -366,7 +358,7 @@ def test_update_from_zero_to_off(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards Off): ",
+        "\nEstimated APR (Rewards Off): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * (86400 / sleep_time)))
             / (newStrategy.estimatedTotalAssets())
@@ -375,6 +367,7 @@ def test_update_from_zero_to_off(
 
     # try turning off our rewards again
     if is_convex:
+        newStrategy.updateRewards(False, 0, False, {"from": gov})
         newStrategy.updateRewards(False, 0, False, {"from": gov})
     else:
         newStrategy.updateRewards(False, rewards_token, False, {"from": gov})
@@ -399,7 +392,7 @@ def test_update_from_zero_to_off(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards Off Still): ",
+        "\nEstimated APR (Rewards Off Still): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * (86400 / sleep_time)))
             / (newStrategy.estimatedTotalAssets())
@@ -433,7 +426,7 @@ def test_change_rewards(
     keeper,
     rewards,
     chain,
-    StrategyConvexsBTCMetapoolsOldClonable,
+    contract_name,
     voter,
     proxy,
     pid,
@@ -444,34 +437,29 @@ def test_change_rewards(
     is_convex,
     rewards_token,
     sleep_time,
+    rewards_template,
 ):
+    # skip this test if we don't use rewards in this template
+    if not rewards_template:
+        return
 
     if is_convex:
-        ## clone our strategy
-        tx = strategy.cloneConvexSBTCOld(
+        newStrategy = strategist.deploy(
+            contract_name,
             vault,
-            strategist,
-            rewards,
-            keeper,
             pid,
             pool,
             strategy_name,
-            {"from": gov},
         )
-        newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
+        print("\nConvex strategy")
     else:
-        ## clone our strategy
-        tx = strategy.cloneCurve3CrvRewards(
+        newStrategy = strategist.deploy(
+            contract_name,
             vault,
-            strategist,
-            rewards,
-            keeper,
             gauge,
             pool,
             strategy_name,
-            {"from": gov},
         )
-        newStrategy = StrategyConvexsBTCMetapoolsOldClonable.at(tx.return_value)
 
     # revoke and send all funds back to vault
     startingDebtRatio = vault.strategies(strategy)["debtRatio"]
@@ -517,7 +505,7 @@ def test_change_rewards(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards On): ",
+        "\nEstimated APR (Rewards On): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * (86400 / sleep_time)))
             / (newStrategy.estimatedTotalAssets())
@@ -536,7 +524,7 @@ def test_check_rewards(
     keeper,
     rewards,
     chain,
-    StrategyConvexsBTCMetapoolsOldClonable,
+    contract_name,
     voter,
     proxy,
     pid,
@@ -548,7 +536,11 @@ def test_check_rewards(
     convexToken,
     is_convex,
     sleep_time,
+    rewards_template,
 ):
+    # skip this test if we don't use rewards in this template
+    if not rewards_template:
+        return
 
     # check if our strategy has extra rewards
     rewards_token = strategy.rewardsToken()
@@ -630,7 +622,11 @@ def test_more_rewards_stuff(
     strategy_name,
     is_convex,
     sleep_time,
+    rewards_template,
 ):
+    # skip this test if we don't use rewards in this template
+    if not rewards_template:
+        return
 
     ## deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
@@ -645,7 +641,7 @@ def test_more_rewards_stuff(
         strategy.updateRewards(False, rewards_token, False, {"from": gov})
         strategy.updateRewards(False, rewards_token, False, {"from": gov})
 
-    # sleep for a day to get some profit
+    # sleep to get some profit
     chain.sleep(sleep_time)
     chain.mine(1)
     strategy.harvest({"from": gov})
@@ -658,7 +654,7 @@ def test_more_rewards_stuff(
         strategy.updateRewards(True, rewards_token, False, {"from": gov})
         strategy.updateRewards(True, rewards_token, False, {"from": gov})
 
-    # sleep for a day to get some profit
+    # sleep to get some profit
     chain.sleep(sleep_time)
     chain.mine(1)
     strategy.harvest({"from": gov})
@@ -670,9 +666,9 @@ def test_more_rewards_stuff(
         strategy.setKeepCRV(10000, {"from": gov})
     chain.sleep(1)
     chain.mine(1)
-
-    # this one seems to randomly fail sometimes, adding sleep/mine before fixed it, likely because of updating the view variable?
-    tx = strategy.harvest({"from": gov})
+    tx = strategy.harvest(
+        {"from": gov}
+    )  # this one seems to randomly fail sometimes, adding sleep/mine before fixed it, likely because of updating the view variable?
 
     # we do this twice to hit both branches of the if statement
     if is_convex:
@@ -682,7 +678,7 @@ def test_more_rewards_stuff(
         strategy.updateRewards(False, rewards_token, False, {"from": gov})
         strategy.updateRewards(False, rewards_token, False, {"from": gov})
 
-    # sleep for a day to get some profit
+    # sleep to get some profit
     chain.sleep(sleep_time)
     chain.mine(1)
     strategy.harvest({"from": gov})
@@ -695,7 +691,7 @@ def test_more_rewards_stuff(
         strategy.updateRewards(True, rewards_token, False, {"from": gov})
         strategy.updateRewards(True, rewards_token, False, {"from": gov})
 
-    # sleep for a day to get some profit
+    # sleep to get some profit
     chain.sleep(sleep_time)
     chain.mine(1)
     strategy.harvest({"from": gov})
