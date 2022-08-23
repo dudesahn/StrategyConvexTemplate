@@ -21,7 +21,7 @@ def test_split(
     pool
 ):
 
-
+    assert False
     target_tvl_dominance = .95
 
     yearn_weights_to_test = [
