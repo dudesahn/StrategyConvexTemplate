@@ -24,16 +24,14 @@ def test_emergency_shutdown_from_vault(
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    # sleep to collect earnings
+    # simulate earnings
     chain.sleep(sleep_time)
-    chain.mine(1)
 
     chain.mine(1)
     strategy.harvest({"from": gov})
 
-    # sleep to collect earnings
+    # simulate earnings
     chain.sleep(sleep_time)
-    chain.mine(1)
 
     # set emergency and exit, then confirm that the strategy has no funds
     vault.setEmergencyShutdown(True, {"from": gov})

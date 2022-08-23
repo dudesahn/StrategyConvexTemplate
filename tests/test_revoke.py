@@ -12,9 +12,9 @@ def test_revoke_strategy_from_vault(
     chain,
     strategy,
     amount,
-    sleep_time,
     is_slippery,
     no_profit,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving
@@ -24,7 +24,7 @@ def test_revoke_strategy_from_vault(
     chain.sleep(1)
     strategy.harvest({"from": gov})
 
-    # sleep to collect earnings
+    # sleep to earn some yield
     chain.sleep(sleep_time)
     chain.mine(1)
 
