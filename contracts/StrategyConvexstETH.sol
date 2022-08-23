@@ -287,9 +287,6 @@ contract StrategyConvexstETH is StrategyConvexBase {
     bool public hasRewards;
     address[] internal rewardsPath;
 
-    // check for cloning
-    bool internal isOriginal = true;
-
     /* ========== CONSTRUCTOR ========== */
 
     constructor(
@@ -298,20 +295,6 @@ contract StrategyConvexstETH is StrategyConvexBase {
         address _curvePool,
         string memory _name
     ) public StrategyConvexBase(_vault) {
-        _initializeStrat(_pid, _curvePool, _name);
-    }
-
-    /* ========== CLONING ========== */
-
-    // this is called by our original strategy, as well as any clones
-    function _initializeStrat(
-        uint256 _pid,
-        address _curvePool,
-        string memory _name
-    ) internal {
-        // make sure that we haven't initialized this before
-        require(address(curve) == address(0)); // already initialized.
-
         // You can set these parameters on deployment to whatever you want
         maxReportDelay = 21 days; // 21 days in seconds, if we hit this then harvestTrigger = True
         healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; // health.ychad.eth
