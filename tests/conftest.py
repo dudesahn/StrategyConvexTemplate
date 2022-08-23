@@ -164,7 +164,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 24  # oBTC 6 hours
+    hours_to_sleep = 12  # oBTC 6 hours
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
