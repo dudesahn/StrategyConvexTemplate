@@ -5,7 +5,7 @@ import math
 
 # test migrating a strategy
 def test_migration(
-    StrategyConvex2BTCClonable,
+    contract_name,
     gov,
     token,
     vault,
@@ -37,7 +37,7 @@ def test_migration(
     if is_convex:
         # make sure to include all constructor parameters needed here
         new_strategy = strategist.deploy(
-            StrategyConvex2BTCClonable,
+            contract_name,
             vault,
             pid,
             pool,
@@ -51,13 +51,12 @@ def test_migration(
     else:
         # make sure to include all constructor parameters needed here
         new_strategy = strategist.deploy(
-            StrategyConvex2BTCClonable,
+            contract_name,
             vault,
             gauge,
             pool,
             strategy_name,
         )
-
         # harvestTrigger check for isActive() doesn't work if we have multiple curve strategies for the same LP
 
     total_old = strategy.estimatedTotalAssets()
