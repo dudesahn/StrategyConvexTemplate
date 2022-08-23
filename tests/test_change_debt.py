@@ -14,6 +14,8 @@ def test_change_debt(
     chain,
     amount,
     sleep_time,
+    is_slippery,
+    no_profit,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -28,7 +30,7 @@ def test_change_debt(
     startingStrategy = strategy.estimatedTotalAssets()
 
     # debtRatio is in BPS (aka, max is 10,000, which represents 100%), and is a fraction of the funds that can be in the strategy
-    currentDebt = 10000
+    currentDebt = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, currentDebt / 2, {"from": gov})
     chain.sleep(sleep_time)
     strategy.harvest({"from": gov})
@@ -56,6 +58,12 @@ def test_change_debt(
     chain.sleep(86400)
     chain.mine(1)
 
-    # withdraw and confirm our whale made money
+    # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) >= startingWhale
+    if is_slippery and no_profit:
+        assert (
+            math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
+            or token.balanceOf(whale) >= startingWhale
+        )
+    else:
+        assert token.balanceOf(whale) >= startingWhale

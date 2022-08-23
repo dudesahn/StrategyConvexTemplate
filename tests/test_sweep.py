@@ -26,7 +26,7 @@ def test_sweep(
 
     # Strategy want token doesn't work
     startingWhale = token.balanceOf(whale)
-    token.transfer(strategy.address, amount / 4, {"from": whale})
+    token.transfer(strategy.address, amount, {"from": whale})
     assert token.address == strategy.want()
     assert token.balanceOf(strategy) > 0
     with brownie.reverts("!want"):
