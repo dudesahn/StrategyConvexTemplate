@@ -107,7 +107,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     address internal constant depositContract =
         0xF403C135812408BFbE8713b5A23a04b3D48AAE31; // this is the deposit contract that all pools use, aka booster
     IConvexRewards public rewardsContract; // This is unique to each curve pool
-    uint256 public pid = 38; // this is unique to each pool
+    uint256 public pid; // this is unique to each pool
 
     // keepCRV stuff
     uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points)
@@ -264,8 +264,7 @@ contract StrategyConvex3Crypto is StrategyConvexBase {
     // these will likely change across different wants.
 
     // Curve stuff
-    ICurveFi public curve =
-        ICurveFi(0xD51a44d3FaE010294C616388b506AcdA1bfAAE46); // Curve Pool, this is our pool specific to this vault
+    ICurveFi public curve; // Curve Pool, this is our pool specific to this vault
 
     bool public checkEarmark; // this determines if we should check if we need to earmark rewards before harvesting
 
@@ -277,16 +276,16 @@ contract StrategyConvex3Crypto is StrategyConvexBase {
 
     /* ========== CONSTRUCTOR ========== */
 
-    constructor(address _vault) public StrategyConvexBase(_vault) {
-        _initializeStrat();
-    }
-
-    // this is called by our constructor
-    function _initializeStrat() internal {
+    constructor(
+        address _vault,
+        uint256 _pid,
+        address _curvePool,
+        string memory _name
+    ) public StrategyConvexBase(_vault) {
         // You can set these parameters on deployment to whatever you want
         maxReportDelay = 100 days; // 100 days in seconds, if we hit this then harvestTrigger = True
         healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; // health.ychad.eth
-        harvestProfitMin = 30000e6;
+        harvestProfitMin = 10000e6;
         harvestProfitMax = 120000e6;
         creditThreshold = 400 * 1e18;
         keepCRV = 1000; // default of 10%
@@ -296,11 +295,14 @@ contract StrategyConvex3Crypto is StrategyConvexBase {
         want.approve(address(depositContract), type(uint256).max);
         convexToken.approve(address(cvxeth), type(uint256).max);
         crv.approve(address(crveth), type(uint256).max);
-        weth.approve(address(curve), type(uint256).max);
+
+        // this is the pool specific to this vault, but we only use it as an address
+        curve = ICurveFi(_curvePool);
 
         // setup our rewards contract
+        pid = _pid; // this is the pool ID on convex, we use this to determine what the reweardsContract address is
         (address lptoken, , , address _rewardsContract, , ) =
-            IConvexDeposit(depositContract).poolInfo(pid);
+            IConvexDeposit(depositContract).poolInfo(_pid);
 
         // set up our rewardsContract
         rewardsContract = IConvexRewards(_rewardsContract);
@@ -308,8 +310,11 @@ contract StrategyConvex3Crypto is StrategyConvexBase {
         // check that our LP token based on our pid matches our want
         require(address(lptoken) == address(want));
 
-        // set our name
-        stratName = "StrategyConvex3Crypto";
+        // set our strategy's name
+        stratName = _name;
+
+        // these are our approvals and path specific to this contract
+        weth.approve(address(curve), type(uint256).max);
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
