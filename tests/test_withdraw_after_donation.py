@@ -15,6 +15,7 @@ def test_withdraw_after_donation_1(
     amount,
     is_slippery,
     no_profit,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving
@@ -37,8 +38,8 @@ def test_withdraw_after_donation_1(
     # have our whale withdraw half of his donation, this ensures that we test withdrawing without pulling from the staked balance
     vault.withdraw(donation / 2, {"from": whale})
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate some earnings
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # turn off health check since we just took big profit
@@ -47,8 +48,9 @@ def test_withdraw_after_donation_1(
     tx = strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy)
 
-    # sleep 10 hours to increase our credit available for last assert at the bottom.
+    # sleep 10 hours to allow share price to normalize
     chain.sleep(60 * 60 * 10)
+    chain.mine(1)
 
     profit = new_params["totalGain"] - prev_params["totalGain"]
 
@@ -89,6 +91,7 @@ def test_withdraw_after_donation_2(
     amount,
     is_slippery,
     no_profit,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving
@@ -111,8 +114,8 @@ def test_withdraw_after_donation_2(
     # have our whale withdraw half of his donation, this ensures that we test withdrawing without pulling from the staked balance
     vault.withdraw(donation / 2, {"from": whale})
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate some earnings
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # turn off health check since we just took big profit
@@ -121,8 +124,9 @@ def test_withdraw_after_donation_2(
     strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy)
 
-    # sleep 10 hours to increase our credit available for last assert at the bottom.
+    # sleep 10 hours to allow share price to normalize
     chain.sleep(60 * 60 * 10)
+    chain.mine(1)
 
     profit = new_params["totalGain"] - prev_params["totalGain"]
 
@@ -163,6 +167,7 @@ def test_withdraw_after_donation_3(
     amount,
     is_slippery,
     no_profit,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving
@@ -189,8 +194,8 @@ def test_withdraw_after_donation_3(
     withdrawal_in_shares = withdrawal * 1e18 / vault.pricePerShare()
     vault.withdraw(withdrawal_in_shares, {"from": whale})
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate some earnings
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # turn off health check since we just took big profit
@@ -199,8 +204,9 @@ def test_withdraw_after_donation_3(
     strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy)
 
-    # sleep 10 hours to increase our credit available for last assert at the bottom.
+    # sleep 10 hours to allow share price to normalize
     chain.sleep(60 * 60 * 10)
+    chain.mine(1)
 
     profit = new_params["totalGain"] - prev_params["totalGain"]
 
@@ -241,6 +247,7 @@ def test_withdraw_after_donation_4(
     amount,
     is_slippery,
     no_profit,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving
@@ -267,8 +274,8 @@ def test_withdraw_after_donation_4(
     withdrawal_in_shares = withdrawal * 1e18 / vault.pricePerShare()
     vault.withdraw(withdrawal_in_shares, {"from": whale})
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate some earnings
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # turn off health check since we just took big profit
@@ -277,8 +284,9 @@ def test_withdraw_after_donation_4(
     strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy)
 
-    # sleep 10 hours to increase our credit available for last assert at the bottom.
+    # sleep 10 hours to allow share price to normalize
     chain.sleep(60 * 60 * 10)
+    chain.mine(1)
 
     profit = new_params["totalGain"] - prev_params["totalGain"]
 
@@ -322,6 +330,7 @@ def test_withdraw_after_donation_5(
     amount,
     is_slippery,
     no_profit,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving
@@ -344,8 +353,8 @@ def test_withdraw_after_donation_5(
     withdrawal_in_shares = withdrawal * 1e18 / vault.pricePerShare()
     vault.withdraw(withdrawal_in_shares, {"from": whale})
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate some earnings
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # turn off health check since we just took big profit
@@ -354,8 +363,9 @@ def test_withdraw_after_donation_5(
     strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy)
 
-    # sleep 10 hours to increase our credit available for last assert at the bottom.
+    # sleep 10 hours to allow share price to normalize
     chain.sleep(60 * 60 * 10)
+    chain.mine(1)
 
     profit = new_params["totalGain"] - prev_params["totalGain"]
 
@@ -396,6 +406,7 @@ def test_withdraw_after_donation_6(
     amount,
     is_slippery,
     no_profit,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving
@@ -414,8 +425,8 @@ def test_withdraw_after_donation_6(
     # have our whale withdraws more than his donation, ensuring we pull from strategy
     vault.withdraw(donation / 2, {"from": whale})
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate some earnings
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # turn off health check since we just took big profit
@@ -424,8 +435,9 @@ def test_withdraw_after_donation_6(
     strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy)
 
-    # sleep 10 hours to increase our credit available for last assert at the bottom.
+    # sleep 10 hours to allow share price to normalize
     chain.sleep(60 * 60 * 10)
+    chain.mine(1)
 
     profit = new_params["totalGain"] - prev_params["totalGain"]
 
@@ -467,6 +479,7 @@ def test_withdraw_after_donation_7(
     is_slippery,
     no_profit,
     vault_address,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving
@@ -496,8 +509,8 @@ def test_withdraw_after_donation_7(
     withdrawal_in_shares = withdrawal * 1e18 / vault.pricePerShare()
     vault.withdraw(withdrawal_in_shares, {"from": whale})
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate some earnings
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # We harvest twice to take profits and then to send the funds to our strategy. This is for our last check below.
@@ -532,8 +545,8 @@ def test_withdraw_after_donation_7(
     else:
         assert starting_total_vault_debt - starting_strategy_debt <= vault.totalDebt()
 
-    # sleep to allow share price to normalize
-    chain.sleep(86400)
+    # sleep 10 hours to allow share price to normalize
+    chain.sleep(60 * 60 * 10)
     chain.mine(1)
 
     profit = new_params["totalGain"] - prev_params["totalGain"]
@@ -567,6 +580,7 @@ def test_withdraw_after_donation_8(
     is_slippery,
     no_profit,
     vault_address,
+    sleep_time,
 ):
 
     ## deposit to the vault after approving
@@ -596,8 +610,8 @@ def test_withdraw_after_donation_8(
     withdrawal_in_shares = withdrawal * 1e18 / vault.pricePerShare()
     vault.withdraw(withdrawal_in_shares, {"from": whale})
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate some earnings
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # We harvest twice to take profits and then to send the funds to our strategy. This is for our last check below.
@@ -632,8 +646,8 @@ def test_withdraw_after_donation_8(
     else:
         assert starting_total_vault_debt - starting_strategy_debt <= vault.totalDebt()
 
-    # sleep to allow share price to normalize
-    chain.sleep(86400)
+    # sleep 10 hours to allow share price to normalize
+    chain.sleep(60 * 60 * 10)
     chain.mine(1)
 
     profit = new_params["totalGain"] - prev_params["totalGain"]
