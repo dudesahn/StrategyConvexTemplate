@@ -13,13 +13,12 @@ def test_cloning(
     keeper,
     rewards,
     chain,
-    proxy,
-    StrategyConvexLINK,
+    contract_name,
     rewardsContract,
     pid,
     amount,
-    gauge,
     pool,
+    gauge,
     strategy_name,
     sleep_time,
     tests_using_tenderly,
@@ -28,7 +27,9 @@ def test_cloning(
     is_convex,
     vault_address,
     has_rewards,
+    rewards_token,
     is_clonable,
+    proxy,
 ):
 
     # skip this test if we don't clone
@@ -39,7 +40,7 @@ def test_cloning(
     if tests_using_tenderly:
         if is_convex:
             ## clone our strategy
-            tx = strategy.cloneConvexSBTCOld(
+            tx = strategy.cloneConvexOldEth(
                 vault,
                 strategist,
                 rewards,
@@ -49,10 +50,10 @@ def test_cloning(
                 strategy_name,
                 {"from": gov},
             )
-            newStrategy = StrategyConvexLINK.at(tx.return_value)
+            newStrategy = contract_name.at(tx.return_value)
         else:
             ## clone our strategy
-            tx = strategy.cloneConvexSBTCOld(
+            tx = strategy.cloneCurveEURS(
                 vault,
                 strategist,
                 rewards,
@@ -62,7 +63,7 @@ def test_cloning(
                 strategy_name,
                 {"from": gov},
             )
-            newStrategy = StrategyConvexLINK.at(tx.return_value)
+            newStrategy = contract_name.at(tx.return_value)
     else:
         if is_convex:
             # Shouldn't be able to call initialize again
@@ -79,7 +80,7 @@ def test_cloning(
                 )
 
             ## clone our strategy
-            tx = strategy.cloneConvexSBTCOld(
+            tx = strategy.cloneConvexOldEth(
                 vault,
                 strategist,
                 rewards,
@@ -89,7 +90,7 @@ def test_cloning(
                 strategy_name,
                 {"from": gov},
             )
-            newStrategy = StrategyConvexLINK.at(tx.return_value)
+            newStrategy = contract_name.at(tx.return_value)
 
             # Shouldn't be able to call initialize again
             with brownie.reverts():
@@ -106,7 +107,7 @@ def test_cloning(
 
             ## shouldn't be able to clone a clone
             with brownie.reverts():
-                newStrategy.cloneConvexSBTCOld(
+                newStrategy.cloneConvexOldEth(
                     vault,
                     strategist,
                     rewards,
@@ -132,7 +133,7 @@ def test_cloning(
                 )
 
             ## clone our strategy
-            tx = strategy.cloneConvexSBTCOld(
+            tx = strategy.cloneCurveEURS(
                 vault,
                 strategist,
                 rewards,
@@ -142,7 +143,7 @@ def test_cloning(
                 strategy_name,
                 {"from": gov},
             )
-            newStrategy = StrategyConvexLINK.at(tx.return_value)
+            newStrategy = contract_name.at(tx.return_value)
 
             # Shouldn't be able to call initialize again
             with brownie.reverts():
@@ -159,7 +160,7 @@ def test_cloning(
 
             ## shouldn't be able to clone a clone
             with brownie.reverts():
-                newStrategy.cloneConvexSBTCOld(
+                newStrategy.cloneCurveEURS(
                     vault,
                     strategist,
                     rewards,
@@ -179,21 +180,25 @@ def test_cloning(
 
     # attach our new strategy
     vault.addStrategy(newStrategy, currentDebt, 0, 2 ** 256 - 1, 1_000, {"from": gov})
+
     if vault_address == ZERO_ADDRESS:
         assert vault.withdrawalQueue(1) == newStrategy
     else:
-        assert vault.withdrawalQueue(2) == newStrategy
+        if (
+            vault.withdrawalQueue(2) == ZERO_ADDRESS
+        ):  # only has convex, since we just added our clone to position index 1
+            assert vault.withdrawalQueue(1) == newStrategy
+        else:
+            assert vault.withdrawalQueue(2) == newStrategy
     assert vault.strategies(newStrategy)["debtRatio"] == currentDebt
     assert vault.strategies(strategy)["debtRatio"] == 0
 
     # add rewards token if needed
     if has_rewards:
-        if (
-            is_convex
-        ):  # pBTC is the only BTC factory token with rewards, and it needs UniV2
-            newStrategy.updateRewards(True, 0, False, {"from": gov})
+        if is_convex:
+            newStrategy.updateRewards(True, 0, {"from": gov})
         else:
-            newStrategy.updateRewards(True, rewards_token, False, {"from": gov})
+            newStrategy.updateRewards(True, rewards_token, {"from": gov})
 
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
