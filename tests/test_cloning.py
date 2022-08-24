@@ -40,7 +40,7 @@ def test_cloning(
     if tests_using_tenderly:
         if is_convex:
             ## clone our strategy
-            tx = strategy.cloneCurve3CrvRewards(
+            tx = strategy.cloneConvex3CrvRewards(
                 vault,
                 strategist,
                 rewards,
@@ -53,7 +53,7 @@ def test_cloning(
             newStrategy = contract_name.at(tx.return_value)
         else:
             ## clone our strategy
-            tx = strategy.cloneCurve3CrvRewards(
+            tx = strategy.cloneCurveEURS(
                 vault,
                 strategist,
                 rewards,
@@ -80,7 +80,7 @@ def test_cloning(
                 )
 
             ## clone our strategy
-            tx = strategy.cloneCurve3CrvRewards(
+            tx = strategy.cloneConvex3CrvRewards(
                 vault,
                 strategist,
                 rewards,
@@ -107,7 +107,7 @@ def test_cloning(
 
             ## shouldn't be able to clone a clone
             with brownie.reverts():
-                newStrategy.cloneCurve3CrvRewards(
+                newStrategy.cloneConvex3CrvRewards(
                     vault,
                     strategist,
                     rewards,
@@ -133,7 +133,7 @@ def test_cloning(
                 )
 
             ## clone our strategy
-            tx = strategy.cloneCurve3CrvRewards(
+            tx = strategy.cloneCurveEURS(
                 vault,
                 strategist,
                 rewards,
@@ -160,7 +160,7 @@ def test_cloning(
 
             ## shouldn't be able to clone a clone
             with brownie.reverts():
-                newStrategy.cloneCurve3CrvRewards(
+                newStrategy.cloneCurveEURS(
                     vault,
                     strategist,
                     rewards,
