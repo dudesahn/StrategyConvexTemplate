@@ -53,7 +53,7 @@ def test_cloning(
             newStrategy = contract_name.at(tx.return_value)
         else:
             ## clone our strategy
-            tx = strategy.cloneConvexUnderlying(
+            tx = strategy.cloneCurveEURS(
                 vault,
                 strategist,
                 rewards,
@@ -133,7 +133,7 @@ def test_cloning(
                 )
 
             ## clone our strategy
-            tx = strategy.cloneConvexUnderlying(
+            tx = strategy.cloneCurveEURS(
                 vault,
                 strategist,
                 rewards,
@@ -160,7 +160,7 @@ def test_cloning(
 
             ## shouldn't be able to clone a clone
             with brownie.reverts():
-                newStrategy.cloneConvexUnderlying(
+                newStrategy.cloneCurveEURS(
                     vault,
                     strategist,
                     rewards,
