@@ -11,6 +11,7 @@ def isolation(fn_isolation):
 # set this for if we want to use tenderly or not; mostly helpful because with brownie.reverts fails in tenderly forks.
 use_tenderly = False
 
+
 ################################################## TENDERLY DEBUGGING ##################################################
 
 # change autouse to True if we want to use this fork to help debug tests
@@ -39,10 +40,10 @@ def tests_using_tenderly():
 # use this to set what chain we use. 1 for ETH, 250 for fantom
 chain_used = 1
 
-# If testing a Convex strategy, set this equal to your PID
+# put our pool's convex pid here
 @pytest.fixture(scope="session")
 def pid():
-    pid = 28  # 13 USDN, 28 USDP, 55 EURT, RAI 63
+    pid = 13  # 13 USDN, 28 USDP, 55 EURT, RAI 63
     yield pid
 
 
@@ -57,9 +58,9 @@ def amount():
 def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    whale = accounts.at("0x1B5eb1173D2Bf770e50F10410C9a96F7a8eB6e75", force=True)
-    # 0x1B5eb1173D2Bf770e50F10410C9a96F7a8eB6e75 USDP
+    whale = accounts.at("0x9899c2c49f5eF2f37fbA6F9F8E7557E7A945c964", force=True)
     # 0x9899c2c49f5eF2f37fbA6F9F8E7557E7A945c964 USDN
+    # 0x1B5eb1173D2Bf770e50F10410C9a96F7a8eB6e75 USDP
     # 0xc065653dD4fd6fD97E7134b7B6daAb6fC221FD23 EURT
     # 0x3dFc49e5112005179Da613BdE5973229082dAc35 RAI
     if token.balanceOf(whale) < 2 * amount:
@@ -72,12 +73,23 @@ def whale(accounts, amount, token):
 # use this if your vault is already deployed
 @pytest.fixture(scope="session")
 def vault_address():
-    vault_address = "0xC4dAf3b5e2A9e93861c3FBDd25f1e943B8D87417"
+    vault_address = "0x3B96d491f067912D18563d56858Ba7d6EC67a6fa"
     # USDN 0x3B96d491f067912D18563d56858Ba7d6EC67a6fa
     # USDP 0xC4dAf3b5e2A9e93861c3FBDd25f1e943B8D87417
     # EURT 0xBCBB5b54Fa51e7b7Dc920340043B203447842A6b
     # RAI 0x2D5D4869381C4Fce34789BC1D38aCCe747E295AE
     yield vault_address
+
+
+# curve deposit pool for old pools, set to ZERO_ADDRESS otherwise
+@pytest.fixture(scope="session")
+def old_pool():
+    old_pool = "0x094d12e5b541784701FD8d65F11fc0598FBC6332"
+    # USDN 0x094d12e5b541784701FD8d65F11fc0598FBC6332
+    # USDP 0x3c8caee4e09296800f8d29a68fa3837e2dae4940
+    # EURT 0x5D0F47B32fDd343BfA74cE221808e2abE4A53827, not actually the pool but the zap contract for individual token deposits
+    # RAI 0xcB636B81743Bb8a7F1E355DEBb7D33b07009cCCC
+    yield old_pool
 
 
 # this is the name we want to give our strategy
@@ -98,7 +110,15 @@ def contract_name(StrategyConvexOldPoolsClonable):
 # this is the address of our rewards token, in this case it's a dummy (ALCX) that our whale happens to hold just used to test stuff
 @pytest.fixture(scope="session")
 def rewards_token():  # OGN 0x8207c1FfC5B6804F6024322CcF34F29c3541Ae26, SPELL 0x090185f2135308BaD17527004364eBcC2D37e5F6
+    # SNX 0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F
     yield Contract("0x090185f2135308BaD17527004364eBcC2D37e5F6")
+
+
+# sUSD gauge uses blocks instead of seconds to determine rewards, so this needs to be true for that to test if we're earning
+@pytest.fixture(scope="session")
+def try_blocks():
+    try_blocks = False  # True for sUSD
+    yield try_blocks
 
 
 # whether or not we should try a test donation of our rewards token to make sure the strategy handles them correctly
@@ -118,25 +138,17 @@ def try_blocks():
 
 @pytest.fixture(scope="session")
 def rewards_whale(accounts):
-    # PNT whale: 0xF977814e90dA44bFA03b6295A0616a897441aceC, >13m PNT
-    yield accounts.at("0xF977814e90dA44bFA03b6295A0616a897441aceC", force=True)
+    # SNX whale: 0x8D6F396D210d385033b348bCae9e4f9Ea4e045bD, >600k SNX
+    # SPELL whale: 0x46f80018211D5cBBc988e853A8683501FCA4ee9b, >10b SPELL
+    yield accounts.at("0x46f80018211D5cBBc988e853A8683501FCA4ee9b", force=True)
 
 
 @pytest.fixture(scope="session")
 def rewards_amount():
-    rewards_amount = 100_000e18
+    rewards_amount = 1_000_000e18
+    # SNX 50_000e18
+    # SPELL 1_000_000e18
     yield rewards_amount
-
-
-# curve deposit pool for old pools, set to ZERO_ADDRESS otherwise
-@pytest.fixture(scope="session")
-def old_pool():
-    old_pool = "0x3c8caee4e09296800f8d29a68fa3837e2dae4940"
-    # USDN 0x094d12e5b541784701FD8d65F11fc0598FBC6332
-    # USDP 0x3c8caee4e09296800f8d29a68fa3837e2dae4940
-    # EURT 0x5D0F47B32fDd343BfA74cE221808e2abE4A53827, not actually the pool but the zap contract for individual token deposits
-    # RAI 0xcB636B81743Bb8a7F1E355DEBb7D33b07009cCCC
-    yield old_pool
 
 
 # whether or not a strategy is clonable. if true, don't forget to update what our cloning function is called in test_cloning.py
@@ -198,7 +210,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 12  # RAI 12, EURT always zero
+    hours_to_sleep = 12  # RAI, USDP, USDN 12, 24 EURT
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
@@ -377,6 +389,7 @@ if chain_used == 1:  # mainnet
         rewards_token,
         has_rewards,
         vault_address,
+        try_blocks,
     ):
         if is_convex:
             # make sure to include all constructor parameters needed here
@@ -510,8 +523,13 @@ if chain_used == 1:  # mainnet
                 "Profits on first harvest (should only be on migrations):",
                 tx.events["Harvested"]["profit"] / 1e18,
             )
+        if try_blocks:
+            chain.sleep(
+                1
+            )  # if we're close to Thursday midnight UTC, sleeping might kill our ability to earn from old gauges
+        else:
             chain.sleep(10 * 3600)  # normalize share price
-            chain.mine(1)
+        chain.mine(1)
 
         # print assets in each strategy
         if vault_address != ZERO_ADDRESS and other_strat != ZERO_ADDRESS:
