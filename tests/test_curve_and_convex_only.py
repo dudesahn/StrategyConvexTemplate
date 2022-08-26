@@ -31,6 +31,8 @@ def test_update_to_zero_then_back(
     is_slippery,
     rewards_template,
     sushi_router,
+    rewards_amount,
+    rewards_whale,
 ):
     # skip this test if we don't use rewards in this template
     if not rewards_template:
@@ -109,7 +111,7 @@ def test_update_to_zero_then_back(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards On): ",
+        "\nEstimated APR (Rewards On): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * (86400 / sleep_time)))
             / (newStrategy.estimatedTotalAssets())
@@ -150,7 +152,7 @@ def test_update_to_zero_then_back(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards Off): ",
+        "\nEstimated APR (Rewards Off): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * (86400 / sleep_time)))
             / (newStrategy.estimatedTotalAssets())
@@ -176,6 +178,7 @@ def test_update_to_zero_then_back(
     chain.mine(1)
 
     # harvest with our new rewards token attached
+    newStrategy.setDoHealthCheck(False, {"from": gov})
     newStrategy.harvest({"from": gov})
 
     # confirm that we are selling our rewards token
@@ -186,13 +189,14 @@ def test_update_to_zero_then_back(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards Back On, extra rewards tokens): ",
+        "\nEstimated APR (Rewards Back On, extra rewards tokens): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * (86400 / sleep_time)))
             / (newStrategy.estimatedTotalAssets())
         ),
     )
 
+    # sleep so we free locked profit
     chain.sleep(sleep_time)
     chain.mine(1)
 
@@ -317,7 +321,7 @@ def test_update_from_zero_to_off(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards On): ",
+        "\nEstimated APR (Rewards On): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * (86400 / sleep_time)))
             / (newStrategy.estimatedTotalAssets())
@@ -358,7 +362,7 @@ def test_update_from_zero_to_off(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards Off): ",
+        "\nEstimated APR (Rewards Off): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * (86400 / sleep_time)))
             / (newStrategy.estimatedTotalAssets())
@@ -391,7 +395,7 @@ def test_update_from_zero_to_off(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards Off Still): ",
+        "\nEstimated APR (Rewards Off Still): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * (86400 / sleep_time)))
             / (newStrategy.estimatedTotalAssets())
@@ -504,7 +508,7 @@ def test_change_rewards(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards On): ",
+        "\nEstimated APR (Rewards On): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * (86400 / sleep_time)))
             / (newStrategy.estimatedTotalAssets())
@@ -536,6 +540,11 @@ def test_check_rewards(
     is_convex,
     sleep_time,
     rewards_template,
+    rewards_whale,
+    rewards_amount,
+    rewards_token,
+    test_donation,
+    try_blocks,
 ):
     # skip this test if we don't use rewards in this template
     if not rewards_template:
@@ -551,6 +560,47 @@ def test_check_rewards(
         assert convexToken != rewards_token
     else:
         assert ZERO_ADDRESS == rewards_token
+
+    if has_rewards and test_donation:
+        ## deposit to the vault after approving
+        token.approve(vault, 2 ** 256 - 1, {"from": whale})
+        vault.deposit(amount, {"from": whale})
+        strategy.harvest({"from": gov})
+
+        if not is_convex and try_blocks:
+            # test our proxy, some old gauges use blocks instead of seconds. make sure we're earning!
+            chain.mine(240)
+            assert gauge.balanceOf(voter) > 0
+            balance_1 = gauge.claimable_reward(voter)
+            print("Earned balance:", balance_1)
+            chain.sleep(1)
+            chain.mine(240)
+            chain.sleep(1)
+            balance_2 = gauge.claimable_reward(voter)
+            print("Earned balance:", balance_2)
+            assert balance_2 > balance_1
+            tx = strategy.harvest({"from": gov})
+            chain.mine(240)
+            chain.sleep(1)
+            balance_3 = gauge.claimable_reward(voter)
+            print("Earned balance:", balance_3)
+            assert balance_3 > balance_2
+            proxy.claimRewards(gauge, rewards_token, {"from": strategy})
+            assert rewards_token.balanceOf(strategy) > 0
+
+        tx = strategy.harvest({"from": gov})
+        normal_profits = tx.events["Harvested"]["profit"]
+        print("Normal Profit:", normal_profits / 1e18)
+
+        # check after our whale donates
+        rewards_token.transfer(strategy, rewards_amount, {"from": rewards_whale})
+        chain.sleep(sleep_time)
+        chain.mine(1)
+        strategy.setDoHealthCheck(False, {"from": gov})
+        tx = strategy.harvest({"from": gov})
+        rewards_profits = tx.events["Harvested"]["profit"]
+        print("Rewards Profit:", rewards_profits / 1e18)
+        assert rewards_profits > normal_profits
 
 
 # this one tests if we don't have any CRV to send to voter or any left over after sending
@@ -698,10 +748,6 @@ def test_more_rewards_stuff(
     # sleep to get some profit
     chain.sleep(sleep_time)
     chain.mine(1)
-
-    # can't set to 4
-    with brownie.reverts():
-        strategy.setOptimal(4, {"from": gov})
 
     # take 0% of our CRV to the voter
     if is_convex:
