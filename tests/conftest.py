@@ -43,14 +43,14 @@ chain_used = 1
 # put our pool's convex pid here
 @pytest.fixture(scope="session")
 def pid():
-    pid = 4  # yUSD 2, yBUSD 3, 4 sUSD
+    pid = 2  # yUSD 2, yBUSD 3, 4 sUSD
     yield pid
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="session")
 def amount():
-    amount = 75_000e18  # 250k for both, 75k for sUSD
+    amount = 250_000e18  # 250k for both, 75k for sUSD
     yield amount
 
 
@@ -59,7 +59,7 @@ def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0x1f9bB27d0C66fEB932f3F8B02620A128d072f3d8",
+        "0xC53195Bbad57105cc9a4DF752121AfD9C15FBd8f",
         force=True,  # yUSD 0xC53195Bbad57105cc9a4DF752121AfD9C15FBd8f
     )  # 0x613d9871c25721E8f90ACF8cC4341Bb145F29C23 for yBUSD
     # sUSD 0x1f9bB27d0C66fEB932f3F8B02620A128d072f3d8
@@ -73,7 +73,7 @@ def whale(accounts, amount, token):
 # use this if your vault is already deployed
 @pytest.fixture(scope="session")
 def vault_address():
-    vault_address = "0x5a770DbD3Ee6bAF2802D29a901Ef11501C44797A"
+    vault_address = "0x4B5BfD52124784745c1071dcB244C6688d2533d3"
     # yUSD 0x4B5BfD52124784745c1071dcB244C6688d2533d3
     # yBUSD 0x8ee57c05741aA9DB947A744E713C15d4d19D8822
     # sUSD 0x5a770DbD3Ee6bAF2802D29a901Ef11501C44797A
@@ -83,7 +83,7 @@ def vault_address():
 # curve deposit pool for old pools, set to ZERO_ADDRESS otherwise
 @pytest.fixture(scope="session")
 def old_pool():
-    old_pool = ZERO_ADDRESS
+    old_pool = "0xbBC81d23Ea2c3ec7e56D39296F0cbB648873a5d3"
     # yUSD 0xbBC81d23Ea2c3ec7e56D39296F0cbB648873a5d3
     # yBUSD 0xb6c057591E073249F2D9D88Ba59a46CFC9B59EdB
     # sUSD ZERO_ADDRESS
@@ -130,12 +130,15 @@ def test_donation():
 @pytest.fixture(scope="session")
 def rewards_whale(accounts):
     # SNX whale: 0x8D6F396D210d385033b348bCae9e4f9Ea4e045bD, >600k SNX
+    # SPELL whale: 0x46f80018211D5cBBc988e853A8683501FCA4ee9b, >10b SPELL
     yield accounts.at("0x8D6F396D210d385033b348bCae9e4f9Ea4e045bD", force=True)
 
 
 @pytest.fixture(scope="session")
 def rewards_amount():
     rewards_amount = 50_000e18
+    # SNX 50_000e18
+    # SPELL 1_000_000e18
     yield rewards_amount
 
 
@@ -149,14 +152,14 @@ def is_clonable():
 # whether or not a strategy can possibly have rewards, even if they are zero (false for yUSD/yBUSD)
 @pytest.fixture(scope="session")
 def rewards_template():
-    rewards_template = True  # only true for sUSD
+    rewards_template = False  # only true for sUSD
     yield rewards_template
 
 
 # this is whether our pool currently has extra reward emissions
 @pytest.fixture(scope="session")
 def has_rewards():
-    has_rewards = True  # only true for sUSD
+    has_rewards = False  # only true for sUSD
     yield has_rewards
 
 
@@ -170,14 +173,14 @@ def is_convex():
 # if our curve gauge deposits aren't tokenized (older pools), we can't as easily do some tests and we skip them
 @pytest.fixture(scope="session")
 def gauge_is_not_tokenized():
-    gauge_is_not_tokenized = True
+    gauge_is_not_tokenized = False  # doesn't matter for Convex strategies
     yield gauge_is_not_tokenized
 
 
 # use this to test our strategy in case there are no profits
 @pytest.fixture(scope="session")
 def no_profit():
-    no_profit = False
+    no_profit = False  # yBUSD True now
     yield no_profit
 
 
@@ -198,7 +201,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 4  # 12 works for sUSD, 6 for yUSD, 4 for yBUSD
+    hours_to_sleep = 6  # 12 works for sUSD, 6 for yUSD, 4 for yBUSD
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
@@ -377,6 +380,7 @@ if chain_used == 1:  # mainnet
         rewards_token,
         has_rewards,
         vault_address,
+        try_blocks,
     ):
         if is_convex:
             # make sure to include all constructor parameters needed here
