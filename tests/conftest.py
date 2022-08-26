@@ -103,6 +103,7 @@ def contract_name(StrategyConvexUnderlying3Clonable):
 # this is the address of our rewards token, in this case it's a dummy (ALCX) that our whale happens to hold just used to test stuff
 @pytest.fixture(scope="session")
 def rewards_token():  # OGN 0x8207c1FfC5B6804F6024322CcF34F29c3541Ae26, SPELL 0x090185f2135308BaD17527004364eBcC2D37e5F6
+    # SNX 0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F
     yield Contract("0x090185f2135308BaD17527004364eBcC2D37e5F6")
 
 
@@ -121,15 +122,25 @@ def test_donation():
     yield test_donation
 
 
+# sUSD gauge uses blocks instead of seconds to determine rewards, so this needs to be true for that to test if we're earning
+@pytest.fixture(scope="session")
+def try_blocks():
+    try_blocks = False
+    yield try_blocks
+
+
 @pytest.fixture(scope="session")
 def rewards_whale(accounts):
-    # PNT whale: 0xF977814e90dA44bFA03b6295A0616a897441aceC, >13m PNT
-    yield accounts.at("0xF977814e90dA44bFA03b6295A0616a897441aceC", force=True)
+    # SNX whale: 0x8D6F396D210d385033b348bCae9e4f9Ea4e045bD, >600k SNX
+    # SPELL whale: 0x46f80018211D5cBBc988e853A8683501FCA4ee9b, >10b SPELL
+    yield accounts.at("0x46f80018211D5cBBc988e853A8683501FCA4ee9b", force=True)
 
 
 @pytest.fixture(scope="session")
 def rewards_amount():
-    rewards_amount = 100_000e18
+    rewards_amount = 1_000_000e18
+    # SNX 50_000e18
+    # SPELL 1_000_000e18
     yield rewards_amount
 
 
@@ -164,14 +175,14 @@ def is_convex():
 # if our curve gauge deposits aren't tokenized (older pools), we can't as easily do some tests and we skip them
 @pytest.fixture(scope="session")
 def gauge_is_not_tokenized():
-    gauge_is_not_tokenized = False
+    gauge_is_not_tokenized = False  # doesn't matter for Convex strategies
     yield gauge_is_not_tokenized
 
 
 # use this to test our strategy in case there are no profits
 @pytest.fixture(scope="session")
 def no_profit():
-    no_profit = True  # Aave has really low yield, basically no profit
+    no_profit = True  # True for both
     yield no_profit
 
 
@@ -192,7 +203,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 24
+    hours_to_sleep = 24  # 24 for IB, same for Aave but no yield
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
