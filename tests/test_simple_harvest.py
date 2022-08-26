@@ -105,7 +105,7 @@ def test_simple_harvest(
 
         # Display estimated APR
         print(
-            "\nEstimated APR: ",
+            "\nEstimated Simulated CRV APR: ",
             "{:.2%}".format(
                 ((new_assets - old_assets) * (365 * 86400 / sleep_time))
                 / (strategy.estimatedTotalAssets())
@@ -136,7 +136,7 @@ def test_simple_harvest(
 
             # Display estimated APR
             print(
-                "\nEstimated APR: ",
+                "\nEstimated Simulated CVX APR: ",
                 "{:.2%}".format(
                     ((new_assets - old_assets) * (365 * 86400 / sleep_time))
                     / (strategy.estimatedTotalAssets())
@@ -144,6 +144,9 @@ def test_simple_harvest(
             )
             print("CVX harvest info:", tx.events["Harvested"])
             assert tx.events["Harvested"]["profit"] > 0
+
+        # end here if no profit, no reason to test USDC and USDT
+        return
 
     # change our optimal deposit asset
     strategy.setOptimal(1, {"from": gov})
