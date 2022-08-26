@@ -122,13 +122,6 @@ def test_donation():
     yield test_donation
 
 
-# sUSD gauge uses blocks instead of seconds to determine rewards, so this needs to be true for that to test if we're earning
-@pytest.fixture(scope="session")
-def try_blocks():
-    try_blocks = False
-    yield try_blocks
-
-
 @pytest.fixture(scope="session")
 def rewards_whale(accounts):
     # SNX whale: 0x8D6F396D210d385033b348bCae9e4f9Ea4e045bD, >600k SNX
