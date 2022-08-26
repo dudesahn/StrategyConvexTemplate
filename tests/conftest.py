@@ -11,6 +11,7 @@ def isolation(fn_isolation):
 # set this for if we want to use tenderly or not; mostly helpful because with brownie.reverts fails in tenderly forks.
 use_tenderly = False
 
+
 ################################################## TENDERLY DEBUGGING ##################################################
 
 # change autouse to True if we want to use this fork to help debug tests
@@ -38,7 +39,6 @@ def tests_using_tenderly():
 
 # use this to set what chain we use. 1 for ETH, 250 for fantom
 chain_used = 1
-
 
 # put our pool's convex pid here
 @pytest.fixture(scope="session")
@@ -78,6 +78,13 @@ def vault_address():
     yield vault_address
 
 
+# curve deposit pool for old pools, set to ZERO_ADDRESS otherwise
+@pytest.fixture(scope="session")
+def old_pool():
+    old_pool = ZERO_ADDRESS
+    yield old_pool
+
+
 # this is the name we want to give our strategy
 @pytest.fixture(scope="session")
 def strategy_name():
@@ -99,19 +106,19 @@ def rewards_token():  # OGN 0x8207c1FfC5B6804F6024322CcF34F29c3541Ae26, SPELL 0x
     yield Contract("0x090185f2135308BaD17527004364eBcC2D37e5F6")
 
 
+# sUSD gauge uses blocks instead of seconds to determine rewards, so this needs to be true for that to test if we're earning
+@pytest.fixture(scope="session")
+def try_blocks():
+    try_blocks = False  # True for sUSD
+    yield try_blocks
+
+
 # whether or not we should try a test donation of our rewards token to make sure the strategy handles them correctly
 # if you want to bother with whale and amount below, this needs to be true
 @pytest.fixture(scope="session")
 def test_donation():
     test_donation = False
     yield test_donation
-
-
-# sUSD gauge uses blocks instead of seconds to determine rewards, so this needs to be true for that to test if we're earning
-@pytest.fixture(scope="session")
-def try_blocks():
-    try_blocks = False
-    yield try_blocks
 
 
 @pytest.fixture(scope="session")
@@ -126,21 +133,14 @@ def rewards_amount():
     yield rewards_amount
 
 
-# curve deposit pool for old pools, set to ZERO_ADDRESS otherwise
-@pytest.fixture(scope="session")
-def old_pool():
-    old_pool = ZERO_ADDRESS
-    yield old_pool
-
-
-# whether or not a strategy is clonable
+# whether or not a strategy is clonable. if true, don't forget to update what our cloning function is called in test_cloning.py
 @pytest.fixture(scope="session")
 def is_clonable():
     is_clonable = True
     yield is_clonable
 
 
-# whether or not a strategy can possibly have rewards
+# whether or not a strategy can possibly have rewards, even if they are zero
 @pytest.fixture(scope="session")
 def rewards_template():
     rewards_template = False
@@ -371,6 +371,7 @@ if chain_used == 1:  # mainnet
         rewards_token,
         has_rewards,
         vault_address,
+        try_blocks,
     ):
         if is_convex:
             # make sure to include all constructor parameters needed here
@@ -504,8 +505,13 @@ if chain_used == 1:  # mainnet
                 "Profits on first harvest (should only be on migrations):",
                 tx.events["Harvested"]["profit"] / 1e18,
             )
+        if try_blocks:
+            chain.sleep(
+                1
+            )  # if we're close to Thursday midnight UTC, sleeping might kill our ability to earn from old gauges
+        else:
             chain.sleep(10 * 3600)  # normalize share price
-            chain.mine(1)
+        chain.mine(1)
 
         # print assets in each strategy
         if vault_address != ZERO_ADDRESS and other_strat != ZERO_ADDRESS:
