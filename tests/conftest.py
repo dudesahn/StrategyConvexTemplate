@@ -11,6 +11,7 @@ def isolation(fn_isolation):
 # set this for if we want to use tenderly or not; mostly helpful because with brownie.reverts fails in tenderly forks.
 use_tenderly = False
 
+
 ################################################## TENDERLY DEBUGGING ##################################################
 
 # change autouse to True if we want to use this fork to help debug tests
@@ -39,8 +40,7 @@ def tests_using_tenderly():
 # use this to set what chain we use. 1 for ETH, 250 for fantom
 chain_used = 1
 
-
-# If testing a Convex strategy, set this equal to your PID
+# put our pool's convex pid here
 @pytest.fixture(scope="session")
 def pid():
     pid = 99  # TOKE 99
@@ -73,6 +73,13 @@ def vault_address():
     yield vault_address
 
 
+# curve deposit pool for old pools, set to ZERO_ADDRESS otherwise
+@pytest.fixture(scope="session")
+def old_pool():
+    old_pool = "0xe0e970a99bc4F53804D8145beBBc7eBc9422Ba7F"
+    yield old_pool
+
+
 # this is the name we want to give our strategy
 @pytest.fixture(scope="session")
 def strategy_name():
@@ -93,28 +100,51 @@ def rewards_token():
     yield Contract("0x89Ab32156e46F46D02ade3FEcbe5Fc4243B9AAeD")
 
 
-# curve deposit pool for old metapools and crypto pools, set to ZERO_ADDRESS otherwise
+# sUSD gauge uses blocks instead of seconds to determine rewards, so this needs to be true for that to test if we're earning
 @pytest.fixture(scope="session")
-def old_pool():
-    old_pool = "0xe0e970a99bc4F53804D8145beBBc7eBc9422Ba7F"
-    yield old_pool
+def try_blocks():
+    try_blocks = False  # True for sUSD
+    yield try_blocks
 
 
-# whether or not a strategy is clonable
+# whether or not we should try a test donation of our rewards token to make sure the strategy handles them correctly
+# if you want to bother with whale and amount below, this needs to be true
+@pytest.fixture(scope="session")
+def test_donation():
+    test_donation = False
+    yield test_donation
+
+
+@pytest.fixture(scope="session")
+def rewards_whale(accounts):
+    # SNX whale: 0x8D6F396D210d385033b348bCae9e4f9Ea4e045bD, >600k SNX
+    # SPELL whale: 0x46f80018211D5cBBc988e853A8683501FCA4ee9b, >10b SPELL
+    yield accounts.at("0x46f80018211D5cBBc988e853A8683501FCA4ee9b", force=True)
+
+
+@pytest.fixture(scope="session")
+def rewards_amount():
+    rewards_amount = 1_000_000e18
+    # SNX 50_000e18
+    # SPELL 1_000_000e18
+    yield rewards_amount
+
+
+# whether or not a strategy is clonable. if true, don't forget to update what our cloning function is called in test_cloning.py
 @pytest.fixture(scope="session")
 def is_clonable():
     is_clonable = True
     yield is_clonable
 
 
-# whether or not a strategy template can possibly have rewards
+# whether or not a strategy has ever had rewards, even if they are zero currently. essentially checking if the infra is there for rewards.
 @pytest.fixture(scope="session")
 def rewards_template():
     rewards_template = False
     yield rewards_template
 
 
-# this is whether our pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
+# this is whether our pool currently has extra reward emissions (SNX, SPELL, etc)
 @pytest.fixture(scope="session")
 def has_rewards():
     has_rewards = False
@@ -138,7 +168,7 @@ def gauge_is_not_tokenized():
 # use this to test our strategy in case there are no profits
 @pytest.fixture(scope="session")
 def no_profit():
-    no_profit = False
+    no_profit = True
     yield no_profit
 
 
@@ -159,7 +189,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 48
+    hours_to_sleep = 12  # 12 hours has no yield now for some reason
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
@@ -206,6 +236,10 @@ if chain_used == 1:  # mainnet
         yield Contract("0x90E00ACe148ca3b23Ac1bC8C240C2a7Dd9c2d7f5")
 
     @pytest.fixture(scope="session")
+    def curve_cryptoswap_registry():
+        yield Contract("0x4AacF35761d06Aa7142B9326612A42A2b9170E33")
+
+    @pytest.fixture(scope="session")
     def healthCheck():
         yield Contract("0xDDCea799fF1699e98EDF118e0629A974Df7DF012")
 
@@ -234,16 +268,24 @@ if chain_used == 1:  # mainnet
     # gauge for the curve pool
     @pytest.fixture(scope="session")
     def gauge(pid, booster):
-        # this should be the address of the convex deposit token
         gauge = booster.poolInfo(pid)[2]
         yield Contract(gauge)
 
     # curve deposit pool
     @pytest.fixture(scope="session")
-    def pool(token, curve_registry, old_pool):
+    def pool(token, curve_registry, curve_cryptoswap_registry, old_pool):
         if old_pool == ZERO_ADDRESS:
             if curve_registry.get_pool_from_lp_token(token) == ZERO_ADDRESS:
-                poolContract = token
+                if (
+                    curve_cryptoswap_registry.get_pool_from_lp_token(token)
+                    == ZERO_ADDRESS
+                ):
+                    poolContract = token
+                else:
+                    poolAddress = curve_cryptoswap_registry.get_pool_from_lp_token(
+                        token
+                    )
+                    poolContract = Contract(poolAddress)
             else:
                 poolAddress = curve_registry.get_pool_from_lp_token(token)
                 poolContract = Contract(poolAddress)
@@ -326,6 +368,7 @@ if chain_used == 1:  # mainnet
         rewards_token,
         has_rewards,
         vault_address,
+        try_blocks,
     ):
         if is_convex:
             # make sure to include all constructor parameters needed here
@@ -442,6 +485,13 @@ if chain_used == 1:  # mainnet
         gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})
         strategy.setHealthCheck(healthCheck, {"from": gov})
 
+        # add rewards token if needed. Double-check if we specify router here (sBTC new and old clonable only)
+        if has_rewards:
+            if is_convex:
+                strategy.updateRewards(True, 0, {"from": gov})
+            else:
+                strategy.updateRewards(True, rewards_token, {"from": gov})
+
         # set up custom params and setters
         strategy.setMaxReportDelay(86400 * 21, {"from": gov})
 
@@ -452,20 +502,18 @@ if chain_used == 1:  # mainnet
                 "Profits on first harvest (should only be on migrations):",
                 tx.events["Harvested"]["profit"] / 1e18,
             )
+        if try_blocks:
+            chain.sleep(
+                1
+            )  # if we're close to Thursday midnight UTC, sleeping might kill our ability to earn from old gauges
+        else:
             chain.sleep(10 * 3600)  # normalize share price
-            chain.mine(1)
+        chain.mine(1)
 
         # print assets in each strategy
         if vault_address != ZERO_ADDRESS and other_strat != ZERO_ADDRESS:
             print("Other strat assets:", other_strat.estimatedTotalAssets() / 1e18)
         print("Main strat assets:", strategy.estimatedTotalAssets() / 1e18)
-
-        # add rewards token if needed. Double-check if we specify router here (sBTC clonable does, 3Crv doesn't)
-        if has_rewards:
-            if is_convex:
-                strategy.updateRewards(True, 0, {"from": gov})
-            else:
-                strategy.updateRewards(True, rewards_token, {"from": gov})
 
         yield strategy
 
