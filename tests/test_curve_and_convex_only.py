@@ -121,8 +121,7 @@ def test_update_to_zero_then_back(
     )
 
     # check what we have
-    _rewards_token = newStrategy.rewardsToken()
-    rewards_token = Contract(_rewards_token)
+    assert rewards_token.address == newStrategy.rewardsToken()
     assert newStrategy.hasRewards() == True
     assert rewards_token.allowance(newStrategy, sushi_router) > 0
 
@@ -155,7 +154,7 @@ def test_update_to_zero_then_back(
 
     # Display estimated APR
     print(
-        "\nEstimated DAI APR (Rewards Off): ",
+        "\nEstimated APR (Rewards Off): ",
         "{:.2%}".format(
             ((new_assets_dai - old_assets_dai) * (365 * (86400 / sleep_time)))
             / (newStrategy.estimatedTotalAssets())
@@ -169,7 +168,7 @@ def test_update_to_zero_then_back(
         newStrategy.updateRewards(True, rewards_token, {"from": gov})
 
     # assert that we set things up correctly
-    assert newStrategy.rewardsToken() == _rewards_token
+    assert newStrategy.rewardsToken() == rewards_token
     assert newStrategy.hasRewards() == True
     assert rewards_token.allowance(newStrategy, sushi_router) > 0
 
@@ -191,12 +190,6 @@ def test_update_to_zero_then_back(
     assert rewards_token.balanceOf(newStrategy) == 0
     new_assets_dai = vault.totalAssets()
 
-    # compare all of our various profit values if we have active rewards
-    if has_rewards:
-        assert rewards_back_on_profit > rewards_on_profit
-        assert rewards_on_profit > rewards_off_profit
-        print("Rewards token is accumulating as expected")
-
     # Display estimated APR
     print(
         "\nEstimated APR (Rewards Back On, extra rewards tokens): ",
@@ -205,6 +198,12 @@ def test_update_to_zero_then_back(
             / (newStrategy.estimatedTotalAssets())
         ),
     )
+
+    # compare all of our various profit values if we have active rewards
+    if has_rewards:
+        assert rewards_back_on_profit > rewards_on_profit
+        assert rewards_on_profit > rewards_off_profit
+        print("Rewards token is accumulating as expected\n")
 
     # sleep so we free locked profit
     chain.sleep(sleep_time)
@@ -340,8 +339,7 @@ def test_update_from_zero_to_off(
     )
 
     # check what we have
-    _rewards_token = newStrategy.rewardsToken()
-    rewards_token = Contract(_rewards_token)
+    assert rewards_token.address == newStrategy.rewardsToken()
     assert newStrategy.hasRewards() == True
     assert rewards_token.allowance(newStrategy, sushi_router) > 0
 
@@ -419,7 +417,7 @@ def test_update_from_zero_to_off(
     if has_rewards:
         assert math.isclose(rewards_still_off_profit, rewards_off_profit, abs_tol=1e18)
         assert rewards_on_profit > rewards_off_profit
-        print("Rewards token performing as expected")
+        print("Rewards token performing as expected\n")
 
     chain.sleep(sleep_time)
     chain.mine(1)
@@ -569,22 +567,26 @@ def test_check_rewards(
     if not rewards_template:
         return
 
-    # check if our strategy has extra rewards
-    rewards_token = strategy.rewardsToken()
-
     # if we're supposed to have a rewards token, make sure it's not CVX
     if has_rewards:
-        rewards_token = Contract(strategy.rewardsToken())
+        assert rewards_token.address == strategy.rewardsToken()
         print("\nThis is our rewards token:", rewards_token.name())
         assert convexToken != rewards_token
     else:
-        assert ZERO_ADDRESS == rewards_token
+        assert ZERO_ADDRESS == strategy.rewardsToken()
 
-    if has_rewards and test_donation:
+    if test_donation:
         ## deposit to the vault after approving
         token.approve(vault, 2 ** 256 - 1, {"from": whale})
         vault.deposit(amount, {"from": whale})
         strategy.harvest({"from": gov})
+
+        # setup our rewards if we need to
+        if not has_rewards:
+            if is_convex:
+                strategy.updateRewards(True, 0, {"from": gov})
+            else:
+                strategy.updateRewards(True, rewards_token, {"from": gov})
 
         if not is_convex and try_blocks:
             # test our proxy, some old gauges use blocks instead of seconds. make sure we're earning!
@@ -607,6 +609,8 @@ def test_check_rewards(
             proxy.claimRewards(gauge, rewards_token, {"from": strategy})
             assert rewards_token.balanceOf(strategy) > 0
 
+        chain.sleep(sleep_time)
+        chain.mine(1)
         tx = strategy.harvest({"from": gov})
         normal_profits = tx.events["Harvested"]["profit"]
         print("Normal Profit:", normal_profits / 1e18)

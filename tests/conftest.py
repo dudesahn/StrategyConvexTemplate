@@ -43,14 +43,14 @@ chain_used = 1
 # put our pool's convex pid here
 @pytest.fixture(scope="session")
 def pid():
-    pid = 23  # sETH 23, alETH 49, ankrETH 27
+    pid = 27  # sETH 23, alETH 49, ankrETH 27
     yield pid
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="session")
 def amount():
-    amount = 90e18  # sETH 90e18, alETH 20e18, ankrETH 12e18
+    amount = 12e18  # sETH 90e18, alETH 20e18, ankrETH 12e18
     yield amount
 
 
@@ -61,7 +61,7 @@ def whale(accounts, amount, token):
     # sETH 0xB289360A2Ab9eacfFd1d7883183A6d9576DB515F
     # alETH 0xAB8e74017a8Cc7c15FFcCd726603790d26d7DeCa
     # ankrETH 0x7A791a73eAE3CCE350a2b4A34E3231D151D09D72
-    whale = accounts.at("0xB289360A2Ab9eacfFd1d7883183A6d9576DB515F", force=True)
+    whale = accounts.at("0x7A791a73eAE3CCE350a2b4A34E3231D151D09D72", force=True)
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -72,7 +72,7 @@ def whale(accounts, amount, token):
 # set address if already deployed, use ZERO_ADDRESS if not
 @pytest.fixture(scope="session")
 def vault_address():
-    vault_address = "0x986b4AFF588a109c09B50A03f42E4110E29D353F"
+    vault_address = "0x132d8D2C76Db3812403431fAcB00F3453Fc42125"
     # sETH 0x986b4AFF588a109c09B50A03f42E4110E29D353F
     # alETH 0x718AbE90777F5B778B52D553a5aBaa148DD0dc5D
     # ankrETH 0x132d8D2C76Db3812403431fAcB00F3453Fc42125
@@ -89,7 +89,7 @@ def old_pool():
 # this is the name we want to give our strategy
 @pytest.fixture(scope="session")
 def strategy_name():
-    strategy_name = "StrategyConvexsETH"
+    strategy_name = "StrategyConvexankrETH"
     yield strategy_name
 
 
@@ -102,8 +102,8 @@ def contract_name(StrategyConvexEthPoolsClonable):
 
 # this is the address of our rewards token
 @pytest.fixture(scope="session")
-def rewards_token():
-    yield Contract("0x89Ab32156e46F46D02ade3FEcbe5Fc4243B9AAeD")
+def rewards_token():  # ONX, first reward token for ANKR pool
+    yield Contract("0xE0aD1806Fd3E7edF6FF52Fdb822432e847411033")
 
 
 # sUSD gauge uses blocks instead of seconds to determine rewards, so this needs to be true for that to test if we're earning
@@ -117,7 +117,7 @@ def try_blocks():
 # if you want to bother with whale and amount below, this needs to be true
 @pytest.fixture(scope="session")
 def test_donation():
-    test_donation = False
+    test_donation = True
     yield test_donation
 
 
@@ -125,14 +125,16 @@ def test_donation():
 def rewards_whale(accounts):
     # SNX whale: 0x8D6F396D210d385033b348bCae9e4f9Ea4e045bD, >600k SNX
     # SPELL whale: 0x46f80018211D5cBBc988e853A8683501FCA4ee9b, >10b SPELL
-    yield accounts.at("0x46f80018211D5cBBc988e853A8683501FCA4ee9b", force=True)
+    # ONX whale: 0x0D0707963952f2fBA59dD06f2b425ace40b492Fe, >490k ONX
+    yield accounts.at("0x0D0707963952f2fBA59dD06f2b425ace40b492Fe", force=True)
 
 
 @pytest.fixture(scope="session")
 def rewards_amount():
-    rewards_amount = 1_000_000e18
+    rewards_amount = 400_000e18
     # SNX 50_000e18
     # SPELL 1_000_000e18
+    # ONX 400_000e18
     yield rewards_amount
 
 
@@ -146,7 +148,7 @@ def is_clonable():
 # whether or not a strategy has ever had rewards, even if they are zero currently. essentially checking if the infra is there for rewards.
 @pytest.fixture(scope="session")
 def rewards_template():
-    rewards_template = False  # true for ankrETH
+    rewards_template = True  # true for ankrETH
     yield rewards_template
 
 
