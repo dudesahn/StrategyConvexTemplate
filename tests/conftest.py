@@ -99,8 +99,7 @@ def contract_name(StrategyConvexUnderlying3Clonable):
     yield contract_name
 
 
-# we need these next two fixtures for deploying our curve strategy, but not for convex. for convex we can pull them programmatically.
-# this is the address of our rewards token, in this case it's a dummy (ALCX) that our whale happens to hold just used to test stuff
+# this is the address of our rewards token
 @pytest.fixture(scope="session")
 def rewards_token():  # OGN 0x8207c1FfC5B6804F6024322CcF34F29c3541Ae26, SPELL 0x090185f2135308BaD17527004364eBcC2D37e5F6
     # SNX 0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F
@@ -144,14 +143,14 @@ def is_clonable():
     yield is_clonable
 
 
-# whether or not a strategy can possibly have rewards, even if they are zero
+# whether or not a strategy has ever had rewards, even if they are zero currently. essentially checking if the infra is there for rewards.
 @pytest.fixture(scope="session")
 def rewards_template():
     rewards_template = False
     yield rewards_template
 
 
-# this is whether our pool currently has extra reward emissions
+# this is whether our pool currently has extra reward emissions (SNX, SPELL, etc)
 @pytest.fixture(scope="session")
 def has_rewards():
     has_rewards = False
@@ -175,7 +174,7 @@ def gauge_is_not_tokenized():
 # use this to test our strategy in case there are no profits
 @pytest.fixture(scope="session")
 def no_profit():
-    no_profit = True  # True for both
+    no_profit = False  # True for Aave, sometimes true for IB
     yield no_profit
 
 
@@ -196,7 +195,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 24  # 24 for IB, same for Aave but no yield
+    hours_to_sleep = 3  # 3 for IB, same for Aave but no yield
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
