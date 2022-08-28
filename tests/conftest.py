@@ -95,7 +95,7 @@ def old_pool():
 # this is the name we want to give our strategy
 @pytest.fixture(scope="session")
 def strategy_name():
-    strategy_name = "StrategyConvexUSDP"
+    strategy_name = "StrategyConvexUSDN"
     yield strategy_name
 
 
@@ -106,8 +106,7 @@ def contract_name(StrategyConvexOldPoolsClonable):
     yield contract_name
 
 
-# we need these next two fixtures for deploying our curve strategy, but not for convex. for convex we can pull them programmatically.
-# this is the address of our rewards token, in this case it's a dummy (ALCX) that our whale happens to hold just used to test stuff
+# this is the address of our rewards token
 @pytest.fixture(scope="session")
 def rewards_token():  # OGN 0x8207c1FfC5B6804F6024322CcF34F29c3541Ae26, SPELL 0x090185f2135308BaD17527004364eBcC2D37e5F6
     # SNX 0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F
@@ -151,14 +150,14 @@ def is_clonable():
     yield is_clonable
 
 
-# whether or not a strategy can possibly have rewards, even if they are zero
+# whether or not a strategy has ever had rewards, even if they are zero currently. essentially checking if the infra is there for rewards.
 @pytest.fixture(scope="session")
 def rewards_template():
     rewards_template = False
     yield rewards_template
 
 
-# this is whether our pool currently has extra reward emissions
+# this is whether our pool currently has extra reward emissions (SNX, SPELL, etc)
 @pytest.fixture(scope="session")
 def has_rewards():
     has_rewards = False
