@@ -108,7 +108,6 @@ abstract contract StrategyConvexBase is BaseStrategy {
     address internal constant depositContract =
         0xF403C135812408BFbE8713b5A23a04b3D48AAE31; // this is the deposit contract that all pools use, aka booster
     IConvexRewards public rewardsContract; // This is unique to each curve pool
-    address public virtualRewardsPool; // This is only if we have bonus rewards
     uint256 public pid; // this is unique to each pool
 
     // keepCRV stuff
@@ -570,9 +569,7 @@ contract StrategyConvexCompound is StrategyConvexBase {
     function needsEarmarkReward() public view returns (bool needsEarmark) {
         // check if there is any CRV we need to earmark
         uint256 crvExpiry = rewardsContract.periodFinish();
-        if (crvExpiry < block.timestamp) {
-            return true;
-        }
+        return crvExpiry < block.timestamp;
     }
 
     /* ========== SETTERS ========== */
