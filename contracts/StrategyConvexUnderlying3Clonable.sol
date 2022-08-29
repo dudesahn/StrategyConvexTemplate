@@ -675,7 +675,18 @@ contract StrategyConvexUnderlying3Clonable is StrategyConvexBase {
         uniStableFee = _stableFee;
     }
 
-    // Min profit to start checking for harvests if gas is good, max will harvest no matter gas (both in USDT, 6 decimals). Credit threshold is in want token, and will trigger a harvest if credit is large enough. check earmark to look at convex's booster.
+    /**
+     * @notice
+     * Here we set various parameters to optimize our harvestTrigger.
+     * @param _harvestProfitMin The amount of profit (in USDC, 6 decimals)
+     * that will trigger a harvest if gas price is acceptable.
+     * @param _harvestProfitMax The amount of profit in USDC that
+     * will trigger a harvest regardless of gas price.
+     * @param _creditThreshold The number of want tokens that will
+     * automatically trigger a harvest once gas is cheap enough.
+     * @param _checkEarmark Whether or not we should check Convex's
+     * booster to see if we need to earmark before harvesting.
+     */
     function setHarvestTriggerParams(
         uint256 _harvestProfitMin,
         uint256 _harvestProfitMax,
