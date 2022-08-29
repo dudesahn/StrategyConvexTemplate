@@ -11,6 +11,7 @@ def isolation(fn_isolation):
 # set this for if we want to use tenderly or not; mostly helpful because with brownie.reverts fails in tenderly forks.
 use_tenderly = False
 
+
 ################################################## TENDERLY DEBUGGING ##################################################
 
 # change autouse to True if we want to use this fork to help debug tests
@@ -39,8 +40,7 @@ def tests_using_tenderly():
 # use this to set what chain we use. 1 for ETH, 250 for fantom
 chain_used = 1
 
-
-# for these LPs, we only use this to generate the correct want token. 61 CRV-ETH, 64 CVX-ETH
+# put our pool's convex pid here
 @pytest.fixture(scope="session")
 def pid():
     pid = 25
@@ -58,7 +58,7 @@ def amount():
 def whale(accounts, token, amount):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    whale = accounts.at("0xBA12222222228d8Ba445958a75a0704d566BF2C8", force=True)
+    whale = accounts.at("0x43378368D84D4bA00D1C8E97EC2E6016A82fC062", force=True)
     if token.balanceOf(whale) < 2 * amount:
         print("Token address:", token.address, "Whale:", whale)
         raise ValueError(
@@ -72,6 +72,13 @@ def whale(accounts, token, amount):
 def vault_address():
     vault_address = "0xdCD90C7f6324cfa40d7169ef80b12031770B4325"
     yield vault_address
+
+
+# curve deposit pool for old pools, set to ZERO_ADDRESS otherwise
+@pytest.fixture(scope="session")
+def old_pool():
+    old_pool = ZERO_ADDRESS
+    yield old_pool
 
 
 # this is the name we want to give our strategy
@@ -94,55 +101,53 @@ def rewards_token():  # LDO
     yield Contract("0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32")
 
 
+# sUSD gauge uses blocks instead of seconds to determine rewards, so this needs to be true for that to test if we're earning
+@pytest.fixture(scope="session")
+def try_blocks():
+    try_blocks = False  # True for sUSD
+    yield try_blocks
+
+
 # whether or not we should try a test donation of our rewards token to make sure the strategy handles them correctly
 # if you want to bother with whale and amount below, this needs to be true
 @pytest.fixture(scope="session")
 def test_donation():
-    test_donation = False
+    test_donation = True
     yield test_donation
-
-
-# sUSD gauge uses blocks instead of seconds to determine rewards, so this needs to be true for that to test if we're earning
-@pytest.fixture(scope="session")
-def try_blocks():
-    try_blocks = False
-    yield try_blocks
 
 
 @pytest.fixture(scope="session")
 def rewards_whale(accounts):
-    # PNT whale: 0xF977814e90dA44bFA03b6295A0616a897441aceC, >13m PNT
-    yield accounts.at("0xF977814e90dA44bFA03b6295A0616a897441aceC", force=True)
+    # SNX whale: 0x8D6F396D210d385033b348bCae9e4f9Ea4e045bD, >600k SNX
+    # SPELL whale: 0x46f80018211D5cBBc988e853A8683501FCA4ee9b, >10b SPELL
+    # LDO whale: 0x008756e24b06267B9D2488E5bf50091fC26C8e8d, > 7.9m LDO
+    yield accounts.at("0x008756e24b06267B9D2488E5bf50091fC26C8e8d", force=True)
 
 
 @pytest.fixture(scope="session")
 def rewards_amount():
-    rewards_amount = 100_000e18
+    rewards_amount = 1_000_000e18
+    # SNX 50_000e18
+    # SPELL 1_000_000e18
+    # LDO 50_000e18
     yield rewards_amount
 
 
-# curve deposit pool for old metapools, set to ZERO_ADDRESS otherwise
-@pytest.fixture(scope="session")
-def old_pool():
-    old_pool = ZERO_ADDRESS
-    yield old_pool
-
-
-# whether or not a strategy is clonable
+# whether or not a strategy is clonable. if true, don't forget to update what our cloning function is called in test_cloning.py
 @pytest.fixture(scope="session")
 def is_clonable():
     is_clonable = False
     yield is_clonable
 
 
-# whether or not a strategy can possibly have rewards
+# whether or not a strategy has ever had rewards, even if they are zero currently. essentially checking if the infra is there for rewards.
 @pytest.fixture(scope="session")
 def rewards_template():
     rewards_template = True
     yield rewards_template
 
 
-# this is whether our pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
+# this is whether our pool currently has extra reward emissions (SNX, SPELL, etc)
 @pytest.fixture(scope="session")
 def has_rewards():
     has_rewards = True
@@ -366,6 +371,7 @@ if chain_used == 1:  # mainnet
         rewards_token,
         has_rewards,
         vault_address,
+        try_blocks,
     ):
         if is_convex:
             # make sure to include all constructor parameters needed here
@@ -499,8 +505,13 @@ if chain_used == 1:  # mainnet
                 "Profits on first harvest (should only be on migrations):",
                 tx.events["Harvested"]["profit"] / 1e18,
             )
+        if try_blocks:
+            chain.sleep(
+                1
+            )  # if we're close to Thursday midnight UTC, sleeping might kill our ability to earn from old gauges
+        else:
             chain.sleep(10 * 3600)  # normalize share price
-            chain.mine(1)
+        chain.mine(1)
 
         # print assets in each strategy
         if vault_address != ZERO_ADDRESS and other_strat != ZERO_ADDRESS:

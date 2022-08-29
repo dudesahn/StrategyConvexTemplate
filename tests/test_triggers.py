@@ -115,12 +115,8 @@ def test_triggers(
         )
         assert tx == False
         strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
-    else:  # curve uses minDelay as well
-        strategy.setMinReportDelay(sleep_time - 1)
-        tx = strategy.harvestTrigger(0, {"from": gov})
-        print("\nShould we harvest? Should be True.", tx)
-        assert tx == True
-
+    else:  # remove this for stETH, no minDelay
+        print("No minDelay for stETH since 0.3.0, so skip minDelay curve check")
     # harvest, wait
     chain.sleep(1)
     tx = strategy.harvest({"from": gov})
