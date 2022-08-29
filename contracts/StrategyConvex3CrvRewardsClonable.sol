@@ -113,6 +113,8 @@ abstract contract StrategyConvexBase is BaseStrategy {
 
     // keepCRV stuff
     uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points)
+    uint256 public keepCVX; // the percentage of CVX we keep for boosting yield (in basis points)
+    address public keepCVXDestination; // where we send the CVX we are keeping
     address internal constant voter =
         0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
@@ -237,10 +239,16 @@ abstract contract StrategyConvexBase is BaseStrategy {
 
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
-    // Set the amount of CRV to be locked in Yearn's veCRV voter from each harvest. Default is 10%.
-    function setKeepCRV(uint256 _keepCRV) external onlyVaultManagers {
-        require(_keepCRV <= 10_000);
+    // Set the amount of CRV to be locked in Yearn's veCRV voter from each harvest. Default is 10%. Option to keep CVX as well.
+    function setKeep(
+        uint256 _keepCRV,
+        uint256 _keepCVX,
+        address _keepCVXDestination
+    ) external onlyGovernance {
+        require(_keepCRV <= 10_000 && _keepCVX <= 10_000);
         keepCRV = _keepCRV;
+        keepCVX = _keepCVX;
+        keepCVXDestination = _keepCVXDestination;
     }
 
     // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
@@ -379,6 +387,8 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         harvestProfitMin = 60000e6;
         harvestProfitMax = 120000e6;
         creditThreshold = 1e6 * 1e18;
+        keepCRV = 1000; // default of 10%
+        keepCVXDestination = 0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde; // default to treasury
 
         // want = Curve LP
         want.approve(address(depositContract), type(uint256).max);
@@ -435,6 +445,13 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         uint256 _sendToVoter = crvBalance.mul(keepCRV).div(FEE_DENOMINATOR);
         if (_sendToVoter > 0) {
             crv.safeTransfer(voter, _sendToVoter);
+            crvBalance = crv.balanceOf(address(this));
+        }
+
+        uint256 _cvxToKeep = convexBalance.mul(keepCVX).div(FEE_DENOMINATOR);
+        if (_cvxToKeep > 0) {
+            convexToken.safeTransfer(keepCVXDestination, _cvxToKeep);
+            convexBalance = convexToken.balanceOf(address(this));
         }
 
         // claim and sell our rewards if we have them
@@ -446,12 +463,8 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
             }
         }
 
-        // check our balance again after transferring some crv to our voter
-        crvBalance = crv.balanceOf(address(this));
-
-        if (crvBalance > 0 || convexBalance > 0) {
-            _sellCrvAndCvx(crvBalance, convexBalance);
-        }
+        // do this even if we have zero balances so we can sell WETH from rewards
+        _sellCrvAndCvx(crvBalance, convexBalance);
 
         // check for balances of tokens to deposit
         uint256 _daiBalance = dai.balanceOf(address(this));
@@ -516,32 +529,37 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         );
     }
 
-    // Sells our CRV -> WETH on UniV3 and CVX -> WETH on Sushi, then WETH -> stables together on UniV3
+    // Sells our CRV and CVX on Curve, then WETH -> stables together on UniV3
     function _sellCrvAndCvx(uint256 _crvAmount, uint256 _convexAmount)
         internal
     {
-        if (_convexAmount > 0) {
+        if (_convexAmount > 1e17) {
+            // don't want to swap dust or we might revert
             cvxeth.exchange(1, 0, _convexAmount, 0, false);
         }
 
-        if (_crvAmount > 0) {
+        if (_crvAmount > 1e17) {
+            // don't want to swap dust or we might revert
             crveth.exchange(1, 0, _crvAmount, 0, false);
         }
 
         uint256 _wethBalance = weth.balanceOf(address(this));
-        IUniV3(uniswapv3).exactInput(
-            IUniV3.ExactInputParams(
-                abi.encodePacked(
-                    address(weth),
-                    uint24(uniStableFee),
-                    address(targetStable)
-                ),
-                address(this),
-                block.timestamp,
-                _wethBalance,
-                uint256(1)
-            )
-        );
+        if (_wethBalance > 1e15) {
+            // don't want to swap dust or we might revert
+            IUniV3(uniswapv3).exactInput(
+                IUniV3.ExactInputParams(
+                    abi.encodePacked(
+                        address(weth),
+                        uint24(uniStableFee),
+                        address(targetStable)
+                    ),
+                    address(this),
+                    block.timestamp,
+                    _wethBalance,
+                    uint256(1)
+                )
+            );
+        }
     }
 
     // Sells our harvested reward token into the selected output.
@@ -694,9 +712,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
             // check if there is any bonus reward we need to earmark
             uint256 rewardsExpiry =
                 IConvexRewards(virtualRewardsPool).periodFinish();
-            if (rewardsExpiry < block.timestamp) {
-                return true;
-            }
+            return rewardsExpiry < block.timestamp;
         }
     }
 
@@ -717,7 +733,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         }
     }
 
-    // Use to add, update or remove rewards
+    /// @notice Use to update, add, or remove extra rewards tokens.
     function updateRewards(bool _hasRewards, uint256 _rewardsIndex)
         external
         onlyGovernance
@@ -746,7 +762,18 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         }
     }
 
-    // Min profit to start checking for harvests if gas is good, max will harvest no matter gas (both in USDT, 6 decimals). Credit threshold is in want token, and will trigger a harvest if credit is large enough. check earmark to look at convex's booster.
+    /**
+     * @notice
+     * Here we set various parameters to optimize our harvestTrigger.
+     * @param _harvestProfitMin The amount of profit (in USDC, 6 decimals)
+     * that will trigger a harvest if gas price is acceptable.
+     * @param _harvestProfitMax The amount of profit in USDC that
+     * will trigger a harvest regardless of gas price.
+     * @param _creditThreshold The number of want tokens that will
+     * automatically trigger a harvest once gas is cheap enough.
+     * @param _checkEarmark Whether or not we should check Convex's
+     * booster to see if we need to earmark before harvesting.
+     */
     function setHarvestTriggerParams(
         uint256 _harvestProfitMin,
         uint256 _harvestProfitMax,

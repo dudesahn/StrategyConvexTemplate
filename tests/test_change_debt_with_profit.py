@@ -16,16 +16,17 @@ def test_change_debt_with_profit(
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
+    chain.mine(1)
     strategy.harvest({"from": gov})
 
     # store our values before we start doing weird stuff
     prev_params = vault.strategies(strategy)
     currentDebt = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, currentDebt / 2, {"from": gov})
-    assert vault.strategies(strategy)["debtRatio"] == 5000
+    assert vault.strategies(strategy)["debtRatio"] == currentDebt / 2
 
     # our whale donates dust to the vault, what a nice person!
     donation = amount / 10
@@ -34,11 +35,13 @@ def test_change_debt_with_profit(
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
+    chain.mine(1)
     strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy)
 
-    # sleep 10 hours to increase our credit available for last assert at the bottom.
-    chain.sleep(sleep_time)
+    # sleep 10 hours to allow share price to normalize
+    chain.sleep(60 * 60 * 10)
+    chain.mine(1)
 
     profit = new_params["totalGain"] - prev_params["totalGain"]
 
