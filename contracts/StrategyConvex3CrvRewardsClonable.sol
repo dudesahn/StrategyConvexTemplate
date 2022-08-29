@@ -733,7 +733,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         }
     }
 
-    // @notice Use to update, add, or remove extra rewards tokens.
+    /// @notice Use to update, add, or remove extra rewards tokens.
     function updateRewards(bool _hasRewards, uint256 _rewardsIndex)
         external
         onlyGovernance
