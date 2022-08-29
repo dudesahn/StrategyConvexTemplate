@@ -287,7 +287,7 @@ contract StrategyConvexcvxCRV is StrategyConvexBase {
         healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; // health.ychad.eth
         harvestProfitMin = 10000e6;
         harvestProfitMax = 120000e6;
-        creditThreshold = 400 * 1e18;
+        creditThreshold = 1e6 * 1e18;
         keepCRV = 1000; // default of 10%
         keepCVXDestination = 0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde; // default to treasury
 
