@@ -11,6 +11,7 @@ def isolation(fn_isolation):
 # set this for if we want to use tenderly or not; mostly helpful because with brownie.reverts fails in tenderly forks.
 use_tenderly = False
 
+
 ################################################## TENDERLY DEBUGGING ##################################################
 
 # change autouse to True if we want to use this fork to help debug tests
@@ -39,8 +40,7 @@ def tests_using_tenderly():
 # use this to set what chain we use. 1 for ETH, 250 for fantom
 chain_used = 1
 
-
-# If testing a Convex strategy, set this equal to your PID
+# put our pool's convex pid here
 @pytest.fixture(scope="session")
 def pid():
     pid = 30
@@ -73,6 +73,13 @@ def vault_address():
     yield vault_address
 
 
+# curve deposit pool for old pools, set to ZERO_ADDRESS otherwise
+@pytest.fixture(scope="session")
+def old_pool():
+    old_pool = ZERO_ADDRESS
+    yield old_pool
+
+
 # this is the name we want to give our strategy
 @pytest.fixture(scope="session")
 def strategy_name():
@@ -89,8 +96,16 @@ def contract_name(StrategyConvexLINK):
 
 # this is the address of our rewards token
 @pytest.fixture(scope="session")
-def rewards_token():
-    yield Contract("0x89Ab32156e46F46D02ade3FEcbe5Fc4243B9AAeD")
+def rewards_token():  # OGN 0x8207c1FfC5B6804F6024322CcF34F29c3541Ae26, SPELL 0x090185f2135308BaD17527004364eBcC2D37e5F6
+    # SNX 0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F
+    yield Contract("0x090185f2135308BaD17527004364eBcC2D37e5F6")
+
+
+# sUSD gauge uses blocks instead of seconds to determine rewards, so this needs to be true for that to test if we're earning
+@pytest.fixture(scope="session")
+def try_blocks():
+    try_blocks = False  # True for sUSD
+    yield try_blocks
 
 
 # whether or not we should try a test donation of our rewards token to make sure the strategy handles them correctly
@@ -101,47 +116,36 @@ def test_donation():
     yield test_donation
 
 
-# sUSD gauge uses blocks instead of seconds to determine rewards, so this needs to be true for that to test if we're earning
-@pytest.fixture(scope="session")
-def try_blocks():
-    try_blocks = False
-    yield try_blocks
-
-
 @pytest.fixture(scope="session")
 def rewards_whale(accounts):
-    # PNT whale: 0xF977814e90dA44bFA03b6295A0616a897441aceC, >13m PNT
-    yield accounts.at("0xF977814e90dA44bFA03b6295A0616a897441aceC", force=True)
+    # SNX whale: 0x8D6F396D210d385033b348bCae9e4f9Ea4e045bD, >600k SNX
+    # SPELL whale: 0x46f80018211D5cBBc988e853A8683501FCA4ee9b, >10b SPELL
+    yield accounts.at("0x46f80018211D5cBBc988e853A8683501FCA4ee9b", force=True)
 
 
 @pytest.fixture(scope="session")
 def rewards_amount():
-    rewards_amount = 100_000e18
+    rewards_amount = 1_000_000e18
+    # SNX 50_000e18
+    # SPELL 1_000_000e18
     yield rewards_amount
 
 
-# curve deposit pool for old pools, set to ZERO_ADDRESS otherwise
-@pytest.fixture(scope="session")
-def old_pool():
-    old_pool = ZERO_ADDRESS
-    yield old_pool
-
-
-# whether or not a strategy is clonable
+# whether or not a strategy is clonable. if true, don't forget to update what our cloning function is called in test_cloning.py
 @pytest.fixture(scope="session")
 def is_clonable():
     is_clonable = False
     yield is_clonable
 
 
-# whether or not a strategy template can possibly have rewards
+# whether or not a strategy has ever had rewards, even if they are zero currently. essentially checking if the infra is there for rewards.
 @pytest.fixture(scope="session")
 def rewards_template():
     rewards_template = False
     yield rewards_template
 
 
-# this is whether our pool has extra rewards tokens or not, use this to confirm that our strategy set everything up correctly.
+# this is whether our pool currently has extra reward emissions (SNX, SPELL, etc)
 @pytest.fixture(scope="session")
 def has_rewards():
     has_rewards = False
@@ -365,6 +369,7 @@ if chain_used == 1:  # mainnet
         rewards_token,
         has_rewards,
         vault_address,
+        try_blocks,
     ):
         if is_convex:
             # make sure to include all constructor parameters needed here
@@ -498,8 +503,13 @@ if chain_used == 1:  # mainnet
                 "Profits on first harvest (should only be on migrations):",
                 tx.events["Harvested"]["profit"] / 1e18,
             )
+        if try_blocks:
+            chain.sleep(
+                1
+            )  # if we're close to Thursday midnight UTC, sleeping might kill our ability to earn from old gauges
+        else:
             chain.sleep(10 * 3600)  # normalize share price
-            chain.mine(1)
+        chain.mine(1)
 
         # print assets in each strategy
         if vault_address != ZERO_ADDRESS and other_strat != ZERO_ADDRESS:
