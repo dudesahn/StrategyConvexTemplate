@@ -669,9 +669,7 @@ contract StrategyConvexEURSClonable is StrategyConvexBase {
     function needsEarmarkReward() public view returns (bool needsEarmark) {
         // check if there is any CRV we need to earmark
         uint256 crvExpiry = rewardsContract.periodFinish();
-        if (crvExpiry < block.timestamp) {
-            return true;
-        }
+        return crvExpiry < block.timestamp;
     }
 
     /* ========== SETTERS ========== */
