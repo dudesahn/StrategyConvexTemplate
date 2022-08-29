@@ -648,13 +648,14 @@ def test_odds_and_ends_no_profit(
     if is_convex:
         assert strategy.needsEarmarkReward()
 
-    # sleep to try and generate profit, but it shouldn't. we should still be able to harvest though.
+    # sleep to try and generate profit, but it shouldn't (if convex). we should still be able to harvest though.
     chain.sleep(1)
     if is_convex:
         assert strategy.claimableBalance() == 0
     tx = strategy.harvest({"from": gov})
     profit = tx.events["Harvested"]["profit"]
-    assert profit == 0
+    if is_convex:
+        assert profit == 0
 
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
