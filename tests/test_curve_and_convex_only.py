@@ -537,7 +537,7 @@ def test_weird_amounts(
     chain.mine(1)
 
     # take 100% of our CRV to the voter
-    strategy.setKeep(10000, 0, gov, {"from": gov})
+    strategy.setKeep(10000, {"from": gov})
     chain.sleep(1)
     chain.mine(1)
     strategy.harvest({"from": gov})
@@ -563,7 +563,7 @@ def test_weird_amounts(
     chain.mine(1)
 
     # take 0% of our CRV to the voter
-    strategy.setKeep(0, 0, gov, {"from": gov})
+    strategy.setKeep(0, {"from": gov})
     chain.sleep(1)
     chain.mine(1)
     strategy.harvest({"from": gov})
@@ -608,10 +608,42 @@ def test_more_rewards_stuff(
     strategy.setOptimal(0, {"from": gov})
 
     # sleep for a day to get some profit
-    chain.sleep(86400)
+    chain.sleep(86400 * 15)
     chain.mine(1)
-    strategy.harvest({"from": gov})
+    
+    yvecrv = Contract('0xc5bDdf9843308380375a611c18B50Fb9341f502A')
+    crv = Contract('0xD533a949740bb3306d119CC777fa900bA034cd52')
+    cvx = Contract('0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B')
+    weth = Contract('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
+    treasury = vault.rewards()
+    treasury_balance_before = crv.balanceOf(treasury)
+    
+    tx = strategy.harvest({"from": gov})
+    assert weth.balanceOf(strategy) < 1e15
+    assert cvx.balanceOf(strategy) < 1e17
+    assert crv.balanceOf(strategy) < 1e17
+    
 
+    # Print all token transfers
+    crv_amount = 0
+    yvecrv_minted = 0
+    rewards = vault.rewards()
+    crv.balanceOf(rewards)
+    # for t in tx.events["Transfer"]:
+    #     token = Contract(t.address)
+    #     sender = t.values()[0]
+    #     receiver = t.values()[1]
+    #     value = t.values()[2]
+    #     if token.address == crv.address and receiver == strategy.address:
+    #         crv_amount += value
+    #     if token.address == yvecrv.address and receiver == vault.rewards():
+    #         yvecrv_minted += value
+    #     print(f'{token.symbol()}, {"STRATEGY" if sender == strategy.address else sender} --> {"STRATEGY" if receiver == strategy.address else receiver}')
+    #     print(f'    {"{:,.2f}".format(value/10**token.decimals())}')
+    # assert yvecrv_minted > 0
+    # Make sure the amount of CRV locked on harvest roughly matches the keepCRV amount
+    assert crv_amount * strategy.keepCRV() / 10_000 / 1e18 == pytest.approx(yvecrv_minted / 1e18, 0.1)
+    assert crv.balanceOf(treasury) > treasury_balance_before
     # set our optimal to USDC without rewards on
     strategy.setOptimal(1, {"from": gov})
 
@@ -657,7 +689,7 @@ def test_more_rewards_stuff(
     strategy.harvest({"from": gov})
 
     # take 100% of our CRV to the voter
-    strategy.setKeep(10000, 0, gov, {"from": gov})
+    strategy.setKeep(10000, {"from": gov})
     chain.sleep(1)
     chain.mine(1)
     tx = strategy.harvest(
@@ -729,7 +761,7 @@ def test_more_rewards_stuff(
         strategy.setOptimal(4, {"from": gov})
 
     # take 0% of our CRV to the voter
-    strategy.setKeep(0, 0, gov, {"from": gov})
+    strategy.setKeep(0, {"from": gov})
     chain.sleep(1)
     chain.mine(1)
     strategy.harvest({"from": gov})
