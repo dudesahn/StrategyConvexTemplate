@@ -616,7 +616,7 @@ def test_more_rewards_stuff(
     cvx = Contract('0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B')
     weth = Contract('0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')
     treasury = vault.rewards()
-    treasury_balance_before = yvecrv.balanceOf(treasury)
+    treasury_balance_before = crv.balanceOf(treasury)
     
     tx = strategy.harvest({"from": gov})
     assert weth.balanceOf(strategy) < 1e15
@@ -627,21 +627,23 @@ def test_more_rewards_stuff(
     # Print all token transfers
     crv_amount = 0
     yvecrv_minted = 0
-    for t in tx.events["Transfer"]:
-        token = Contract(t.address)
-        sender = t.values()[0]
-        receiver = t.values()[1]
-        value = t.values()[2]
-        if token.address == crv.address and receiver == strategy.address:
-            crv_amount += value
-        if token.address == yvecrv.address and receiver == vault.rewards():
-            yvecrv_minted += value
-        print(f'{token.symbol()}, {"STRATEGY" if sender == strategy.address else sender} --> {"STRATEGY" if receiver == strategy.address else receiver}')
-        print(f'    {"{:,.2f}".format(value/10**token.decimals())}')
-    assert yvecrv_minted > 0
+    rewards = vault.rewards()
+    crv.balanceOf(rewards)
+    # for t in tx.events["Transfer"]:
+    #     token = Contract(t.address)
+    #     sender = t.values()[0]
+    #     receiver = t.values()[1]
+    #     value = t.values()[2]
+    #     if token.address == crv.address and receiver == strategy.address:
+    #         crv_amount += value
+    #     if token.address == yvecrv.address and receiver == vault.rewards():
+    #         yvecrv_minted += value
+    #     print(f'{token.symbol()}, {"STRATEGY" if sender == strategy.address else sender} --> {"STRATEGY" if receiver == strategy.address else receiver}')
+    #     print(f'    {"{:,.2f}".format(value/10**token.decimals())}')
+    # assert yvecrv_minted > 0
     # Make sure the amount of CRV locked on harvest roughly matches the keepCRV amount
     assert crv_amount * strategy.keepCRV() / 10_000 / 1e18 == pytest.approx(yvecrv_minted / 1e18, 0.1)
-    assert yvecrv.balanceOf(treasury) > treasury_balance_before
+    assert crv.balanceOf(treasury) > treasury_balance_before
     # set our optimal to USDC without rewards on
     strategy.setOptimal(1, {"from": gov})
 

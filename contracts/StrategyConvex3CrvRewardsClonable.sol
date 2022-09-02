@@ -22,11 +22,6 @@ interface IOracle {
     function latestAnswer() external view returns (uint256);
 }
 
-interface IYveCRV {
-    function deposit(uint256 _amount) external;
-    function transfer(address _recipeint, uint256 _amount) external;
-}
-
 interface IVaultRewards {
     function rewards() external view returns (address);
 }
@@ -122,7 +117,6 @@ abstract contract StrategyConvexBase is BaseStrategy {
 
     // keepCRV stuff
     uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points)
-    IYveCRV internal constant yveCRV = IYveCRV(0xc5bDdf9843308380375a611c18B50Fb9341f502A); // Yearn's liquid token through which CRV is locked
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
 
     // Swap stuff
@@ -245,7 +239,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
 
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
-    // Set the percentage of total profit to lock to veCRV (via yveCRV). Default is 10%.
+    // Set the percentage of total CRV profit to keep without converting to underlying.
     function setKeep(
         uint256 _keepCRV
     ) external onlyGovernance {
@@ -395,7 +389,6 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         want.approve(address(depositContract), type(uint256).max);
         convexToken.approve(address(cvxeth), type(uint256).max);
         crv.approve(address(crveth), type(uint256).max);
-        crv.approve(address(yveCRV), type(uint256).max);
         weth.approve(address(crveth), type(uint256).max);
         weth.approve(uniswapv3, type(uint256).max);
 
@@ -453,11 +446,10 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         _buyCRV();
 
         uint256 crvBalance = crv.balanceOf(address(this));
-        uint256 amountToLock = crvBalance.mul(keepCRV).div(FEE_DENOMINATOR);
-        if (amountToLock > 0) {
-            yveCRV.deposit(amountToLock);
-            yveCRV.transfer(IVaultRewards(address(vault)).rewards(), amountToLock);
-            crvBalance -= amountToLock;
+        uint256 toKeep = crvBalance.mul(keepCRV).div(FEE_DENOMINATOR);
+        if (toKeep > 0) {
+            crv.transfer(IVaultRewards(address(vault)).rewards(), toKeep);
+            crvBalance -= toKeep;
         }
 
         _sellCrv(crvBalance);
