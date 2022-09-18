@@ -514,7 +514,7 @@ contract StrategyConvexEURSClonable is StrategyConvexBase {
         );
     }
 
-    // Sells our CRV and CVX on Curve, then WETH -> WBTC together on UniV3
+    // Sells our CRV and CVX on Curve, then WETH -> USDC or EURS as needed
     function _sellCrvAndCvx(uint256 _crvAmount, uint256 _convexAmount)
         internal
     {
