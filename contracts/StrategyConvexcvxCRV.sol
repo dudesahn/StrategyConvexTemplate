@@ -294,9 +294,6 @@ contract StrategyConvexcvxCRV is StrategyConvexBase {
         // these are our standard approvals. want = Curve LP token
         want.approve(address(depositContract), type(uint256).max);
 
-        // set our keepCRV
-        keepCRV = 1000;
-
         // this is the pool specific to this vault, used for depositing
         curve = ICurveFi(_curvePool);
 
