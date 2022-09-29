@@ -59,8 +59,8 @@ def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0x916AB31C6226E44B6256598a677CCEfFa385cced", force=True
-    )  # 0x916AB31C6226E44B6256598a677CCEfFa385cced for 3Crypto (660 total)
+        "0xfE4d9D4F102b40193EeD8aA6C52BD87a328177fc", force=True
+    )  # 0xfE4d9D4F102b40193EeD8aA6C52BD87a328177fc for 3Crypto (440 total)
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
