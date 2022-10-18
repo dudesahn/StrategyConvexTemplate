@@ -265,14 +265,14 @@ abstract contract StrategyConvexBase is BaseStrategy {
     }
 }
 
-contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
+contract StrategyConvexFraxBpRewardsClonable is StrategyConvexBase {
     /* ========== STATE VARIABLES ========== */
     // these will likely change across different wants.
 
     // Curve stuff
     address public curve; // Curve Pool, this is our pool specific to this vault
     ICurveFi internal constant zapContract =
-        ICurveFi(0xA79828DF1850E8a3A3064576f380D90aECDD3359); // this is used for depositing to all 3Crv metapools
+        ICurveFi(0x08780fb7E580e492c1935bEe4fA5920b94AA95Da); // this is used for depositing to all FRAX-BP metapools
 
     bool public checkEarmark; // this determines if we should check if we need to earmark rewards before harvesting
 
@@ -283,15 +283,10 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         ICurveFi(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4); // use curve's new CVX-ETH crypto pool to sell our CVX
 
     // we use these to deposit to our curve pool
-    address public targetStable;
     address internal constant uniswapv3 =
         0xE592427A0AEce92De3Edee1F18E0157C05861564;
-    IERC20 internal constant usdt =
-        IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7);
     IERC20 internal constant usdc =
         IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
-    IERC20 internal constant dai =
-        IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     uint24 public uniStableFee; // this is equal to 0.05%, can change this later if a different path becomes more optimal
 
     // rewards token info. we can have more than 1 reward token but this is rare, so we don't include this in the template
@@ -318,7 +313,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
     event Cloned(address indexed clone);
 
     // we use this to clone our original strategy to other vaults
-    function cloneConvex3CrvRewards(
+    function cloneConvexFraxBpRewards(
         address _vault,
         address _strategist,
         address _rewards,
@@ -345,7 +340,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
             newStrategy := create(0, clone_code, 0x37)
         }
 
-        StrategyConvex3CrvRewardsClonable(newStrategy).initialize(
+        StrategyConvexFraxBpRewardsClonable(newStrategy).initialize(
             _vault,
             _strategist,
             _rewards,
@@ -382,12 +377,11 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         require(address(curve) == address(0)); // already initialized.
 
         // You can set these parameters on deployment to whatever you want
-        maxReportDelay = 21 days; // 21 days in seconds, if we hit this then harvestTrigger = True
+        maxReportDelay = 365 days; // 365 days in seconds, if we hit this then harvestTrigger = True
         healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; // health.ychad.eth
-        harvestProfitMin = 60000e6;
+        harvestProfitMin = 7500e6;
         harvestProfitMax = 120000e6;
         creditThreshold = 1e6 * 1e18;
-        keepCRV = 1000; // default of 10%
         keepCVXDestination = 0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde; // default to treasury
 
         // want = Curve LP
@@ -414,12 +408,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         stratName = _name;
 
         // these are our approvals and path specific to this contract
-        dai.approve(address(zapContract), type(uint256).max);
-        usdt.safeApprove(address(zapContract), type(uint256).max); // USDT requires safeApprove(), funky token
         usdc.approve(address(zapContract), type(uint256).max);
-
-        // start with usdt
-        targetStable = address(usdt);
 
         // set our uniswap pool fees
         uniStableFee = 500;
@@ -467,17 +456,11 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
         _sellCrvAndCvx(crvBalance, convexBalance);
 
         // check for balances of tokens to deposit
-        uint256 _daiBalance = dai.balanceOf(address(this));
         uint256 _usdcBalance = usdc.balanceOf(address(this));
-        uint256 _usdtBalance = usdt.balanceOf(address(this));
 
         // deposit our balance to Curve if we have any
-        if (_daiBalance > 0 || _usdcBalance > 0 || _usdtBalance > 0) {
-            zapContract.add_liquidity(
-                curve,
-                [0, _daiBalance, _usdcBalance, _usdtBalance],
-                0
-            );
+        if (_usdcBalance > 0) {
+            zapContract.add_liquidity(curve, [0, 0, _usdcBalance], 0);
         }
 
         // debtOustanding will only be > 0 in the event of revoking or if we need to rebalance from a withdrawal or lowering the debtRatio
@@ -551,7 +534,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
                     abi.encodePacked(
                         address(weth),
                         uint24(uniStableFee),
-                        address(targetStable)
+                        address(usdc)
                     ),
                     address(this),
                     block.timestamp,
@@ -670,7 +653,7 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
             address[] memory usd_path = new address[](3);
             usd_path[0] = address(rewardsToken);
             usd_path[1] = address(weth);
-            usd_path[2] = address(usdt);
+            usd_path[2] = address(usdc);
 
             uint256 _claimableBonusBal =
                 IConvexRewards(virtualRewardsPool).earned(address(this));
@@ -719,19 +702,6 @@ contract StrategyConvex3CrvRewardsClonable is StrategyConvexBase {
     /* ========== SETTERS ========== */
 
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
-
-    /// @notice Set optimal token to sell harvested funds for depositing to Curve.
-    function setOptimal(uint256 _optimal) external onlyVaultManagers {
-        if (_optimal == 0) {
-            targetStable = address(dai);
-        } else if (_optimal == 1) {
-            targetStable = address(usdc);
-        } else if (_optimal == 2) {
-            targetStable = address(usdt);
-        } else {
-            revert("incorrect token");
-        }
-    }
 
     /// @notice Use to update, add, or remove extra rewards tokens.
     function updateRewards(bool _hasRewards, uint256 _rewardsIndex)

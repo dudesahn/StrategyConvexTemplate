@@ -40,7 +40,7 @@ def test_cloning(
     if tests_using_tenderly:
         if is_convex:
             ## clone our strategy
-            tx = strategy.cloneConvex3CrvRewards(
+            tx = strategy.cloneConvexFraxBpRewards(
                 vault,
                 strategist,
                 rewards,
@@ -80,7 +80,7 @@ def test_cloning(
                 )
 
             ## clone our strategy
-            tx = strategy.cloneConvex3CrvRewards(
+            tx = strategy.cloneConvexFraxBpRewards(
                 vault,
                 strategist,
                 rewards,
@@ -107,7 +107,7 @@ def test_cloning(
 
             ## shouldn't be able to clone a clone
             with brownie.reverts():
-                newStrategy.cloneConvex3CrvRewards(
+                newStrategy.cloneConvexFraxBpRewards(
                     vault,
                     strategist,
                     rewards,

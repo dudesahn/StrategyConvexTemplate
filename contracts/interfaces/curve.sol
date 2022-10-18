@@ -54,6 +54,13 @@ interface ICurveFi is IERC20 {
     ) external;
 
     function add_liquidity(
+        // FRAX-BP Metapools
+        address pool,
+        uint256[3] calldata amounts,
+        uint256 min_mint_amount
+    ) external;
+
+    function add_liquidity(
         // Y and yBUSD
         uint256[4] calldata amounts,
         uint256 min_mint_amount,

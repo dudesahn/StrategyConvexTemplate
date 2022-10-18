@@ -43,14 +43,14 @@ chain_used = 1
 # put our pool's convex pid here
 @pytest.fixture(scope="session")
 def pid():
-    pid = 40  # mim 40, FRAX 32
+    pid = 115  # DOLA 115
     yield pid
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="session")
 def amount():
-    amount = 35_000e18  # use 35k for MIM, 140k for FRAX
+    amount = 45e18  # use 45 for DOLA
     yield amount
 
 
@@ -58,8 +58,8 @@ def amount():
 def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
-    # MIM 0xe896e539e557BC751860a7763C8dD589aF1698Ce, FRAX 0x839Bb033738510AA6B4f78Af20f066bdC824B189
-    whale = accounts.at("0xe896e539e557BC751860a7763C8dD589aF1698Ce", force=True)
+    # DOLA 0x5180db0237291A6449DdA9ed33aD90a38787621c
+    whale = accounts.at("0x5180db0237291A6449DdA9ed33aD90a38787621c", force=True)
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -70,9 +70,7 @@ def whale(accounts, amount, token):
 # use this if your vault is already deployed
 @pytest.fixture(scope="session")
 def vault_address():
-    vault_address = "0x2DfB14E32e2F8156ec15a2c21c3A6c053af52Be8"
-    # MIM 0x2DfB14E32e2F8156ec15a2c21c3A6c053af52Be8
-    # FRAX 0xB4AdA607B9d6b2c9Ee07A275e9616B84AC560139
+    vault_address = ZERO_ADDRESS
     yield vault_address
 
 
@@ -86,14 +84,14 @@ def old_pool():
 # this is the name we want to give our strategy
 @pytest.fixture(scope="session")
 def strategy_name():
-    strategy_name = "StrategyConvexMIM"
+    strategy_name = "StrategyConvexDOLA-FRAXBP"
     yield strategy_name
 
 
 # this is the name of our strategy in the .sol file
 @pytest.fixture(scope="session")
-def contract_name(StrategyConvex3CrvRewardsClonable):
-    contract_name = StrategyConvex3CrvRewardsClonable
+def contract_name(StrategyConvexFraxBpRewardsClonable):
+    contract_name = StrategyConvexFraxBpRewardsClonable
     yield contract_name
 
 
@@ -115,7 +113,7 @@ def try_blocks():
 # if you want to bother with whale and amount below, this needs to be true
 @pytest.fixture(scope="session")
 def test_donation():
-    test_donation = True
+    test_donation = False
     yield test_donation
 
 
@@ -144,14 +142,14 @@ def is_clonable():
 # whether or not a strategy has ever had rewards, even if they are zero currently. essentially checking if the infra is there for rewards.
 @pytest.fixture(scope="session")
 def rewards_template():
-    rewards_template = True  # MIM True, FRAX False
+    rewards_template = False  #
     yield rewards_template
 
 
 # this is whether our pool currently has extra reward emissions (SNX, SPELL, etc)
 @pytest.fixture(scope="session")
 def has_rewards():
-    has_rewards = False  # Both False
+    has_rewards = False  #
     yield has_rewards
 
 
@@ -172,7 +170,7 @@ def gauge_is_not_tokenized():
 # use this to test our strategy in case there are no profits
 @pytest.fixture(scope="session")
 def no_profit():
-    no_profit = False
+    no_profit = True
     yield no_profit
 
 
@@ -193,7 +191,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 6  # 6 for MIM and FRAX
+    hours_to_sleep = 72  #
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time

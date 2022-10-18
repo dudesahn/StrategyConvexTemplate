@@ -647,9 +647,6 @@ def test_weird_amounts(
     vault.deposit(amount, {"from": whale})
     strategy.harvest({"from": gov})
 
-    # set our optimal to DAI
-    strategy.setOptimal(0, {"from": gov})
-
     # sleep to get some profit
     chain.sleep(sleep_time)
     chain.mine(1)
@@ -661,22 +658,6 @@ def test_weird_amounts(
         strategy.setKeepCRV(10000, {"from": gov})
     chain.sleep(1)
     chain.mine(1)
-    strategy.harvest({"from": gov})
-
-    # sleep to get some profit
-    chain.sleep(sleep_time)
-    chain.mine(1)
-
-    # switch to USDC, want to not have any profit tho
-    strategy.setOptimal(1, {"from": gov})
-    strategy.harvest({"from": gov})
-
-    # sleep to get some profit
-    chain.sleep(sleep_time)
-    chain.mine(1)
-
-    # switch to USDT, want to not have any profit tho
-    strategy.setOptimal(2, {"from": gov})
     strategy.harvest({"from": gov})
 
     # sleep to get some profit
