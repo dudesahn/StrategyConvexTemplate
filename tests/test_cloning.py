@@ -179,7 +179,7 @@ def test_cloning(
     chain.sleep(1)
 
     # attach our new strategy
-    vault.addStrategy(newStrategy, currentDebt, 0, 2 ** 256 - 1, 1_000, {"from": gov})
+    vault.addStrategy(newStrategy, currentDebt, 0, 2**256 - 1, 1_000, {"from": gov})
 
     if vault_address == ZERO_ADDRESS:
         assert vault.withdrawalQueue(1) == newStrategy
@@ -203,7 +203,7 @@ def test_cloning(
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount

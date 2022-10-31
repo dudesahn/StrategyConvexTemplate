@@ -43,14 +43,14 @@ chain_used = 1
 # put our pool's convex pid here
 @pytest.fixture(scope="session")
 def pid():
-    pid = 95  # CAD 79, STG 95
+    pid = 113  # 113
     yield pid
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="session")
 def amount():
-    amount = 10_000e18  # 10k for STG-USDC
+    amount = 4_000e18  # 4k for agEUR-EUROC
     yield amount
 
 
@@ -59,8 +59,8 @@ def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0xeCb456EA5365865EbAb8a2661B0c503410e9B347", force=True
-    )  # 0x26f539A0fE189A7f228D7982BF10Bc294FA9070c for CAD-USDC (270k total), 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 for STG-USDC
+        "0xDe46532a49c88af504594F488822F452b7FBc7BD", force=True
+    )  # 0xDe46532a49c88af504594F488822F452b7FBc7BD, stakeDAO vault, 8k tokens
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -71,38 +71,36 @@ def whale(accounts, amount, token):
 # set address if already deployed, use ZERO_ADDRESS if not
 @pytest.fixture(scope="session")
 def vault_address():
-    vault_address = "0x341bb10D8f5947f3066502DC8125d9b8949FD3D6"
-    # STG-USDC 0x341bb10D8f5947f3066502DC8125d9b8949FD3D6, others ZERO
+    vault_address = ZERO_ADDRESS
     yield vault_address
 
 
 # curve deposit pool for old pools, set to ZERO_ADDRESS otherwise
 @pytest.fixture(scope="session")
 def old_pool():
-    old_pool = "0x3211C6cBeF1429da3D0d58494938299C92Ad5860"
-    # 0xE07BDe9Eb53DEFfa979daE36882014B758111a78 for CAD-USDC, 0x3211C6cBeF1429da3D0d58494938299C92Ad5860 for STG-USDC
+    old_pool = ZERO_ADDRESS
     yield old_pool
 
 
 # this is the name we want to give our strategy
 @pytest.fixture(scope="session")
 def strategy_name():
-    strategy_name = "StrategyConvexSTG-USDC"
+    strategy_name = "StrategyConvexagEUR-EUROC"
     yield strategy_name
 
 
 # this is the name of our strategy in the .sol file
 @pytest.fixture(scope="session")
-def contract_name(StrategyConvexUsdcPairsClonable):
-    contract_name = StrategyConvexUsdcPairsClonable
+def contract_name(StrategyConvexagEUR_EUROC):
+    contract_name = StrategyConvexagEUR_EUROC
     yield contract_name
 
 
 # this is the address of our rewards token
 @pytest.fixture(scope="session")
 def rewards_token():  # OGN 0x8207c1FfC5B6804F6024322CcF34F29c3541Ae26, SPELL 0x090185f2135308BaD17527004364eBcC2D37e5F6
-    # SNX 0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F
-    yield Contract("0x090185f2135308BaD17527004364eBcC2D37e5F6")
+    # SNX 0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F, ANGLE 0x31429d1856aD1377A8A0079410B297e1a9e214c2
+    yield Contract("0x31429d1856aD1377A8A0079410B297e1a9e214c2")
 
 
 # sUSD gauge uses blocks instead of seconds to determine rewards, so this needs to be true for that to test if we're earning
@@ -116,7 +114,7 @@ def try_blocks():
 # if you want to bother with whale and amount below, this needs to be true
 @pytest.fixture(scope="session")
 def test_donation():
-    test_donation = False
+    test_donation = True
     yield test_donation
 
 
@@ -124,21 +122,23 @@ def test_donation():
 def rewards_whale(accounts):
     # SNX whale: 0x8D6F396D210d385033b348bCae9e4f9Ea4e045bD, >600k SNX
     # SPELL whale: 0x46f80018211D5cBBc988e853A8683501FCA4ee9b, >10b SPELL
-    yield accounts.at("0x46f80018211D5cBBc988e853A8683501FCA4ee9b", force=True)
+    # ANGLE whale: 0x2Fc443960971e53FD6223806F0114D5fAa8C7C4e, 11.6m ANGLE
+    yield accounts.at("0x2Fc443960971e53FD6223806F0114D5fAa8C7C4e", force=True)
 
 
 @pytest.fixture(scope="session")
 def rewards_amount():
-    rewards_amount = 1_000_000e18
+    rewards_amount = 10_000_000e18
     # SNX 50_000e18
     # SPELL 1_000_000e18
+    # ANGLE 10_000_000e18
     yield rewards_amount
 
 
 # whether or not a strategy is clonable. if true, don't forget to update what our cloning function is called in test_cloning.py
 @pytest.fixture(scope="session")
 def is_clonable():
-    is_clonable = True
+    is_clonable = False
     yield is_clonable
 
 
@@ -173,7 +173,7 @@ def gauge_is_not_tokenized():
 # use this to test our strategy in case there are no profits
 @pytest.fixture(scope="session")
 def no_profit():
-    no_profit = False
+    no_profit = True
     yield no_profit
 
 
@@ -341,7 +341,7 @@ if chain_used == 1:  # mainnet
             Vault = pm(config["dependencies"][0]).Vault
             vault = guardian.deploy(Vault)
             vault.initialize(token, gov, rewards, "", "", guardian)
-            vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
+            vault.setDepositLimit(2**256 - 1, {"from": gov})
             vault.setManagement(management, {"from": gov})
             chain.sleep(1)
             chain.mine(1)
@@ -414,7 +414,7 @@ if chain_used == 1:  # mainnet
             # do slightly different if vault is existing or not
             if vault_address == ZERO_ADDRESS:
                 vault.addStrategy(
-                    strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov}
+                    strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov}
                 )
                 print("New Vault, Convex Strategy")
                 chain.sleep(1)
@@ -439,7 +439,7 @@ if chain_used == 1:  # mainnet
             # do slightly different if vault is existing or not
             if vault_address == ZERO_ADDRESS:
                 vault.addStrategy(
-                    strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov}
+                    strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov}
                 )
                 print("New Vault, Curve Strategy")
                 chain.sleep(1)
@@ -449,7 +449,7 @@ if chain_used == 1:  # mainnet
                     other_strat = Contract(vault.withdrawalQueue(0))
                     vault.updateStrategyDebtRatio(other_strat, 5000, {"from": gov})
                     vault.addStrategy(
-                        strategy, 5000, 0, 2 ** 256 - 1, 1_000, {"from": gov}
+                        strategy, 5000, 0, 2**256 - 1, 1_000, {"from": gov}
                     )
 
                     # reorder so curve first, convex second
@@ -521,7 +521,6 @@ if chain_used == 1:  # mainnet
         print("Main strat assets:", strategy.estimatedTotalAssets() / 1e18)
 
         yield strategy
-
 
 elif chain_used == 250:  # only fantom so far and convex doesn't exist there
 

@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/math/Math.sol";
 
 import "./interfaces/curve.sol";
+import {IUniswapV2Router02} from "./interfaces/uniswap.sol";
 import {
     BaseStrategy,
     StrategyParams
@@ -107,6 +108,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     address internal constant depositContract =
         0xF403C135812408BFbE8713b5A23a04b3D48AAE31; // this is the deposit contract that all pools use, aka booster
     IConvexRewards public rewardsContract; // This is unique to each curve pool
+    address public virtualRewardsPool; // This is only if we have bonus rewards
     uint256 public pid; // this is unique to each pool
 
     // keepCRV stuff
@@ -116,6 +118,10 @@ abstract contract StrategyConvexBase is BaseStrategy {
     address internal constant voter =
         0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, we send some extra CRV here
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
+
+    // Swap stuff
+    address internal constant sushiswap =
+        0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // we use this to sell our bonus token
 
     IERC20 internal constant crv =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
@@ -259,7 +265,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     }
 }
 
-contract StrategyConvexUsdcPairsClonable is StrategyConvexBase {
+contract StrategyConvexagEUR_EUROC is StrategyConvexBase {
     /* ========== STATE VARIABLES ========== */
     // these will likely change across different wants.
 
@@ -275,14 +281,22 @@ contract StrategyConvexUsdcPairsClonable is StrategyConvexBase {
         ICurveFi(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4); // use curve's new CVX-ETH crypto pool to sell our CVX
 
     // sell our weth to usdc on uniV3
+    address public targetEuro;
     IERC20 internal constant usdc =
         IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+    IERC20 internal constant ageur =
+        IERC20(0x1a7e4e63778B4f12a199C062f3eFdD288afCBce8);
+    IERC20 internal constant euroc =
+        IERC20(0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c);
     address internal constant uniswapv3 =
         0xE592427A0AEce92De3Edee1F18E0157C05861564;
-    uint24 public uniStableFee; // this is equal to 0.05%, can change this later if a different path becomes more optimal
+    uint24 public uniUsdcFee; // this is equal to 0.05%, can change this later if a different path becomes more optimal
+    uint24 public uniEuroFee; // this is equal to 0.01%, can change this later if a different path becomes more optimal
 
-    // check for cloning
-    bool internal isOriginal = true;
+    // rewards token info. we can have more than 1 reward token but this is rare, so we don't include this in the template
+    IERC20 public rewardsToken;
+    bool public hasRewards;
+    address[] internal rewardsPath;
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -292,84 +306,12 @@ contract StrategyConvexUsdcPairsClonable is StrategyConvexBase {
         address _curvePool,
         string memory _name
     ) public StrategyConvexBase(_vault) {
-        _initializeStrat(_pid, _curvePool, _name);
-    }
-
-    /* ========== CLONING ========== */
-
-    event Cloned(address indexed clone);
-
-    // we use this to clone our original strategy to other vaults
-    function cloneConvexUsdcPairs(
-        address _vault,
-        address _strategist,
-        address _rewards,
-        address _keeper,
-        uint256 _pid,
-        address _curvePool,
-        string memory _name
-    ) external returns (address newStrategy) {
-        require(isOriginal);
-        // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
-        bytes20 addressBytes = bytes20(address(this));
-        assembly {
-            // EIP-1167 bytecode
-            let clone_code := mload(0x40)
-            mstore(
-                clone_code,
-                0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000
-            )
-            mstore(add(clone_code, 0x14), addressBytes)
-            mstore(
-                add(clone_code, 0x28),
-                0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000
-            )
-            newStrategy := create(0, clone_code, 0x37)
-        }
-
-        StrategyConvexUsdcPairsClonable(newStrategy).initialize(
-            _vault,
-            _strategist,
-            _rewards,
-            _keeper,
-            _pid,
-            _curvePool,
-            _name
-        );
-
-        emit Cloned(newStrategy);
-    }
-
-    // this will only be called by the clone function above
-    function initialize(
-        address _vault,
-        address _strategist,
-        address _rewards,
-        address _keeper,
-        uint256 _pid,
-        address _curvePool,
-        string memory _name
-    ) public {
-        _initialize(_vault, _strategist, _rewards, _keeper);
-        _initializeStrat(_pid, _curvePool, _name);
-    }
-
-    // this is called by our original strategy, as well as any clones
-    function _initializeStrat(
-        uint256 _pid,
-        address _curvePool,
-        string memory _name
-    ) internal {
-        // make sure that we haven't initialized this before
-        require(address(curve) == address(0)); // already initialized.
-
         // You can set these parameters on deployment to whatever you want
-        maxReportDelay = 21 days; // 21 days in seconds, if we hit this then harvestTrigger = True
+        maxReportDelay = 365 days; // 365 days in seconds, if we hit this then harvestTrigger = True
         healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; // health.ychad.eth
-        harvestProfitMin = 60000e6;
+        harvestProfitMin = 7_500e6;
         harvestProfitMax = 120000e6;
         creditThreshold = 1e6 * 1e18;
-        keepCRV = 1000; // default of 10%
         keepCVXDestination = 0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde; // default to treasury
 
         // want = Curve LP
@@ -393,13 +335,18 @@ contract StrategyConvexUsdcPairsClonable is StrategyConvexBase {
         require(address(lptoken) == address(want));
 
         // set our needed curve approvals
-        usdc.approve(address(curve), type(uint256).max);
+        ageur.approve(address(curve), type(uint256).max);
+        euroc.approve(address(curve), type(uint256).max);
 
         // set our strategy's name
         stratName = _name;
 
         // set our uniswap pool fees
-        uniStableFee = 500;
+        uniUsdcFee = 500;
+        uniEuroFee = 100;
+
+        // set our target token
+        targetEuro = address(ageur);
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
@@ -431,12 +378,24 @@ contract StrategyConvexUsdcPairsClonable is StrategyConvexBase {
             convexBalance = convexToken.balanceOf(address(this));
         }
 
+        // claim and sell our rewards if we have them
+        if (hasRewards) {
+            uint256 _rewardsBalance =
+                IERC20(rewardsToken).balanceOf(address(this));
+            if (_rewardsBalance > 0) {
+                _sellRewards(_rewardsBalance);
+            }
+        }
+
         _sellCrvAndCvx(crvBalance, convexBalance);
 
+        // check for balances of tokens to deposit
+        uint256 _ageurBalance = ageur.balanceOf(address(this));
+        uint256 _eurocBalance = euroc.balanceOf(address(this));
+
         // deposit our USDC to the pool
-        uint256 usdcBalance = usdc.balanceOf(address(this));
-        if (usdcBalance > 0) {
-            curve.add_liquidity([0, usdcBalance], 0);
+        if (_ageurBalance > 0 || _eurocBalance > 0) {
+            curve.add_liquidity([_ageurBalance, _eurocBalance], 0);
         }
 
         // debtOustanding will only be > 0 in the event of revoking or if we need to rebalance from a withdrawal or lowering the debtRatio
@@ -508,8 +467,10 @@ contract StrategyConvexUsdcPairsClonable is StrategyConvexBase {
                 IUniV3.ExactInputParams(
                     abi.encodePacked(
                         address(weth),
-                        uint24(uniStableFee),
-                        address(usdc)
+                        uint24(uniUsdcFee),
+                        address(usdc),
+                        uint24(uniEuroFee),
+                        address(targetEuro)
                     ),
                     address(this),
                     block.timestamp,
@@ -518,6 +479,17 @@ contract StrategyConvexUsdcPairsClonable is StrategyConvexBase {
                 )
             );
         }
+    }
+
+    // Sells our harvested reward token into the selected output.
+    function _sellRewards(uint256 _amount) internal {
+        IUniswapV2Router02(sushiswap).swapExactTokensForTokens(
+            _amount,
+            uint256(0),
+            rewardsPath,
+            address(this),
+            block.timestamp
+        );
     }
 
     /* ========== KEEP3RS ========== */
@@ -623,7 +595,7 @@ contract StrategyConvexUsdcPairsClonable is StrategyConvexBase {
     {}
 
     // check if the current baseFee is below our external target
-    function isBaseFeeAcceptable() internal view returns (bool) {
+    function isBaseFeeAcceptable() public view returns (bool) {
         return
             IBaseFee(0xb5e1CAcB567d98faaDB60a1fD4820720141f064F)
                 .isCurrentBaseFeeAcceptable();
@@ -639,6 +611,48 @@ contract StrategyConvexUsdcPairsClonable is StrategyConvexBase {
     /* ========== SETTERS ========== */
 
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
+
+    /// @notice Set optimal token to sell harvested funds for depositing to Curve.
+    function setOptimal(uint256 _optimal) external onlyVaultManagers {
+        if (_optimal == 0) {
+            targetEuro = address(ageur);
+            uniEuroFee = 100;
+        } else if (_optimal == 1) {
+            targetEuro = address(euroc);
+            uniEuroFee = 500;
+        } else {
+            revert("incorrect token");
+        }
+    }
+
+    /// @notice Use to update, add, or remove extra rewards tokens.
+    function updateRewards(bool _hasRewards, uint256 _rewardsIndex)
+        external
+        onlyGovernance
+    {
+        if (
+            address(rewardsToken) != address(0) &&
+            address(rewardsToken) != address(convexToken)
+        ) {
+            rewardsToken.approve(sushiswap, uint256(0));
+        }
+        if (_hasRewards == false) {
+            hasRewards = false;
+            rewardsToken = IERC20(address(0));
+            virtualRewardsPool = address(0);
+        } else {
+            // update with our new token. get this via our virtualRewardsPool
+            virtualRewardsPool = rewardsContract.extraRewards(_rewardsIndex);
+            address _rewardsToken =
+                IConvexRewards(virtualRewardsPool).rewardToken();
+            rewardsToken = IERC20(_rewardsToken);
+
+            // approve, setup our path, and turn on rewards
+            rewardsToken.approve(sushiswap, type(uint256).max);
+            rewardsPath = [address(rewardsToken), address(ageur)];
+            hasRewards = true;
+        }
+    }
 
     /**
      * @notice
@@ -665,7 +679,11 @@ contract StrategyConvexUsdcPairsClonable is StrategyConvexBase {
     }
 
     /// @notice Set the fee pool we'd like to swap through on UniV3 (1% = 10_000)
-    function setUniFees(uint24 _stableFee) external onlyVaultManagers {
-        uniStableFee = _stableFee;
+    function setUniFees(uint24 _usdcFee, uint24 _euroFee)
+        external
+        onlyVaultManagers
+    {
+        uniUsdcFee = _usdcFee;
+        uniEuroFee = _euroFee;
     }
 }
