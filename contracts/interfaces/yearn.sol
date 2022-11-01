@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0
-pragma solidity 0.6.12;
+pragma solidity ^0.8.15;
 pragma experimental ABIEncoderV2;
-
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 interface ICurveStrategyProxy {
     function proxy() external returns (address);

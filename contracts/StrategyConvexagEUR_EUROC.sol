@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0
-pragma solidity 0.6.12;
+pragma solidity ^0.8.15;
 pragma experimental ABIEncoderV2;
 
 // These are the core Yearn libraries
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/math/Math.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 import "./interfaces/curve.sol";
 import {IUniswapV2Router02} from "./interfaces/uniswap.sol";
@@ -99,6 +98,7 @@ interface IConvexDeposit {
 }
 
 abstract contract StrategyConvexBase is BaseStrategy {
+    using SafeERC20 for IERC20;
     using Address for address;
 
     /* ========== STATE VARIABLES ========== */
@@ -133,8 +133,6 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // keeper stuff
     uint256 public harvestProfitMin; // minimum size in USD (6 decimals) that we want to harvest
     uint256 public harvestProfitMax; // maximum size in USD (6 decimals) that we want to harvest
-    uint256 public creditThreshold; // amount of credit in underlying tokens that will automatically trigger a harvest
-    bool internal forceHarvestTriggerOnce; // only set this to true when we want to trigger our keepers to harvest for us
 
     string internal stratName;
 
@@ -167,7 +165,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
     }
 
     function estimatedTotalAssets() public view override returns (uint256) {
-        return balanceOfWant().add(stakedBalance());
+        return balanceOfWant() + stakedBalance();
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
@@ -194,13 +192,13 @@ abstract contract StrategyConvexBase is BaseStrategy {
             uint256 _stakedBal = stakedBalance();
             if (_stakedBal > 0) {
                 rewardsContract.withdrawAndUnwrap(
-                    Math.min(_stakedBal, _amountNeeded.sub(_wantBal)),
+                    Math.min(_stakedBal, _amountNeeded - _wantBal),
                     claimRewards
                 );
             }
             uint256 _withdrawnBal = balanceOfWant();
             _liquidatedAmount = Math.min(_amountNeeded, _withdrawnBal);
-            _loss = _amountNeeded.sub(_liquidatedAmount);
+            _loss = _amountNeeded - _liquidatedAmount;
         } else {
             // we have enough balance to cover the liquidation available
             return (_amountNeeded, 0);
@@ -366,13 +364,13 @@ contract StrategyConvexagEUR_EUROC is StrategyConvexBase {
         uint256 crvBalance = crv.balanceOf(address(this));
         uint256 convexBalance = convexToken.balanceOf(address(this));
 
-        uint256 _sendToVoter = crvBalance.mul(keepCRV).div(FEE_DENOMINATOR);
+        uint256 _sendToVoter = (crvBalance * keepCRV) / FEE_DENOMINATOR;
         if (_sendToVoter > 0) {
             crv.safeTransfer(voter, _sendToVoter);
             crvBalance = crv.balanceOf(address(this));
         }
 
-        uint256 _cvxToKeep = convexBalance.mul(keepCVX).div(FEE_DENOMINATOR);
+        uint256 _cvxToKeep = (convexBalance * keepCVX) / FEE_DENOMINATOR;
         if (_cvxToKeep > 0) {
             convexToken.safeTransfer(keepCVXDestination, _cvxToKeep);
             convexBalance = convexToken.balanceOf(address(this));
@@ -417,16 +415,16 @@ contract StrategyConvexagEUR_EUROC is StrategyConvexBase {
 
         // if assets are greater than debt, things are working great!
         if (assets > debt) {
-            _profit = assets.sub(debt);
+            _profit = assets - debt;
             uint256 _wantBal = balanceOfWant();
-            if (_profit.add(_debtPayment) > _wantBal) {
+            if (_profit + _debtPayment > _wantBal) {
                 // this should only be hit following donations to strategy
                 liquidateAllPositions();
             }
         }
         // if assets are less than debt, we are in trouble
         else {
-            _loss = debt.sub(assets);
+            _loss = debt - assets;
         }
 
         // we're done harvesting, so reset our trigger if we used it
@@ -536,7 +534,7 @@ contract StrategyConvexagEUR_EUROC is StrategyConvexBase {
 
         StrategyParams memory params = vault.strategies(address(this));
         // harvest no matter what once we reach our maxDelay
-        if (block.timestamp.sub(params.lastReport) > maxReportDelay) {
+        if (block.timestamp - params.lastReport > maxReportDelay) {
             return true;
         }
 
@@ -558,17 +556,17 @@ contract StrategyConvexagEUR_EUROC is StrategyConvexBase {
         uint256 supply = convexToken.totalSupply();
         uint256 mintableCvx;
 
-        uint256 cliff = supply.div(reductionPerCliff);
+        uint256 cliff = supply / reductionPerCliff;
         uint256 _claimableBal = claimableBalance();
         //mint if below total cliffs
         if (cliff < totalCliffs) {
             //for reduction% take inverse of current cliff
-            uint256 reduction = totalCliffs.sub(cliff);
+            uint256 reduction = totalCliffs - cliff;
             //reduce
-            mintableCvx = _claimableBal.mul(reduction).div(totalCliffs);
+            mintableCvx = (_claimableBal * reduction) / totalCliffs;
 
             //supply cap check
-            uint256 amtTillMax = maxSupply.sub(supply);
+            uint256 amtTillMax = maxSupply - supply;
             if (mintableCvx > amtTillMax) {
                 mintableCvx = amtTillMax;
             }
@@ -576,14 +574,14 @@ contract StrategyConvexagEUR_EUROC is StrategyConvexBase {
 
         // our chainlink oracle returns prices normalized to 8 decimals, we convert it to 6
         IOracle ethOracle = IOracle(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
-        uint256 ethPrice = ethOracle.latestAnswer().div(1e2); // 1e8 div 1e2 = 1e6
-        uint256 crvPrice = crveth.price_oracle().mul(ethPrice).div(1e18); // 1e18 mul 1e6 div 1e18 = 1e6
-        uint256 cvxPrice = cvxeth.price_oracle().mul(ethPrice).div(1e18); // 1e18 mul 1e6 div 1e18 = 1e6
+        uint256 ethPrice = ethOracle.latestAnswer() / 1e2; // 1e8 div 1e2 = 1e6
+        uint256 crvPrice = (crveth.price_oracle() * ethPrice) / 1e18; // 1e18 mul 1e6 div 1e18 = 1e6
+        uint256 cvxPrice = (cvxeth.price_oracle() * ethPrice) / 1e18; // 1e18 mul 1e6 div 1e18 = 1e6
 
-        uint256 crvValue = crvPrice.mul(_claimableBal).div(1e18); // 1e6 mul 1e18 div 1e18 = 1e6
-        uint256 cvxValue = cvxPrice.mul(mintableCvx).div(1e18); // 1e6 mul 1e18 div 1e18 = 1e6
+        uint256 crvValue = (crvPrice * _claimableBal) / 1e18; // 1e6 mul 1e18 div 1e18 = 1e6
+        uint256 cvxValue = (cvxPrice * mintableCvx) / 1e18; // 1e6 mul 1e18 div 1e18 = 1e6
 
-        return crvValue.add(cvxValue);
+        return crvValue + cvxValue;
     }
 
     // convert our keeper's eth cost into want, we don't need this anymore since we don't use baseStrategy harvestTrigger
@@ -593,13 +591,6 @@ contract StrategyConvexagEUR_EUROC is StrategyConvexBase {
         override
         returns (uint256)
     {}
-
-    // check if the current baseFee is below our external target
-    function isBaseFeeAcceptable() public view returns (bool) {
-        return
-            IBaseFee(0xb5e1CAcB567d98faaDB60a1fD4820720141f064F)
-                .isCurrentBaseFeeAcceptable();
-    }
 
     /// @notice True if someone needs to earmark rewards on Convex before keepers harvest again
     function needsEarmarkReward() public view returns (bool needsEarmark) {
