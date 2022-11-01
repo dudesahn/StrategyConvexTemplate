@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.15;
-pragma experimental ABIEncoderV2;
 
 // These are the core Yearn libraries
 import "@openzeppelin/contracts/utils/Address.sol";
@@ -8,14 +7,7 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 
 import "./interfaces/curve.sol";
 import {IUniswapV2Router02} from "./interfaces/uniswap.sol";
-import {
-    BaseStrategy,
-    StrategyParams
-} from "@yearnvaults/contracts/BaseStrategy.sol";
-
-interface IBaseFee {
-    function isCurrentBaseFeeAcceptable() external view returns (bool);
-}
+import "@yearnvaults/contracts/BaseStrategy.sol";
 
 interface IOracle {
     function latestAnswer() external view returns (uint256);
@@ -98,8 +90,6 @@ interface IConvexDeposit {
 }
 
 abstract contract StrategyConvexBase is BaseStrategy {
-    using SafeERC20 for IERC20;
-    using Address for address;
 
     /* ========== STATE VARIABLES ========== */
     // these should stay the same across different wants.
@@ -141,7 +131,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
 
     /* ========== CONSTRUCTOR ========== */
 
-    constructor(address _vault) public BaseStrategy(_vault) {}
+    constructor(address _vault) BaseStrategy(_vault) {}
 
     /* ========== VIEWS ========== */
 
@@ -254,16 +244,10 @@ abstract contract StrategyConvexBase is BaseStrategy {
         claimRewards = _claimRewards;
     }
 
-    // This allows us to manually harvest with our keeper as needed
-    function setForceHarvestTriggerOnce(bool _forceHarvestTriggerOnce)
-        external
-        onlyVaultManagers
-    {
-        forceHarvestTriggerOnce = _forceHarvestTriggerOnce;
-    }
 }
 
 contract StrategyConvexagEUR_EUROC is StrategyConvexBase {
+    using SafeERC20 for IERC20;
     /* ========== STATE VARIABLES ========== */
     // these will likely change across different wants.
 
