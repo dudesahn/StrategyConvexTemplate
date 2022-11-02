@@ -23,6 +23,8 @@ def test_simple_harvest(
     is_convex,
     crv,
     accounts,
+    booster,
+    pid,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -82,6 +84,125 @@ def test_simple_harvest(
 
     # simulate some profits if we don't have any to make sure everything else works
     if no_profit:
+        if is_convex:
+            # have our crv whale donate directly to the rewards contract to make sure our triggers work
+            crv_whale = accounts.at(
+                "0x32D03DB62e464c9168e41028FFa6E9a05D8C6451", force=True
+            )
+            crv.approve(rewardsContract, 2**256 - 1, {"from": crv_whale})
+            rewardsContract.donate(10_000e18, {"from": crv_whale})
+            chain.sleep(1)
+            chain.mine(1)
+            booster.earmarkRewards(pid, {"from": gov})
+            chain.sleep(1)
+            chain.mine(1)
+            assert strategy.claimableProfitInUsdt() > 0
+
+            # update our minProfit so our harvest triggers true
+            strategy.setHarvestTriggerParams(
+                1, 1000000000e6, 1e24, False, {"from": gov}
+            )
+            tx = strategy.harvestTrigger(0, {"from": gov})
+            print("\nShould we harvest? Should be true.", tx)
+            assert tx == True
+
+            # update our maxProfit so harvest triggers true
+            strategy.setHarvestTriggerParams(
+                1000000000e6, 1, 1e24, False, {"from": gov}
+            )
+            tx = strategy.harvestTrigger(0, {"from": gov})
+            print("\nShould we harvest? Should be true.", tx)
+            assert tx == True
+
+            # harvest to reset, store new asset amount, turn off health check
+            old_assets = vault.totalAssets()
+            chain.sleep(sleep_time)
+            chain.mine(1)
+            strategy.setDoHealthCheck(False, {"from": gov})
+            tx = strategy.harvest({"from": gov})
+            chain.sleep(1)
+            chain.mine(1)
+            new_assets = vault.totalAssets()
+            # confirm we made money, or at least that we have about the same
+            assert new_assets >= old_assets
+            print("\nAssets after 1 day: ", new_assets / 1e18)
+
+            # Display estimated APR
+            print(
+                "\nEstimated Simulated Donation APR: ",
+                "{:.2%}".format(
+                    ((new_assets - old_assets) * (365 * 86400 / sleep_time))
+                    / (strategy.estimatedTotalAssets())
+                ),
+            )
+            print("Donation harvest info:", tx.events["Harvested"])
+            try:
+                assert tx.events["Harvested"]["profit"] > 0
+            except:
+                assert rewardsContract.earned(strategy) > 0
+                print("\nEarning rewards, but dust so didn't sell during harvest")
+
+            # have whale donate CRV directly to the strategy
+            crv_whale = accounts.at(
+                "0x32D03DB62e464c9168e41028FFa6E9a05D8C6451", force=True
+            )
+            crv.transfer(strategy, 10_000e18, {"from": crv_whale})
+
+            # harvest, store new asset amount, turn off health check since we're donating a lot
+            old_assets = vault.totalAssets()
+            chain.sleep(1)
+            chain.mine(1)
+            strategy.setDoHealthCheck(False, {"from": gov})
+            tx = strategy.harvest({"from": gov})
+            chain.sleep(1)
+            chain.mine(1)
+            new_assets = vault.totalAssets()
+            # confirm we made money, or at least that we have about the same
+            assert new_assets >= old_assets
+            print("\nAssets after 1 day: ", new_assets / 1e18)
+
+            # Display estimated APR
+            print(
+                "\nEstimated Simulated CRV APR: ",
+                "{:.2%}".format(
+                    ((new_assets - old_assets) * (365 * 86400 / sleep_time))
+                    / (strategy.estimatedTotalAssets())
+                ),
+            )
+            print("CRV harvest info:", tx.events["Harvested"])
+            assert tx.events["Harvested"]["profit"] > 0
+
+            cvx = Contract("0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B")
+            cvx_whale = accounts.at(
+                "0x28C6c06298d514Db089934071355E5743bf21d60", force=True
+            )
+            cvx.transfer(strategy, 1000e18, {"from": cvx_whale})
+
+            # harvest, store new asset amount, turn off health check since we're donating a lot
+            old_assets = vault.totalAssets()
+            chain.sleep(1)
+            chain.mine(1)
+            strategy.setDoHealthCheck(False, {"from": gov})
+            tx = strategy.harvest({"from": gov})
+            chain.sleep(1)
+            chain.mine(1)
+            new_assets = vault.totalAssets()
+            # confirm we made money, or at least that we have about the same
+            assert new_assets >= old_assets
+            print("\nAssets after 1 day: ", new_assets / 1e18)
+
+            # Display estimated APR
+            print(
+                "\nEstimated Simulated CVX APR: ",
+                "{:.2%}".format(
+                    ((new_assets - old_assets) * (365 * 86400 / sleep_time))
+                    / (strategy.estimatedTotalAssets())
+                ),
+            )
+            print("CVX harvest info:", tx.events["Harvested"])
+            assert tx.events["Harvested"]["profit"] > 0
+    else:
+        # have whale donate CRV directly to the voter strategy
         crv_whale = accounts.at(
             "0x32D03DB62e464c9168e41028FFa6E9a05D8C6451", force=True
         )
@@ -110,56 +231,6 @@ def test_simple_harvest(
         )
         print("CRV harvest info:", tx.events["Harvested"])
         assert tx.events["Harvested"]["profit"] > 0
-
-        if is_convex:
-            cvx = Contract("0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B")
-            cvx_whale = accounts.at(
-                "0x28C6c06298d514Db089934071355E5743bf21d60", force=True
-            )
-            cvx.transfer(strategy, 1000e18, {"from": cvx_whale})
-
-            # update our minProfit so our harvest triggers true
-            strategy.setHarvestTriggerParams(
-                1, 1000000000e6, 1e24, False, {"from": gov}
-            )
-            tx = strategy.harvestTrigger(0, {"from": gov})
-            print("\nShould we harvest? Should be true.", tx)
-            assert tx == True
-
-            # update our maxProfit so harvest triggers true
-            strategy.setHarvestTriggerParams(
-                1000000000e6, 1, 1e24, False, {"from": gov}
-            )
-            tx = strategy.harvestTrigger(0, {"from": gov})
-            print("\nShould we harvest? Should be true.", tx)
-            assert tx == True
-
-            # harvest, store new asset amount, turn off health check since we're donating a lot
-            old_assets = vault.totalAssets()
-            chain.sleep(1)
-            chain.mine(1)
-            strategy.setDoHealthCheck(False, {"from": gov})
-            tx = strategy.harvest({"from": gov})
-            chain.sleep(1)
-            chain.mine(1)
-            new_assets = vault.totalAssets()
-            # confirm we made money, or at least that we have about the same
-            assert new_assets >= old_assets
-            print("\nAssets after 1 day: ", new_assets / 1e18)
-
-            # Display estimated APR
-            print(
-                "\nEstimated Simulated CVX APR: ",
-                "{:.2%}".format(
-                    ((new_assets - old_assets) * (365 * 86400 / sleep_time))
-                    / (strategy.estimatedTotalAssets())
-                ),
-            )
-            print("CVX harvest info:", tx.events["Harvested"])
-            assert tx.events["Harvested"]["profit"] > 0
-
-        # end here if no profit, no reason to test USDC and USDT
-        return
 
     # change our optimal deposit asset
     strategy.setOptimal(1, {"from": gov})

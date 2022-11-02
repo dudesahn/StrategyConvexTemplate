@@ -19,18 +19,17 @@ def test_setters(
 ):
 
     # test our manual harvest trigger
-    gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})
     strategy.setForceHarvestTriggerOnce(True, {"from": gov})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be true.", tx)
     assert tx == True
 
     # shouldn't manually harvest when gas is high
-    gasOracle.setMaxAcceptableBaseFee(1 * 1e9, {"from": strategist_ms})
+    gasOracle.setManualBaseFeeBool(False, {"from": strategist_ms})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be false.", tx)
     assert tx == False
-    gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})
+    gasOracle.setManualBaseFeeBool(True, {"from": strategist_ms})
 
     strategy.setForceHarvestTriggerOnce(False, {"from": gov})
     tx = strategy.harvestTrigger(0, {"from": gov})
@@ -55,12 +54,10 @@ def test_setters(
     strategy.harvest({"from": gov})
 
     # test our setters in baseStrategy and our main strategy
-    strategy.setDebtThreshold(1, {"from": gov})
     strategy.setMaxReportDelay(0, {"from": gov})
     strategy.setMaxReportDelay(1e18, {"from": gov})
     strategy.setMetadataURI(0, {"from": gov})
     strategy.setMinReportDelay(100, {"from": gov})
-    strategy.setProfitFactor(1000, {"from": gov})
     strategy.setRewards(gov, {"from": strategist})
     strategy.setUniFees(0, 0, {"from": gov})
     strategy.updateRewards(False, 0, {"from": gov})

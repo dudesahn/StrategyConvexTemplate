@@ -2,7 +2,6 @@
 pragma solidity ^0.8.15;
 
 // These are the core Yearn libraries
-import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
 import "./interfaces/curve.sol";
@@ -90,7 +89,6 @@ interface IConvexDeposit {
 }
 
 abstract contract StrategyConvexBase is BaseStrategy {
-
     /* ========== STATE VARIABLES ========== */
     // these should stay the same across different wants.
 
@@ -243,7 +241,6 @@ abstract contract StrategyConvexBase is BaseStrategy {
     function setClaimRewards(bool _claimRewards) external onlyVaultManagers {
         claimRewards = _claimRewards;
     }
-
 }
 
 contract StrategyConvexagEUR_EUROC is StrategyConvexBase {

@@ -194,7 +194,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 12
+    hours_to_sleep = 6
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
@@ -300,7 +300,7 @@ if chain_used == 1:  # mainnet
 
     @pytest.fixture(scope="session")
     def gasOracle():
-        yield Contract("0xb5e1CAcB567d98faaDB60a1fD4820720141f064F")
+        yield Contract("0x1E7eFAbF282614Aa2543EDaA50517ef5a23c868b")
 
     # Define any accounts in this section
     # for live testing, governance is the strategist MS; we will update this before we endorse
@@ -364,8 +364,8 @@ if chain_used == 1:  # mainnet
         proxy,
         pid,
         pool,
-        strategy_name,
         gasOracle,
+        strategy_name,
         strategist_ms,
         is_convex,
         booster,
@@ -374,6 +374,7 @@ if chain_used == 1:  # mainnet
         has_rewards,
         vault_address,
         try_blocks,
+        accounts,
     ):
         if is_convex:
             # make sure to include all constructor parameters needed here
@@ -486,9 +487,13 @@ if chain_used == 1:  # mainnet
             # approve our new strategy on the proxy
             proxy.approveStrategy(strategy.gauge(), strategy, {"from": gov})
 
-        # make all harvests permissive unless we change the value lower
-        gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})
+        # turn our oracle into testing mode by setting the provider to 0x00, should default to true
+        strategy.setBaseFeeOracle(gasOracle, {"from": strategist_ms})
+        gasOracle = Contract(strategy.baseFeeOracle())
+        oracle_gov = accounts.at(gasOracle.governance(), force=True)
+        gasOracle.setBaseFeeProvider(ZERO_ADDRESS, {"from": oracle_gov})
         strategy.setHealthCheck(healthCheck, {"from": gov})
+        assert strategy.isBaseFeeAcceptable() == True
 
         # add rewards token if needed. Double-check if we specify router here (sBTC new and old clonable only)
         if has_rewards:
@@ -558,10 +563,6 @@ elif chain_used == 250:  # only fantom so far and convex doesn't exist there
             _poolAddress = curve_registry.get_pool_from_lp_token(token)
             poolAddress = Contract(_poolAddress)
         yield poolAddress
-
-    @pytest.fixture(scope="session")
-    def gasOracle():
-        yield Contract("0xb5e1CAcB567d98faaDB60a1fD4820720141f064F")
 
     # Define any accounts in this section
     # for live testing, governance is the strategist MS; we will update this before we endorse
