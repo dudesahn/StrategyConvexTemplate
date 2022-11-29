@@ -96,20 +96,16 @@ def test_simple_harvest(
             booster.earmarkRewards(pid, {"from": gov})
             chain.sleep(1)
             chain.mine(1)
-            assert strategy.claimableProfitInUsdt() > 0
+            assert strategy.claimableProfitInUsdc() > 0
 
             # update our minProfit so our harvest triggers true
-            strategy.setHarvestTriggerParams(
-                1, 1000000000e6, 1e24, False, {"from": gov}
-            )
+            strategy.setHarvestTriggerParams(1, 1000000000e6, False, {"from": gov})
             tx = strategy.harvestTrigger(0, {"from": gov})
             print("\nShould we harvest? Should be true.", tx)
             assert tx == True
 
             # update our maxProfit so harvest triggers true
-            strategy.setHarvestTriggerParams(
-                1000000000e6, 1, 1e24, False, {"from": gov}
-            )
+            strategy.setHarvestTriggerParams(1000000000e6, 1, False, {"from": gov})
             tx = strategy.harvestTrigger(0, {"from": gov})
             print("\nShould we harvest? Should be true.", tx)
             assert tx == True
@@ -201,36 +197,36 @@ def test_simple_harvest(
             )
             print("CVX harvest info:", tx.events["Harvested"])
             assert tx.events["Harvested"]["profit"] > 0
-    else:
-        # have whale donate CRV directly to the voter strategy
-        crv_whale = accounts.at(
-            "0x32D03DB62e464c9168e41028FFa6E9a05D8C6451", force=True
-        )
-        crv.transfer(strategy, 10_000e18, {"from": crv_whale})
+        else:
+            # have whale donate CRV directly to the voter strategy
+            crv_whale = accounts.at(
+                "0x32D03DB62e464c9168e41028FFa6E9a05D8C6451", force=True
+            )
+            crv.transfer(strategy, 10_000e18, {"from": crv_whale})
 
-        # harvest, store new asset amount, turn off health check since we're donating a lot
-        old_assets = vault.totalAssets()
-        chain.sleep(1)
-        chain.mine(1)
-        strategy.setDoHealthCheck(False, {"from": gov})
-        tx = strategy.harvest({"from": gov})
-        chain.sleep(1)
-        chain.mine(1)
-        new_assets = vault.totalAssets()
-        # confirm we made money, or at least that we have about the same
-        assert new_assets >= old_assets
-        print("\nAssets after 1 day: ", new_assets / 1e18)
+            # harvest, store new asset amount, turn off health check since we're donating a lot
+            old_assets = vault.totalAssets()
+            chain.sleep(1)
+            chain.mine(1)
+            strategy.setDoHealthCheck(False, {"from": gov})
+            tx = strategy.harvest({"from": gov})
+            chain.sleep(1)
+            chain.mine(1)
+            new_assets = vault.totalAssets()
+            # confirm we made money, or at least that we have about the same
+            assert new_assets >= old_assets
+            print("\nAssets after 1 day: ", new_assets / 1e18)
 
-        # Display estimated APR
-        print(
-            "\nEstimated Simulated CRV APR: ",
-            "{:.2%}".format(
-                ((new_assets - old_assets) * (365 * 86400 / sleep_time))
-                / (strategy.estimatedTotalAssets())
-            ),
-        )
-        print("CRV harvest info:", tx.events["Harvested"])
-        assert tx.events["Harvested"]["profit"] > 0
+            # Display estimated APR
+            print(
+                "\nEstimated Simulated CRV APR: ",
+                "{:.2%}".format(
+                    ((new_assets - old_assets) * (365 * 86400 / sleep_time))
+                    / (strategy.estimatedTotalAssets())
+                ),
+            )
+            print("CRV harvest info:", tx.events["Harvested"])
+            assert tx.events["Harvested"]["profit"] > 0
 
     # change our optimal deposit asset
     strategy.setOptimal(1, {"from": gov})
@@ -238,10 +234,6 @@ def test_simple_harvest(
     # can't set to 4
     with brownie.reverts():
         strategy.setOptimal(4, {"from": gov})
-
-    # store asset amount
-    before_usdc_assets = vault.totalAssets()
-    assert token.balanceOf(strategy) == 0
 
     # try and include custom logic here to check that funds are in the staking contract (if needed)
     if is_convex:
@@ -252,6 +244,10 @@ def test_simple_harvest(
     # simulate profits
     chain.sleep(sleep_time)
     chain.mine(1)
+
+    # store asset amount before harvest
+    before_usdc_assets = vault.totalAssets()
+    assert token.balanceOf(strategy) == 0
 
     # harvest, store new asset amount
     chain.sleep(1)

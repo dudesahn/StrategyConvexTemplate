@@ -59,7 +59,6 @@ def test_setters(
     strategy.setMetadataURI(0, {"from": gov})
     strategy.setMinReportDelay(100, {"from": gov})
     strategy.setRewards(gov, {"from": strategist})
-    strategy.setUniFees(0, 0, {"from": gov})
     strategy.updateRewards(False, 0, {"from": gov})
     with brownie.reverts():
         strategy.updateRewards(True, 0, {"from": gov})
@@ -67,13 +66,9 @@ def test_setters(
     if is_convex:
         strategy.setKeep(10, 0, gov, {"from": gov})
         strategy.setClaimRewards(True, {"from": gov})
-        strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
+        strategy.setHarvestTriggerParams(90000e6, 150000e6, False, {"from": gov})
     else:
         strategy.setKeepCRV(0, {"from": gov})
-    try:
-        strategy.setUniFees(3000, {"from": gov})
-    except:
-        print("\nThis strategy doesn't have Uniswap fees, most likely ETH-based")
 
     strategy.setStrategist(strategist, {"from": gov})
     name = strategy.name()
@@ -119,14 +114,5 @@ def test_setters(
     strategy.harvest({"from": gov})
     chain.sleep(86400)
 
-
-#     # try a health check with random contract as health check
-#     strategy.setHealthCheck(gov, {"from": gov})
-#     strategy.setDoHealthCheck(True, {"from": gov})
-#     with brownie.reverts():
-#         strategy.harvest({"from": gov})
-#
-#     # set emergency exit last
-#     strategy.setEmergencyExit({"from": gov})
-#     with brownie.reverts():
-#         strategy.setEmergencyExit({"from": gov})
+    # do this last so it doesn't mess with our harvests
+    strategy.setUniFees(0, 0, {"from": gov})

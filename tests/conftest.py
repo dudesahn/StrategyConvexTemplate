@@ -50,7 +50,7 @@ def pid():
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="session")
 def amount():
-    amount = 4_000e18  # 4k for agEUR-EUROC
+    amount = 50_000e18  # 50k for agEUR-EUROC
     yield amount
 
 
@@ -59,8 +59,8 @@ def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     whale = accounts.at(
-        "0xDe46532a49c88af504594F488822F452b7FBc7BD", force=True
-    )  # 0xDe46532a49c88af504594F488822F452b7FBc7BD, stakeDAO vault, 8k tokens
+        "0xF9F46eF781b9C7B76e8B505226d5E0e0E7FE2f04", force=True
+    )  # 0xF9F46eF781b9C7B76e8B505226d5E0e0E7FE2f04, curve gauge, okay to use with convex
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -173,7 +173,7 @@ def gauge_is_not_tokenized():
 # use this to test our strategy in case there are no profits
 @pytest.fixture(scope="session")
 def no_profit():
-    no_profit = True
+    no_profit = False
     yield no_profit
 
 
@@ -194,7 +194,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 6
+    hours_to_sleep = 24
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
@@ -433,9 +433,7 @@ if chain_used == 1:  # mainnet
                     vault.updateStrategyDebtRatio(strategy, 10000, {"from": gov})
 
             # this is the same for new or existing vaults
-            strategy.setHarvestTriggerParams(
-                90000e6, 150000e6, 1e24, False, {"from": gov}
-            )
+            strategy.setHarvestTriggerParams(90000e6, 150000e6, False, {"from": gov})
         else:
             # do slightly different if vault is existing or not
             if vault_address == ZERO_ADDRESS:

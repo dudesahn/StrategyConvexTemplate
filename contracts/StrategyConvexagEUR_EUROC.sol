@@ -9,7 +9,10 @@ import {IUniswapV2Router02} from "./interfaces/uniswap.sol";
 import "@yearnvaults/contracts/BaseStrategy.sol";
 
 interface IOracle {
-    function latestAnswer() external view returns (uint256);
+    function getPriceUsdcRecommended(address tokenAddress)
+        external
+        view
+        returns (uint256);
 }
 
 interface IUniV3 {
@@ -259,7 +262,7 @@ contract StrategyConvexagEUR_EUROC is StrategyConvexBase {
     ICurveFi internal constant cvxeth =
         ICurveFi(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4); // use curve's new CVX-ETH crypto pool to sell our CVX
 
-    // sell our weth to usdc on uniV3
+    // sell our weth to euros on uniV3
     address public targetEuro;
     IERC20 internal constant usdc =
         IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
@@ -359,8 +362,7 @@ contract StrategyConvexagEUR_EUROC is StrategyConvexBase {
 
         // claim and sell our rewards if we have them
         if (hasRewards) {
-            uint256 _rewardsBalance =
-                IERC20(rewardsToken).balanceOf(address(this));
+            uint256 _rewardsBalance = rewardsToken.balanceOf(address(this));
             if (_rewardsBalance > 0) {
                 _sellRewards(_rewardsBalance);
             }
@@ -372,7 +374,7 @@ contract StrategyConvexagEUR_EUROC is StrategyConvexBase {
         uint256 _ageurBalance = ageur.balanceOf(address(this));
         uint256 _eurocBalance = euroc.balanceOf(address(this));
 
-        // deposit our USDC to the pool
+        // deposit our euros to the pool
         if (_ageurBalance > 0 || _eurocBalance > 0) {
             curve.add_liquidity([_ageurBalance, _eurocBalance], 0);
         }
@@ -426,7 +428,7 @@ contract StrategyConvexagEUR_EUROC is StrategyConvexBase {
         );
     }
 
-    // Sells our CRV and CVX for WETH on Curve, then sell WETH to USDC on UniV3
+    // Sells our CRV and CVX for WETH on Curve, then sell WETH -> USDC -> euro on UniV3
     function _sellCrvAndCvx(uint256 _crvAmount, uint256 _convexAmount)
         internal
     {
@@ -493,7 +495,7 @@ contract StrategyConvexagEUR_EUROC is StrategyConvexBase {
         }
 
         // harvest if we have a profit to claim at our upper limit without considering gas price
-        uint256 claimableProfit = claimableProfitInUsdt();
+        uint256 claimableProfit = claimableProfitInUsdc();
         if (claimableProfit > harvestProfitMax) {
             return true;
         }
@@ -528,41 +530,56 @@ contract StrategyConvexagEUR_EUROC is StrategyConvexBase {
         return false;
     }
 
-    /// @notice The value in dollars that our claimable rewards are worth (in USDT, 6 decimals).
-    function claimableProfitInUsdt() public view returns (uint256) {
+    /// @notice Calculates the profit if all claimable assets were sold for USDC (6 decimals).
+    /// @return Total return in USDC from selling claimable CRV and CVX.
+    function claimableProfitInUsdc() public view returns (uint256) {
+        IOracle yearnOracle =
+            IOracle(0x83d95e0D5f402511dB06817Aff3f9eA88224B030); // yearn lens oracle
+        uint256 crvPrice = yearnOracle.getPriceUsdcRecommended(address(crv));
+        uint256 convexTokenPrice =
+            yearnOracle.getPriceUsdcRecommended(address(convexToken));
+
         // calculations pulled directly from CVX's contract for minting CVX per CRV claimed
         uint256 totalCliffs = 1_000;
-        uint256 maxSupply = 100 * 1_000_000 * 1e18; // 100mil
-        uint256 reductionPerCliff = 100_000 * 1e18; // 100,000
+        uint256 maxSupply; // 100mil
+        unchecked {
+            maxSupply = 100 * 1_000_000 * 1e18;
+        }
+        uint256 reductionPerCliff; // 100,000
+        unchecked {
+            reductionPerCliff = 100_000 * 1e18;
+        }
         uint256 supply = convexToken.totalSupply();
         uint256 mintableCvx;
 
-        uint256 cliff = supply / reductionPerCliff;
+        uint256 cliff;
+        unchecked {
+            cliff = supply / reductionPerCliff;
+        }
         uint256 _claimableBal = claimableBalance();
         //mint if below total cliffs
         if (cliff < totalCliffs) {
-            //for reduction% take inverse of current cliff
-            uint256 reduction = totalCliffs - cliff;
-            //reduce
-            mintableCvx = (_claimableBal * reduction) / totalCliffs;
+            uint256 reduction; // for reduction% take inverse of current cliff
+            unchecked {
+                reduction = totalCliffs - cliff;
+            }
+            // reduce
+            unchecked {
+                mintableCvx = (_claimableBal * reduction) / totalCliffs;
+            }
 
-            //supply cap check
-            uint256 amtTillMax = maxSupply - supply;
+            uint256 amtTillMax; // supply cap check
+            unchecked {
+                amtTillMax = maxSupply - supply;
+            }
             if (mintableCvx > amtTillMax) {
                 mintableCvx = amtTillMax;
             }
         }
 
-        // our chainlink oracle returns prices normalized to 8 decimals, we convert it to 6
-        IOracle ethOracle = IOracle(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419);
-        uint256 ethPrice = ethOracle.latestAnswer() / 1e2; // 1e8 div 1e2 = 1e6
-        uint256 crvPrice = (crveth.price_oracle() * ethPrice) / 1e18; // 1e18 mul 1e6 div 1e18 = 1e6
-        uint256 cvxPrice = (cvxeth.price_oracle() * ethPrice) / 1e18; // 1e18 mul 1e6 div 1e18 = 1e6
-
-        uint256 crvValue = (crvPrice * _claimableBal) / 1e18; // 1e6 mul 1e18 div 1e18 = 1e6
-        uint256 cvxValue = (cvxPrice * mintableCvx) / 1e18; // 1e6 mul 1e18 div 1e18 = 1e6
-
-        return crvValue + cvxValue;
+        // Oracle returns prices as 6 decimals, so multiply by claimable amount and divide by token decimals (1e18)
+        return
+            (crvPrice * _claimableBal + convexTokenPrice * mintableCvx) / 1e18;
     }
 
     // convert our keeper's eth cost into want, we don't need this anymore since we don't use baseStrategy harvestTrigger
@@ -633,20 +650,16 @@ contract StrategyConvexagEUR_EUROC is StrategyConvexBase {
      * that will trigger a harvest if gas price is acceptable.
      * @param _harvestProfitMax The amount of profit in USDC that
      * will trigger a harvest regardless of gas price.
-     * @param _creditThreshold The number of want tokens that will
-     * automatically trigger a harvest once gas is cheap enough.
      * @param _checkEarmark Whether or not we should check Convex's
      * booster to see if we need to earmark before harvesting.
      */
     function setHarvestTriggerParams(
         uint256 _harvestProfitMin,
         uint256 _harvestProfitMax,
-        uint256 _creditThreshold,
         bool _checkEarmark
     ) external onlyVaultManagers {
         harvestProfitMin = _harvestProfitMin;
         harvestProfitMax = _harvestProfitMax;
-        creditThreshold = _creditThreshold;
         checkEarmark = _checkEarmark;
     }
 
