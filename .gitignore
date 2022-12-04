@@ -10,3 +10,5 @@ scripts/deploy2.py
 # Node/npm
 node_modules/
 .DS_Store
+env
+xenv

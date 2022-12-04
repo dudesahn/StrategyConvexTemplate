@@ -249,8 +249,10 @@ abstract contract StrategyConvexBase is BaseStrategy {
     function setSplit(address _split) external onlyGovernance {
         require(address(split) != _split);
         crv.approve(address(split), 0);
+        convexToken.approve(address(split), 0);
         split = ISplit(_split);
-        crv.approve(address(_split), type(uint256).max);
+        crv.approve(_split, type(uint256).max);
+        convexToken.approve(_split, type(uint256).max);
         emit SplitAddressUpdated(_split);
     }
 }
@@ -358,6 +360,7 @@ contract StrategyConvexCrvCvxPairsClonable is StrategyConvexBase {
         weth.approve(address(crveth), type(uint256).max);
         crv.approve(address(crveth), type(uint256).max);
         crv.approve(_split, type(uint256).max);
+        convexToken.approve(_split, type(uint256).max);
 
         // setup our rewards contract
         (address lptoken, , , address _rewardsContract, , ) =
@@ -383,11 +386,7 @@ contract StrategyConvexCrvCvxPairsClonable is StrategyConvexBase {
     {
         // this claims our CRV, CVX, and any extra tokens like SNX or ANKR. no harm leaving this true even if no extra rewards currently.
         rewardsContract.getReward(address(this), true);
-
-        _sellCvx();
-        _buyCRV();
         _splitCRV();
-
 
         // debtOustanding will only be > 0 in the event of revoking or if we need to rebalance from a withdrawal or lowering the debtRatio
         if (_debtOutstanding > 0) {
@@ -495,26 +494,10 @@ contract StrategyConvexCrvCvxPairsClonable is StrategyConvexBase {
         return false;
     }
 
-    // Sells our CRV and CVX on Curve, then WETH -> stables together on UniV3
-    function _sellCvx() internal {
-        uint256 _amount = convexToken.balanceOf(address(this));
-        if (_amount > 1e17) {
-            // don't want to swap dust or we might revert
-            cvxeth.exchange(1, 0, _amount, 0, false);
-        }
-        
-    }
-
-    function _buyCRV() internal {
-        uint256 _wethBalance = weth.balanceOf(address(this));
-        if (_wethBalance > 1e15) {
-            // don't want to swap dust or we might revert
-            crveth.exchange(0, 1, _wethBalance, 0, false);
-        }
-    }
-
     function _splitCRV() internal {
-        split.split();
+        if(address(split) != address(0)){
+            split.split();
+        }
     }
 
     /// @notice The value in dollars that our claimable rewards are worth (in USDT, 6 decimals).

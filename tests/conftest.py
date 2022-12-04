@@ -1,5 +1,5 @@
 import pytest
-from brownie import config, Wei, Contract, Splitter
+from brownie import config, Wei, Contract, Splitter, ZERO_ADDRESS
 import requests
 
 # Snapshots the chain before each test and reverts after test completion.
@@ -26,10 +26,7 @@ def tenderly_fork(web3, chain):
 
 ################################################ UPDATE THINGS BELOW HERE ################################################
 
-@pytest.fixture(scope="module")
-def splitter(strategist):
-    splitter = strategist.deploy(Splitter)
-    yield splitter
+
 
 # for this strategy, set this if we want to test CVX or CRV-ETH LPs. shouldn't need to touch anything else
 @pytest.fixture(scope="module")
@@ -53,11 +50,11 @@ def whale(accounts, use_crv, rewardsContract, vault, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     temple_ms = accounts.at('0x5C8898f8E0F9468D4A677887bC03EE2659321012', force=True)
-    b = token.balanceOf(temple_ms)
-    amt = rewardsContract.balanceOf(temple_ms)
-    rewardsContract.withdrawAndUnwrap(amt, True, {'from': temple_ms})
-    assert token.balanceOf(temple_ms) > b
-    token.approve(vault, 2**256-1, {'from': temple_ms})
+    # b = token.balanceOf(temple_ms)
+    # amt = rewardsContract.balanceOf(temple_ms)
+    # rewardsContract.withdrawAndUnwrap(amt, True, {'from': temple_ms})
+    # assert token.balanceOf(temple_ms) > b
+    # token.approve(vault, 2**256-1, {'from': temple_ms})
     yield temple_ms
 
 @pytest.fixture(scope="module")
@@ -254,12 +251,14 @@ def strategist(accounts):
 # use this if you need to deploy the vault
 @pytest.fixture(scope="module")
 def vault(pm, gov, rewards, guardian, management, token, chain):
-    Vault = pm(config["dependencies"][0]).Vault
-    vault = guardian.deploy(Vault)
-    vault.initialize(token, gov, rewards, "", "", guardian, {"from": gov})
-    vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
-    vault.setManagement(management, {"from": gov})
-    chain.sleep(1)
+    s = Contract('0x06aee67AC42473E9F0e7DC1A6687A1F26C8136A3') # old strat
+    vault = Contract(s.vault())
+    # Vault = pm(config["dependencies"][0]).Vault
+    # vault = guardian.deploy(Vault)
+    # vault.initialize(token, gov, rewards, "", "", guardian, {"from": gov})
+    # vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
+    # vault.setManagement(management, {"from": gov})
+    # chain.sleep(1)
     yield vault
 
 
@@ -272,7 +271,11 @@ def vault(pm, gov, rewards, guardian, management, token, chain):
 #         vault = Contract("0x1635b506a88fBF428465Ad65d00e8d6B6E5846C3")
 #     yield vault
 
-# replace the first value with the name of your strategy
+@pytest.fixture(scope="module")
+def splitter(strategist, gov):
+    splitter = strategist.deploy(Splitter)
+    yield splitter
+    
 @pytest.fixture(scope="module")
 def strategy(
     StrategyConvexCrvCvxPairsClonable,
@@ -280,18 +283,7 @@ def strategy(
     keeper,
     vault,
     gov,
-    guardian,
-    token,
-    healthCheck,
     chain,
-    proxy,
-    pid,
-    pool,
-    strategy_name,
-    gasOracle,
-    strategist_ms,
-    booster,
-    use_crv,
     splitter
 ):
     # make sure to include all constructor parameters needed here
@@ -306,32 +298,36 @@ def strategy(
     vault.setManagementFee(0, {"from": gov})
 
     # we will be migrating on our live vault instead of adding it directly
-    # old_strategy = Contract(vault.withdrawalQueue(0))
-    # vault.migrateStrategy(old_strategy, strategy, {"from": gov})
-    vault.addStrategy(strategy, 10_000, 0, 2**256-1, 0, {"from": gov})
-    strategy.setHealthCheck(healthCheck, {"from": gov})
-    strategy.setDoHealthCheck(True, {"from": gov})
-    # vault.updateStrategyDebtRatio(strategy, 10000, {"from": gov})
+    old_strategy = vault.withdrawalQueue(0)
+    vault.migrateStrategy(old_strategy, strategy, {"from": gov})
+    DAY = 60 * 60 * 24
+    WEEK = DAY * 7
+    chain.sleep(WEEK)
+    chain.mine()
+    # vault.addStrategy(strategy, 10_000, 0, 2**256-1, 0, {"from": gov})
+    # strategy.setHealthCheck(healthCheck, {"from": gov})
+    # strategy.setDoHealthCheck(True, {"from": gov})
+    # # vault.updateStrategyDebtRatio(strategy, 10000, {"from": gov})
 
-    # earmark rewards if we are using a convex strategy
-    booster.earmarkRewards(pid, {"from": gov})
-    chain.sleep(1)
-    chain.mine(1)
+    # # earmark rewards if we are using a convex strategy
+    # booster.earmarkRewards(pid, {"from": gov})
+    # chain.sleep(1)
+    # chain.mine(1)
 
-    # make all harvests permissive unless we change the value lower
-    gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})
+    # # make all harvests permissive unless we change the value lower
+    # gasOracle.setMaxAcceptableBaseFee(2000 * 1e9, {"from": strategist_ms})
 
-    # set up custom params and setters
-    strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
-    strategy.setMaxReportDelay(86400 * 21)
+    # # set up custom params and setters
+    # strategy.setHarvestTriggerParams(90000e6, 150000e6, 1e24, False, {"from": gov})
+    # strategy.setMaxReportDelay(86400 * 21)
 
-    # harvest to send our funds into the strategy and fix any triggers already true
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
-    chain.mine(1)
+    # # harvest to send our funds into the strategy and fix any triggers already true
+    # strategy.harvest({"from": gov})
+    # chain.sleep(1)
+    # chain.mine(1)
 
+    # strategy.setSplit(splitter,{'from':gov})
     yield strategy
-
 
 # use this if your strategy is already deployed
 # @pytest.fixture(scope="function")

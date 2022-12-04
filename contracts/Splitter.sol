@@ -4,8 +4,17 @@ pragma experimental ABIEncoderV2;
 
 // These are the core Yearn libraries
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/math/Math.sol";
-
+import "@openzeppelin/contracts/utils/EnumerableSet.sol";
+interface ICurveFi {
+    function exchange(
+        // CRV-ETH and CVX-ETH
+        uint256 from,
+        uint256 to,
+        uint256 _from_amount,
+        uint256 _min_to_amount,
+        bool use_eth
+    ) external returns (uint);
+}
 interface IGauge {
     struct VotedSlope {
         uint slope;
@@ -37,14 +46,16 @@ interface IYveCRV {
 }
 
 contract Splitter {
-
+    using EnumerableSet for EnumerableSet.AddressSet;
     event Split(uint yearnAmount, uint keep, uint templeAmount, uint period);
-    event PeriodUpdated(uint period, uint globalSlope, uint userSlope);
+    event PeriodUpdated(uint period, uint globalBias, uint userBias);
     event YearnUpdated(address recipient, uint keepCRV);
     event TempleUpdated(address recipient);
     event ShareUpdated(uint share);
     event PendingShareUpdated(address setter, uint share);
     event Sweep(address sweeper, address token, uint amount);
+    event ApprovedCaller(address admin, address caller);
+    event RemovedCaller(address admin, address caller);
 
     struct Yearn{
         address recipient;
@@ -55,48 +66,57 @@ contract Splitter {
     }
     struct Period{
         uint period;
-        uint globalSlope;
-        uint userSlope;
+        uint globalBias;
+        uint userBias;
     }
 
     uint internal constant precision = 10_000;
     uint internal constant WEEK = 7 days;
+    ICurveFi internal constant cvxeth = ICurveFi(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4);
+    ICurveFi internal constant crveth = ICurveFi(0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511); // use curve's new CRV-ETH crypto pool to sell our CRV
+    IERC20 internal constant cvx = IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
     IERC20 internal constant crv = IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
+    IERC20 internal constant weth = IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     IYveCRV internal constant yvecrv = IYveCRV(0xc5bDdf9843308380375a611c18B50Fb9341f502A);
     IERC20 public constant liquidityPool = IERC20(0xdaDfD00A2bBEb1abc4936b1644a3033e1B653228);
     IGauge public constant gaugeController = IGauge(0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB);
     address public constant gauge = 0x8f162742a7BCDb87EB52d83c687E43356055a68B;
-    mapping(address => uint) pendingShare; 
-    
-    Yearn yearn;
-    Period period;
+    mapping(address => uint) public pendingShare; 
+    Yearn public yearn;
+    Period public period;
     address public strategy;
     address templeRecipient = 0x5C8898f8E0F9468D4A677887bC03EE2659321012;
+    EnumerableSet.AddressSet private approvedCallers;
     
     constructor() public {
         crv.approve(address(yvecrv), type(uint).max);
+        cvx.approve(address(cvxeth), type(uint).max);
+        weth.approve(address(crveth), type(uint).max);
         yearn = Yearn(
             address(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52), // recipient
             address(0xF147b8125d2ef93FB6965Db97D6746952a133934), // voter
             address(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52), // admin
             8_000, // share of profit (initial terms of deal)
-            5_000 // Yearn's discretionary % of CRV to lock as veCRV on each split
+            0 // Yearn's discretionary % of CRV to lock as veCRV on each split
         );
     }
 
     function split() external {
+        require(isApprovedCaller(msg.sender) || msg.sender == strategy, "!approved");
         _split();
     }
 
-    function claimAndSplit() external {
-        IRewards(IStrategy(strategy).rewardsContract()).getReward(strategy, true);
-        _split();
-    }
-
-    // @notice split all 
     function _split() internal {
         address _strategy = strategy; // Put strategy address into memory.
         if(_strategy == address(0)) return;
+        IRewards(IStrategy(strategy).rewardsContract()).getReward(strategy, true);
+        uint bal = cvx.balanceOf(strategy);
+        if (bal > 0) {
+            cvx.transferFrom(strategy, address(this), bal);
+            _sellCvx(bal);
+            uint bought = _buyCRV();
+            crv.transfer(_strategy, bought); // Transfer back to the strat
+        }
         uint crvBalance = crv.balanceOf(_strategy);
         if (crvBalance == 0) {
             emit Split(0, 0, 0, period.period);
@@ -117,9 +137,13 @@ contract Splitter {
             yvecrv.deposit(keep);
             IERC20(address(yvecrv)).transfer(yearn.recipient, keep);
         }
-        crv.transferFrom(_strategy, yearn.recipient, yearnAmount.sub(keep));
+        crv.transferFrom(_strategy, yearn.recipient, yearnAmount - keep);
         crv.transferFrom(_strategy, templeRecipient, templeAmount);
         emit Split(yearnAmount, keep, templeAmount, period.period);
+    }
+
+    function updatePeriod() external {
+        _updatePeriod();
     }
 
     // @dev updates all period data to present week
@@ -127,17 +151,18 @@ contract Splitter {
         uint _period = block.timestamp / WEEK * WEEK;
         period.period = _period;
         gaugeController.checkpoint_gauge(gauge);
-        uint _userSlope = gaugeController.vote_user_slopes(yearn.voter, gauge).slope;
-        uint _globalSlope = gaugeController.points_weight(gauge, _period).slope;
-        period.userSlope = _userSlope;
-        period.globalSlope = _globalSlope;
-        emit PeriodUpdated(_period, _userSlope, _globalSlope);
+        IGauge.VotedSlope memory vs = gaugeController.vote_user_slopes(yearn.voter, gauge);
+        uint userBias = _calc_bias(vs.slope, vs.end);
+        uint globalBias = gaugeController.points_weight(gauge, _period).bias;
+        period.userBias = userBias;
+        period.globalBias = globalBias;
+        emit PeriodUpdated(_period, userBias, globalBias);
     }
 
     function _computeSplitRatios() internal view returns (uint yRatio, uint tRatio) {
-        uint userSlope = period.userSlope;
-        if(userSlope == 0) return (0, 10_000);
-        uint relativeSlope = period.globalSlope == 0 ? 0 : userSlope * precision / period.globalSlope;
+        uint userBias = period.userBias;
+        if(userBias == 0) return (0, 10_000);
+        uint relativeBias = period.globalBias == 0 ? 0 : userBias * precision / period.globalBias;
         uint lpSupply = liquidityPool.totalSupply();
         if (lpSupply == 0) return (10_000, 0); // @dev avoid div by 0
         uint gaugeDominance = 
@@ -146,14 +171,14 @@ contract Splitter {
             / lpSupply;
         if (gaugeDominance == 0) return (10_000, 0); // @dev avoid div by 0
         yRatio = 
-            relativeSlope.mul
+            relativeBias
             * yearn.share
             / gaugeDominance;
         // Should not return > 100%
         if (yRatio > 10_000){
             return (10_000, 0);
         }
-        tRatio = precision.sub(yRatio);
+        tRatio = precision - yRatio;
     }
 
     // @dev Estimate only. 
@@ -162,7 +187,16 @@ contract Splitter {
         (uint y, uint t) = _computeSplitRatios();
         uint bal = crv.balanceOf(strategy);
         ySplit = bal * y / precision;
-        tSplit = bal.sub(ySplit);
+        tSplit = bal - ySplit;
+    }
+
+    /// @dev Compute bias from slope and lock end
+    /// @param _slope User's slope
+    /// @param _end Timestamp of user's lock end
+    function _calc_bias(uint _slope, uint _end) internal view returns (uint) {
+        uint current = (block.timestamp / WEEK) * WEEK;
+        if (current + WEEK >= _end) return 0;
+        return _slope * (_end - current);
     }
 
     // @dev Estimate only.
@@ -170,8 +204,21 @@ contract Splitter {
         (ySplit, tSplit) = _computeSplitRatios();
     }
 
-    function updatePeriod() external {
-        _updatePeriod();
+    // Sells our CRV and CVX on Curve, then WETH -> stables together on UniV3
+    function _sellCvx(uint _amount) internal {
+        if (_amount > 1e17) {
+            // don't want to swap dust or we might revert
+            cvxeth.exchange(1, 0, _amount, 0, false);
+        }
+    }
+
+    function _buyCRV() internal returns (uint) {
+        uint256 _wethBalance = weth.balanceOf(address(this));
+        if (_wethBalance > 1e15) {
+            // don't want to swap dust or we might revert
+            return crveth.exchange(0, 1, _wethBalance, 0, false);
+        }
+        return 0;
     }
 
     function setStrategy(address _strategy) external {
@@ -222,6 +269,32 @@ contract Splitter {
         uint amt = token.balanceOf(address(this));
         token.transfer(msg.sender, amt);
         emit Sweep(msg.sender, _token, amt);
+    }
+
+    /// @notice Allow owner to add address to blacklist, preventing them from claiming
+    /// @dev Any vote weight address added
+    function addApprovedCaller(address _caller) external {
+        require(msg.sender == yearn.admin || msg.sender == templeRecipient, "!admin");
+        if (approvedCallers.add(_caller)) emit ApprovedCaller(msg.sender, _caller);
+    }
+
+    /// @notice Allow owner to remove address from blacklist
+    function removeApprovedCaller(address _caller) external {
+        require(msg.sender == yearn.admin || msg.sender == templeRecipient, "!admin");
+        if (approvedCallers.remove(_caller)) emit RemovedCaller(msg.sender, _caller);
+    }
+
+    /// @notice Check if address is approved to call split
+    function isApprovedCaller(address caller) public view returns (bool) {
+        return approvedCallers.contains(caller);
+    }
+
+    /// @dev Helper function, if possible, avoid using on-chain as list can grow unbounded
+    function getApprovedCallers() public view returns (address[] memory _callers) {
+        _callers = new address[](approvedCallers.length());
+        for (uint i; i < approvedCallers.length(); i++) {
+            _callers[i] = approvedCallers.at(i);
+        }
     }
 
 }

@@ -20,8 +20,6 @@ def test_split(
     crv_whale,
     pool
 ):
-
-    assert False
     target_tvl_dominance = .95
 
     yearn_weights_to_test = [
@@ -36,27 +34,30 @@ def test_split(
     ###########################################
     ###########################################
 
-    print_debug = False
+    print_debug = True
     x = target_tvl_dominance + 0.05
     splitter.setStrategy(strategy, {'from':gov})
     amount_temple = token.balanceOf(whale) * x
-    vault.deposit(amount_temple, {'from':whale})
+    # vault.deposit(amount_temple, {'from':whale})
     token.transfer(gov, token.balanceOf(whale),{'from':whale})
     token.approve(booster, 2**256-1,{'from':gov})
     # vault.deposit({'from':gov})
     amt = token.balanceOf(gov)
     if amt > 0:
         booster.deposit(pid,amt,True,{'from':gov})
-    strategy.harvest({'from':gov})
+    # strategy.harvest({'from':gov})
     chain.snapshot()
 
     for w in yearn_weights_to_test:
         for c in convex_weights_to_test:
+            DAY = 60 * 60 * 24
+            chain.sleep(DAY*3)
+            chain.mine()
             print(f'--------------------------------------')
             print(f'𐄷 Pool Dominance: {"{:.2%}".format(strategy.estimatedTotalAssets()/pool.totalSupply())}')
             vote(w, c, vault, whale)
             # print(f'Stratgy Assets: {strategy.estimatedTotalAssets()/1e18}')
-            vault.withdraw(1e18, {'from':whale})
+            # vault.withdraw(1e18, {'from':whale})
             booster.earmarkRewards(pid,{'from':accounts[1]})
             rewardsContract.getReward(strategy, True,{'from':accounts[1]})
             crv.transfer(strategy, 10_000e18 - 10.035993473822e18, {'from': crv_whale})
@@ -67,7 +68,7 @@ def test_split(
             print(f'Split ratios: yearn: {"{:.2%}".format(y/10_000)} temple: {"{:.2%}".format(t/10_000)}')
             y, t = splitter.estimateSplit()
             # print(f'Splits: {y/1e18} temple: {t/1e18}')
-            tx = strategy.harvest({'from':gov})
+            tx = splitter.split({'from':strategy})
             # debug = tx.events["Debug"]
             # for i, d in enumerate(debug):
             #     if print_debug:
@@ -103,6 +104,7 @@ def vote(weight, convex_weight, vault, whale):
         "0xd8b712d29381748dB89c36BCa0138d7c75866ddF", # MIM
         "0x8Fa728F393588E8D8dD1ca397E9a710E53fA553a", # DOLA
         "0x95d16646311fDe101Eb9F897fE06AC881B7Db802", # STARGATE
+        "0x5980d25B4947594c26255C0BF301193ab64ba803", # YCRV
     ]
     
     for g in yearn_voted_gauges:
@@ -117,12 +119,20 @@ def vote(weight, convex_weight, vault, whale):
     chain.sleep(WEEK)
     chain.mine()
 
-    total_slope = gauge_controller.points_weight(temple_gauge, int(chain.time() / WEEK) * WEEK).dict()["slope"] / 1e18
-    y_slope = gauge_controller.vote_user_slopes(yearn, temple_gauge).dict()["slope"] / 1e18
-    c_slope = gauge_controller.vote_user_slopes(convex, temple_gauge).dict()["slope"] / 1e18
+    total_bias = gauge_controller.points_weight(temple_gauge, int(chain.time() / WEEK) * WEEK).dict()["bias"] / 1e18
+    y_dict = gauge_controller.vote_user_slopes(yearn, temple_gauge).dict()
+    c_dict = gauge_controller.vote_user_slopes(convex, temple_gauge).dict()
+    y_bias = calc_bias(y_dict['slope'], y_dict['end']) / 1e18
+    c_bias = calc_bias(c_dict['slope'], c_dict['end']) / 1e18
 
     print('🗳 VOTE DATA')
-    print(f'Yearn vote weight: {weight} slope: {y_slope}')
-    print(f'Convex vote weight: {convex_weight} slope: {c_slope}')
-    # print(f'yearn slope: {y_slope}  convex slope: {c_slope}   total slope: {total_slope}')
-    print(f'Percent of overall vote weight ... Yearn: {"{:.0%}".format(y_slope/total_slope)} Convex: {"{:.0%}".format(c_slope/total_slope)}')
+    print(f'Yearn vote weight: {weight} bias: {y_bias}')
+    print(f'Convex vote weight: {convex_weight} bias: {c_bias}')
+    print(f'Percent of overall vote weight ... Yearn: {"{:.0%}".format(y_bias/total_bias)} Convex: {"{:.0%}".format(c_bias/total_bias)}')
+
+def calc_bias(slope, end):
+    WEEK = 60 * 60 * 24 * 7
+    current = int(chain.time() / WEEK) * WEEK
+    if (current + WEEK >= end):
+        return 0
+    return slope * (end - current)
