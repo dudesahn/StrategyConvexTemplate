@@ -92,12 +92,14 @@ contract Splitter {
         crv.approve(address(ycrv), type(uint).max);
         cvx.approve(address(cvxeth), type(uint).max);
         weth.approve(address(crveth), type(uint).max);
+        approvedCallers.add(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52); // Yearn
+        approvedCallers.add(0xE97CB3a6A0fb5DA228976F3F2B8c37B6984e7915); // Temple
         yearn = Yearn(
             address(0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde), // recipient
             address(0xF147b8125d2ef93FB6965Db97D6746952a133934), // voter
             address(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52), // admin
             8_000, // share of profit (initial terms of deal)
-            0 // Yearn's discretionary % of CRV to lock as veCRV on each split
+            0 // Yearn's discretionary % of CRV to lock to yCRV on each split
         );
     }
 
