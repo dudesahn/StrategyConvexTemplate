@@ -136,6 +136,9 @@ def voter():
 def convexToken():
     yield Contract("0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B")
 
+@pytest.fixture(scope="function")
+def cvx():
+    yield Contract("0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B")
 
 @pytest.fixture(scope="module")
 def crv():

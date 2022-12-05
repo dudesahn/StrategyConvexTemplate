@@ -356,9 +356,6 @@ contract StrategyConvexCrvCvxPairsClonable is StrategyConvexBase {
 
         // want = Curve LP
         want.approve(address(depositContract), type(uint256).max);
-        convexToken.approve(address(cvxeth), type(uint256).max);
-        weth.approve(address(crveth), type(uint256).max);
-        crv.approve(address(crveth), type(uint256).max);
         crv.approve(_split, type(uint256).max);
         convexToken.approve(_split, type(uint256).max);
 
@@ -384,8 +381,6 @@ contract StrategyConvexCrvCvxPairsClonable is StrategyConvexBase {
             uint256 _debtPayment
         )
     {
-        // this claims our CRV, CVX, and any extra tokens like SNX or ANKR. no harm leaving this true even if no extra rewards currently.
-        rewardsContract.getReward(address(this), true);
         _splitCRV();
 
         // debtOustanding will only be > 0 in the event of revoking or if we need to rebalance from a withdrawal or lowering the debtRatio
@@ -548,8 +543,7 @@ contract StrategyConvexCrvCvxPairsClonable is StrategyConvexBase {
     // check if the current baseFee is below our external target
     function isBaseFeeAcceptable() internal view returns (bool) {
         return
-            IBaseFee(0xb5e1CAcB567d98faaDB60a1fD4820720141f064F)
-                .isCurrentBaseFeeAcceptable();
+            IBaseFee(0xb5e1CAcB567d98faaDB60a1fD4820720141f064F).isCurrentBaseFeeAcceptable();
     }
 
     /// @notice True if someone needs to earmark rewards on Convex before keepers harvest again

@@ -41,8 +41,8 @@ interface IRewards {
     function getReward(address, bool) external;
 }
 
-interface IYveCRV {
-    function deposit(uint) external;
+interface IYCRV {
+    function mint(uint, address) external;
 }
 
 contract Splitter {
@@ -77,7 +77,7 @@ contract Splitter {
     IERC20 internal constant cvx = IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
     IERC20 internal constant crv = IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
     IERC20 internal constant weth = IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    IYveCRV internal constant yvecrv = IYveCRV(0xc5bDdf9843308380375a611c18B50Fb9341f502A);
+    IYCRV internal constant ycrv = IYCRV(0xFCc5c47bE19d06BF83eB04298b026F81069ff65b);
     IERC20 public constant liquidityPool = IERC20(0xdaDfD00A2bBEb1abc4936b1644a3033e1B653228);
     IGauge public constant gaugeController = IGauge(0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB);
     address public constant gauge = 0x8f162742a7BCDb87EB52d83c687E43356055a68B;
@@ -85,15 +85,15 @@ contract Splitter {
     Yearn public yearn;
     Period public period;
     address public strategy;
-    address templeRecipient = 0x5C8898f8E0F9468D4A677887bC03EE2659321012;
+    address public templeRecipient = 0xE97CB3a6A0fb5DA228976F3F2B8c37B6984e7915;
     EnumerableSet.AddressSet private approvedCallers;
     
     constructor() public {
-        crv.approve(address(yvecrv), type(uint).max);
+        crv.approve(address(ycrv), type(uint).max);
         cvx.approve(address(cvxeth), type(uint).max);
         weth.approve(address(crveth), type(uint).max);
         yearn = Yearn(
-            address(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52), // recipient
+            address(0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde), // recipient
             address(0xF147b8125d2ef93FB6965Db97D6746952a133934), // voter
             address(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52), // admin
             8_000, // share of profit (initial terms of deal)
@@ -122,10 +122,11 @@ contract Splitter {
             emit Split(0, 0, 0, period.period);
             return;
         }
-        if (block.timestamp / WEEK * WEEK > period.period) _updatePeriod();
+        crv.transferFrom(strategy, address(this), crvBalance);
+        _updatePeriod();
         (uint yRatio, uint tRatio) = _computeSplitRatios();
         if (yRatio == 0) {
-            crv.transferFrom(_strategy, templeRecipient, crvBalance);
+            crv.transfer(templeRecipient, crvBalance);
             emit Split(0, 0, crvBalance, period.period);
             return;
         }
@@ -133,12 +134,10 @@ contract Splitter {
         uint templeAmount = crvBalance * tRatio / precision;
         uint keep = yearnAmount * yearn.keepCRV / precision;
         if (keep > 0) {
-            crv.transferFrom(_strategy, address(this), keep);
-            yvecrv.deposit(keep);
-            IERC20(address(yvecrv)).transfer(yearn.recipient, keep);
+            ycrv.mint(keep, yearn.recipient);
         }
-        crv.transferFrom(_strategy, yearn.recipient, yearnAmount - keep);
-        crv.transferFrom(_strategy, templeRecipient, templeAmount);
+        crv.transfer(yearn.recipient, yearnAmount - keep);
+        crv.transfer(templeRecipient, templeAmount);
         emit Split(yearnAmount, keep, templeAmount, period.period);
     }
 
@@ -148,15 +147,16 @@ contract Splitter {
 
     // @dev updates all period data to present week
     function _updatePeriod() internal {
-        uint _period = block.timestamp / WEEK * WEEK;
-        period.period = _period;
+        uint activePeriod = block.timestamp / WEEK * WEEK;
+        if (activePeriod == period.period) return;
+        period.period = activePeriod;
         gaugeController.checkpoint_gauge(gauge);
         IGauge.VotedSlope memory vs = gaugeController.vote_user_slopes(yearn.voter, gauge);
-        uint userBias = _calc_bias(vs.slope, vs.end);
-        uint globalBias = gaugeController.points_weight(gauge, _period).bias;
+        uint userBias = calcBias(vs.slope, vs.end);
+        uint globalBias = gaugeController.points_weight(gauge, activePeriod).bias;
         period.userBias = userBias;
         period.globalBias = globalBias;
-        emit PeriodUpdated(_period, userBias, globalBias);
+        emit PeriodUpdated(activePeriod, userBias, globalBias);
     }
 
     function _computeSplitRatios() internal view returns (uint yRatio, uint tRatio) {
@@ -193,7 +193,7 @@ contract Splitter {
     /// @dev Compute bias from slope and lock end
     /// @param _slope User's slope
     /// @param _end Timestamp of user's lock end
-    function _calc_bias(uint _slope, uint _end) internal view returns (uint) {
+    function calcBias(uint _slope, uint _end) internal view returns (uint) {
         uint current = (block.timestamp / WEEK) * WEEK;
         if (current + WEEK >= _end) return 0;
         return _slope * (_end - current);
@@ -228,17 +228,26 @@ contract Splitter {
 
     // @notice For use by yearn only to update discretionary values
     // @dev Other values in the struct are either immutable or require agreement by both parties to update.
-    function setYearn(address _recipient, uint _keepCRV) external {
-        require(msg.sender == yearn.admin);
-        require(_keepCRV <= 10_000, "!tooHigh");
-        yearn.recipient = _recipient;
-        yearn.keepCRV = _keepCRV;
+    function setYearn(address _recipient, uint _keepCRV) external {	
+        require(msg.sender == yearn.admin);	
+        require(_keepCRV <= 10_000, "TooHigh");	
+        address recipient = yearn.recipient;	
+        if(recipient != _recipient){	
+            pendingShare[recipient] = 0;	
+            yearn.recipient = _recipient;	
+        }	
+        yearn.keepCRV = _keepCRV;	
+        emit YearnUpdated(_recipient, _keepCRV);	
     }
 
-    function setTemple(address _recipient) external {
-        require(msg.sender == templeRecipient);
-        templeRecipient = _recipient;
-        emit TempleUpdated(_recipient);
+    function setTemple(address _recipient) external {	
+        address recipient = templeRecipient;	
+        require(msg.sender == recipient);	
+        if(recipient != _recipient){	
+            pendingShare[recipient] = 0;	
+            templeRecipient = _recipient;	
+            emit TempleUpdated(_recipient);	
+        }	
     }
 
     // @notice update share if both parties agree.

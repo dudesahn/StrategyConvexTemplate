@@ -18,7 +18,8 @@ def test_split(
     crv,
     convexToken,
     crv_whale,
-    pool
+    pool,
+    cvx
 ):
     target_tvl_dominance = .95
 
@@ -34,7 +35,7 @@ def test_split(
     ###########################################
     ###########################################
 
-    print_debug = True
+    print_debug = False
     x = target_tvl_dominance + 0.05
     splitter.setStrategy(strategy, {'from':gov})
     amount_temple = token.balanceOf(whale) * x
@@ -59,9 +60,11 @@ def test_split(
             # print(f'Stratgy Assets: {strategy.estimatedTotalAssets()/1e18}')
             # vault.withdraw(1e18, {'from':whale})
             booster.earmarkRewards(pid,{'from':accounts[1]})
-            rewardsContract.getReward(strategy, True,{'from':accounts[1]})
-            crv.transfer(strategy, 10_000e18 - 10.035993473822e18, {'from': crv_whale})
+            # rewardsContract.getReward(strategy, True,{'from':accounts[1]})
+            # crv.transfer(strategy, 10_000e18 - 10.035993473822e18, {'from': crv_whale})
             splitter.updatePeriod({'from':accounts[1]})
+            
+            p0 = splitter.period()['period']
             # print(f'{strategy.estimatedTotalAssets()/1e18} {pool.totalSupply()/1e18}')
             print(f'🔎 READ-FUNCTIONS (ESTIMATES)')
             y, t = splitter.estimateSplitRatios()
@@ -69,6 +72,11 @@ def test_split(
             y, t = splitter.estimateSplit()
             # print(f'Splits: {y/1e18} temple: {t/1e18}')
             tx = splitter.split({'from':strategy})
+            print('Period Data:')
+            p1 = splitter.period()['period']
+            print(f'Before: {p0}')
+            print(f'After: {p1}')
+            check_balances(splitter, strategy, cvx, crv)
             # debug = tx.events["Debug"]
             # for i, d in enumerate(debug):
             #     if print_debug:
@@ -90,6 +98,41 @@ def test_split(
             dt = datetime.utcfromtimestamp(ts).strftime("%m/%d/%Y, %H:%M:%S")
             # print(f'Period: {ts} --> {dt}')
             chain.revert()
+
+def test_approved_callers(
+    gov,token,vault,whale,strategy,chain,splitter,
+    booster,rewardsContract,pid,crv,convexToken,crv_whale,pool):
+    
+    user1 = accounts[5]
+    user2 = accounts[6]
+    with brownie.reverts():
+        splitter.split({'from':user1})
+        splitter.split({'from':user2})
+    splitter.addApprovedCaller(user1,{'from':gov})
+    splitter.addApprovedCaller(user2,{'from':splitter.templeRecipient()})
+    splitter.split({'from':user1})
+    splitter.split({'from':user2})
+    approved_callers = list(splitter.getApprovedCallers())
+    print(f'\n--Approved Callers--')
+    for c in approved_callers:
+        print(f'{c}')
+    splitter.removeApprovedCaller(user1,{'from':splitter.templeRecipient()})
+    splitter.removeApprovedCaller(user2,{'from':gov})
+    
+    with brownie.reverts():
+        splitter.split({'from':user1})
+        splitter.split({'from':user2})
+
+def test_basic_funcs(splitter, strategy, cvx, crv, gov):
+    splitter.setStrategy(strategy, {'from':gov})
+    splitter.setYearn(splitter.yearn()['recipient'], 5_000,{'from':gov})
+    strategy.harvest({'from': gov})
+    check_balances(splitter, strategy, cvx, crv)
+    chain.sleep(60*60*24*10)
+    chain.mine()
+    tx = strategy.harvest({'from': gov})
+    print(f'Split with YCRV mint')
+    print(tx.events['Split'])
 
 def vote(weight, convex_weight, vault, whale):
     WEEK = 60 * 60 * 24 * 7
@@ -126,8 +169,8 @@ def vote(weight, convex_weight, vault, whale):
     c_bias = calc_bias(c_dict['slope'], c_dict['end']) / 1e18
 
     print('🗳 VOTE DATA')
-    print(f'Yearn vote weight: {weight} bias: {y_bias}')
-    print(f'Convex vote weight: {convex_weight} bias: {c_bias}')
+    print(f'Yearn vote weight: {weight} | bias: {y_bias}')
+    print(f'Convex vote weight: {convex_weight} | bias: {c_bias}')
     print(f'Percent of overall vote weight ... Yearn: {"{:.0%}".format(y_bias/total_bias)} Convex: {"{:.0%}".format(c_bias/total_bias)}')
 
 def calc_bias(slope, end):
@@ -136,3 +179,9 @@ def calc_bias(slope, end):
     if (current + WEEK >= end):
         return 0
     return slope * (end - current)
+
+def check_balances(splitter, strategy, cvx, crv):
+    assert cvx.balanceOf(splitter) < 2
+    assert cvx.balanceOf(strategy) < 2
+    assert crv.balanceOf(splitter) < 2
+    assert crv.balanceOf(strategy) < 2
