@@ -62,7 +62,12 @@ def test_simple_harvest(
 
     # harvest, store new asset amount
     chain.sleep(1)
+
+    # for arbitrum, checkpoint our rewards so we can see how much is claimable
+    rewardsContract.user_checkpoint(strategy.address, {"from": gov})
+    assert rewardsContract.balanceOf(strategy.address) > 0
     estimated_profit = strategy.claimableProfitInUsdc() / 1e6
+    claimable_balance = strategy.claimableBalance()
     tx = strategy.harvest({"from": gov})
     chain.sleep(1)
     new_assets = vault.totalAssets()
@@ -80,7 +85,10 @@ def test_simple_harvest(
     )
     print("Harvest info:", tx.events["Harvested"])
     print("Estimated Profit:", estimated_profit)
-    print("Real Profit:", tx.events["Harvested"]["profit"])
+    print(
+        "Real Profit:", tx.events["Harvested"]["profit"] * 1042 / 1e18
+    )  # price roughly $1042 on 2/28/23
+    print("Claimable Tokens", claimable_balance)
     if not no_profit:
         assert tx.events["Harvested"]["profit"] > 0
 
@@ -101,13 +109,13 @@ def test_simple_harvest(
             assert strategy.claimableProfitInUsdc() > 0
 
             # update our minProfit so our harvest triggers true
-            strategy.setHarvestTriggerParams(1, 1000000000e6, False, {"from": gov})
+            strategy.setHarvestTriggerParams(1, 1000000000e6, {"from": gov})
             tx = strategy.harvestTrigger(0, {"from": gov})
             print("\nShould we harvest? Should be true.", tx)
             assert tx == True
 
             # update our maxProfit so harvest triggers true
-            strategy.setHarvestTriggerParams(1000000000e6, 1, False, {"from": gov})
+            strategy.setHarvestTriggerParams(1000000000e6, 1, {"from": gov})
             tx = strategy.harvestTrigger(0, {"from": gov})
             print("\nShould we harvest? Should be true.", tx)
             assert tx == True

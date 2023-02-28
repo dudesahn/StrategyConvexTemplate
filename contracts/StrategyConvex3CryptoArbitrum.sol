@@ -3,7 +3,6 @@ pragma solidity ^0.8.15;
 
 // These are the core Yearn libraries
 import "@openzeppelin/contracts/utils/math/Math.sol";
-
 import "./interfaces/curve.sol";
 import "@yearnvaults/contracts/BaseStrategy.sol";
 
@@ -34,7 +33,10 @@ interface IConvexRewards {
     function balanceOf(address account) external view returns (uint256);
 
     // read how much claimable CRV and CVX a strategy has
-    function claimable_reward(address asset, address account) external view returns (uint256);
+    function claimable_reward(address asset, address account)
+        external
+        view
+        returns (uint256);
 
     // on sidechains this replaces withdrawAndUnwrap
     function withdraw(uint256 _amount, bool _claim) external returns (bool);
@@ -45,15 +47,12 @@ interface IConvexRewards {
 
 interface IConvexDeposit {
     // deposit into convex, receive a tokenized deposit. stakes automatically for sidechain implementation.
-    function deposit(
-        uint256 _pid,
-        uint256 _amount
-    ) external returns (bool);
+    function deposit(uint256 _pid, uint256 _amount) external returns (bool);
 
     // burn a tokenized deposit (Convex deposit tokens) to receive curve lp tokens back
     function withdraw(uint256 _pid, uint256 _amount) external returns (bool);
 
-    // give us info about a pool based on its pid
+    // give us info about a pool based on its pid. note this is different for sidechain vs mainnet
     function poolInfo(uint256)
         external
         view
@@ -68,14 +67,18 @@ interface IConvexDeposit {
 
 abstract contract StrategyConvexBase is BaseStrategy {
     /* ========== STATE VARIABLES ========== */
-    // these should stay the same across different wants.
 
-    // convex stuff
-    address internal constant depositContract =
-        0xF403C135812408BFbE8713b5A23a04b3D48AAE31; // this is the deposit contract that all pools use, aka booster
-    IConvexRewards public rewardsContract; // This is unique to each curve pool
-    uint256 public pid; // this is unique to each pool
+    /// @notice This is the deposit contract that all Convex pools use, aka booster.
+    address public constant depositContract =
+        0xF403C135812408BFbE8713b5A23a04b3D48AAE31;
 
+    /// @notice This is unique to each pool and holds the rewards.
+    IConvexRewards public rewardsContract;
+
+    /// @notice This is a unique numerical identifier for each Convex pool.
+    uint256 public pid;
+
+    // tokens used in this strategy, internal constants to save gas
     IERC20 internal constant crv =
         IERC20(0x11cDb42B0EB46D95f990BeDD4695A6e3fA034978);
     IERC20 internal constant convexToken =
@@ -83,15 +86,22 @@ abstract contract StrategyConvexBase is BaseStrategy {
     IERC20 internal constant weth =
         IERC20(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1);
 
-    // keeper stuff
-    uint256 public harvestProfitMin; // minimum size in USD (6 decimals) that we want to harvest
-    uint256 public harvestProfitMax; // maximum size in USD (6 decimals) that we want to harvest
-    uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
+    /// @notice Minimum profit size in USDC that we want to harvest.
+    /// @dev Only used in harvestTrigger.
+    uint256 public harvestProfitMinInUsdc;
 
+    /// @notice Maximum profit size in USDC that we want to harvest (ignore gas price once we get here).
+    /// @dev Only used in harvestTrigger.
+    uint256 public harvestProfitMaxInUsdc;
+
+    /// @notice Whether we should claim rewards when withdrawing, generally this should be false.
+    bool public claimRewards;
+
+    // this means all of our fee values are in basis points
+    uint256 internal constant FEE_DENOMINATOR = 10000;
+
+    // our strategy's name
     string internal stratName;
-
-    // convex-specific variables
-    bool public claimRewards; // boolean if we should always claim rewards when withdrawing (generally this should be false)
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -113,14 +123,20 @@ abstract contract StrategyConvexBase is BaseStrategy {
         return want.balanceOf(address(this));
     }
 
-    /// @notice How much CRV and CVX we can claim from the staking contract
+    /// @notice How much (CRV, CVX) we can claim from the staking contract
     function claimableBalance() public view returns (uint256, uint256) {
-        uint256 crvRewards = rewardsContract.claimable_reward(address(crv), address(this));
-        uint256 cvxRewards = rewardsContract.claimable_reward(address(convexToken), address(this));
-        
+        uint256 crvRewards =
+            rewardsContract.claimable_reward(address(crv), address(this));
+        uint256 cvxRewards =
+            rewardsContract.claimable_reward(
+                address(convexToken),
+                address(this)
+            );
+
         return (crvRewards, cvxRewards);
     }
 
+    /// @notice Total assets the strategy holds, sum of loose and staked want.
     function estimatedTotalAssets() public view override returns (uint256) {
         return balanceOfWant() + stakedBalance();
     }
@@ -172,7 +188,7 @@ abstract contract StrategyConvexBase is BaseStrategy {
         return balanceOfWant();
     }
 
-    // we don't want for these tokens to be swept out. We allow gov to sweep out cvx vault tokens; we would only be holding these if things were really, really rekt.
+    // want is blocked by default, add any other tokens to protect from gov here.
     function protectedTokens()
         internal
         view
@@ -184,7 +200,9 @@ abstract contract StrategyConvexBase is BaseStrategy {
 
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
-    // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
+    /// @notice Set whether we claim rewards on withdrawals.
+    /// @dev Usually false, but may set to true during migrations.
+    /// @param _claimRewards Whether we want to claim rewards on withdrawals.
     function setClaimRewards(bool _claimRewards) external onlyVaultManagers {
         claimRewards = _claimRewards;
     }
@@ -193,14 +211,16 @@ abstract contract StrategyConvexBase is BaseStrategy {
 contract StrategyConvex3CryptoArbitrum is StrategyConvexBase {
     using SafeERC20 for IERC20;
     /* ========== STATE VARIABLES ========== */
-    // these will likely change across different wants.
 
-    // Curve stuff
-    ICurveFi public curve; // Curve Pool, this is our pool specific to this vault
+    /// @notice Curve pool contract, used to deposit for more want.
+    ICurveFi public curve;
 
-    // sell our crv to weth on uniV3
-    address internal constant uniswapv3 = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
+    /// @notice The fee we use for our Uniswap V3 trade CRV -> WETH. 10,000 = 1%.
     uint24 public crvFee;
+
+    // Uniswap V3 router
+    address internal constant uniswapv3 =
+        0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -213,8 +233,8 @@ contract StrategyConvex3CryptoArbitrum is StrategyConvexBase {
         // You can set these parameters on deployment to whatever you want
         maxReportDelay = 365 days; // 365 days in seconds, if we hit this then harvestTrigger = True
         healthCheck = 0x32059ccE723b4DD15dD5cb2a5187f814e6c470bC; // health check
-        harvestProfitMin = 2_000e6;
-        harvestProfitMax = 120000e6;
+        harvestProfitMinInUsdc = 2_000e6;
+        harvestProfitMaxInUsdc = 120000e6;
         creditThreshold = 10 * 1e18;
 
         // want = Curve LP
@@ -260,10 +280,13 @@ contract StrategyConvex3CryptoArbitrum is StrategyConvexBase {
         if (stakedBalance() > 0) {
             rewardsContract.getReward(address(this));
         }
-            
+
         // transfer CVX to gov for now, as there is currrently no liquidity on arbitrum
-        convexToken.safeTransfer(governance(), convexToken.balanceOf(address(this)));
-        
+        uint256 cvxBalance = convexToken.balanceOf(address(this));
+        if (cvxBalance > 0) {
+            convexToken.safeTransfer(governance(), cvxBalance);
+        }
+
         // sell our crv for more weth
         _sellCrv(crv.balanceOf(address(this)));
 
@@ -319,13 +342,14 @@ contract StrategyConvex3CryptoArbitrum is StrategyConvexBase {
             rewardsContract.withdraw(_stakedBal, claimRewards);
         }
         crv.safeTransfer(_newStrategy, crv.balanceOf(address(this)));
-        convexToken.safeTransfer(_newStrategy,convexToken.balanceOf(address(this)));
+        convexToken.safeTransfer(
+            _newStrategy,
+            convexToken.balanceOf(address(this))
+        );
     }
 
     // Sells our CRV for WETH on UniV3
-    function _sellCrv(uint256 _crvAmount)
-        internal
-    {
+    function _sellCrv(uint256 _crvAmount) internal {
         if (_crvAmount > 1e17) {
             IUniV3(uniswapv3).exactInput(
                 IUniV3.ExactInputParams(
@@ -344,7 +368,19 @@ contract StrategyConvex3CryptoArbitrum is StrategyConvexBase {
     }
 
     /* ========== KEEP3RS ========== */
-    // use this to determine when to harvest
+
+    /**
+     * @notice
+     *  Provide a signal to the keeper that harvest() should be called.
+     *
+     *  Don't harvest if a strategy is inactive.
+     *  If our profit exceeds our upper limit, then harvest no matter what. For
+     *  our lower profit limit, credit threshold, max delay, and manual force trigger,
+     *  only harvest if our gas price is acceptable.
+     *
+     * @param callCostinEth The keeper's estimated gas cost to call harvest() (in wei).
+     * @return True if harvest() should be called, false otherwise.
+     */
     function harvestTrigger(uint256 callCostinEth)
         public
         view
@@ -358,7 +394,7 @@ contract StrategyConvex3CryptoArbitrum is StrategyConvexBase {
 
         // harvest if we have a profit to claim at our upper limit without considering gas price
         uint256 claimableProfit = claimableProfitInUsdc();
-        if (claimableProfit > harvestProfitMax) {
+        if (claimableProfit > harvestProfitMaxInUsdc) {
             return true;
         }
 
@@ -373,7 +409,7 @@ contract StrategyConvex3CryptoArbitrum is StrategyConvexBase {
         }
 
         // harvest if we have a sufficient profit to claim, but only if our gas price is acceptable
-        if (claimableProfit > harvestProfitMin) {
+        if (claimableProfit > harvestProfitMinInUsdc) {
             return true;
         }
 
@@ -393,6 +429,7 @@ contract StrategyConvex3CryptoArbitrum is StrategyConvexBase {
     }
 
     /// @notice Calculates the profit if all claimable assets were sold for USDC (6 decimals).
+    /// @dev Uses yearn's lens oracle, if returned values are strange then troubleshoot there.
     /// @return Total return in USDC from selling claimable CRV and CVX.
     function claimableProfitInUsdc() public view returns (uint256) {
         IOracle yearnOracle =
@@ -400,7 +437,7 @@ contract StrategyConvex3CryptoArbitrum is StrategyConvexBase {
         uint256 crvPrice = yearnOracle.getPriceUsdcRecommended(address(crv));
         uint256 convexTokenPrice =
             yearnOracle.getPriceUsdcRecommended(address(convexToken));
-            
+
         // check how much CRV and CVX we can claim from our deposit contract
         (uint256 claimableCrv, uint256 claimableCvx) = claimableBalance();
 
@@ -409,7 +446,10 @@ contract StrategyConvex3CryptoArbitrum is StrategyConvexBase {
             (crvPrice * claimableCrv + convexTokenPrice * claimableCvx) / 1e18;
     }
 
-    // convert our keeper's eth cost into want, we don't need this anymore since we don't use baseStrategy harvestTrigger
+    /// @notice Convert our keeper's eth cost into want
+    /// @dev We don't use this since we don't factor call cost into our harvestTrigger.
+    /// @param _ethAmount Amount of ether spent.
+    /// @return Value of ether in want.
     function ethToWant(uint256 _ethAmount)
         public
         view
@@ -423,25 +463,23 @@ contract StrategyConvex3CryptoArbitrum is StrategyConvexBase {
 
     /**
      * @notice
-     * Here we set various parameters to optimize our harvestTrigger.
-     * @param _harvestProfitMin The amount of profit (in USDC, 6 decimals)
-     * that will trigger a harvest if gas price is acceptable.
-     * @param _harvestProfitMax The amount of profit in USDC that
-     * will trigger a harvest regardless of gas price.
+     *  Here we set various parameters to optimize our harvestTrigger.
+     * @param _harvestProfitMinInUsdc The amount of profit (in USDC, 6 decimals)
+     *  that will trigger a harvest if gas price is acceptable.
+     * @param _harvestProfitMaxInUsdc The amount of profit in USDC that
+     *  will trigger a harvest regardless of gas price.
      */
     function setHarvestTriggerParams(
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax
+        uint256 _harvestProfitMinInUsdc,
+        uint256 _harvestProfitMaxInUsdc
     ) external onlyVaultManagers {
-        harvestProfitMin = _harvestProfitMin;
-        harvestProfitMax = _harvestProfitMax;
+        harvestProfitMinInUsdc = _harvestProfitMinInUsdc;
+        harvestProfitMaxInUsdc = _harvestProfitMaxInUsdc;
     }
 
-    /// @notice Set the fee pool we'd like to swap through on UniV3 (1% = 10_000)
-    function setUniFees(uint24 _crvFee)
-        external
-        onlyVaultManagers
-    {
+    /// @notice Set the fee pool we'd like to swap CRV -> WETH on Uniswap V3.
+    /// @param _crvFee The chosen fee, 1% = 10,000.
+    function setUniFees(uint24 _crvFee) external onlyVaultManagers {
         crvFee = _crvFee;
     }
 }

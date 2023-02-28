@@ -19,6 +19,7 @@ def test_triggers(
     no_profit,
     is_convex,
     sleep_time,
+    rewardsContract,
 ):
 
     # convex inactive strategy (0 DR and 0 assets) shouldn't be touched by keepers
@@ -82,7 +83,8 @@ def test_triggers(
         assert tx == False
 
         if not (is_slippery and no_profit):
-            # update our minProfit so our harvest triggers true
+            # update our minProfit so our harvest triggers true, also need to checkpoint
+            rewardsContract.user_checkpoint(strategy.address, {"from": gov})
             strategy.setHarvestTriggerParams(1, 1000000e6, {"from": gov})
             tx = strategy.harvestTrigger(0, {"from": gov})
             print("\nShould we harvest? Should be true.", tx)
