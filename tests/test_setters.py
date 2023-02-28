@@ -11,7 +11,6 @@ def test_setters(
     whale,
     token,
     vault,
-    proxy,
     amount,
     gasOracle,
     strategist_ms,
@@ -59,16 +58,8 @@ def test_setters(
     strategy.setMetadataURI(0, {"from": gov})
     strategy.setMinReportDelay(100, {"from": gov})
     strategy.setRewards(gov, {"from": strategist})
-    strategy.updateRewards(False, 0, {"from": gov})
-    with brownie.reverts():
-        strategy.updateRewards(True, 0, {"from": gov})
-
-    if is_convex:
-        strategy.setKeep(10, 0, gov, {"from": gov})
-        strategy.setClaimRewards(True, {"from": gov})
-        strategy.setHarvestTriggerParams(90000e6, 150000e6, False, {"from": gov})
-    else:
-        strategy.setKeepCRV(0, {"from": gov})
+    strategy.setClaimRewards(True, {"from": gov})
+    strategy.setHarvestTriggerParams(90000e6, 150000e6, {"from": gov})
 
     strategy.setStrategist(strategist, {"from": gov})
     name = strategy.name()
@@ -99,14 +90,6 @@ def test_setters(
         strategy.setMaxReportDelay(1000, {"from": whale})
     with brownie.reverts():
         strategy.setRewards(strategist, {"from": whale})
-    if is_convex:
-        with brownie.reverts():
-            strategy.setKeep(10_001, 0, gov, {"from": gov})
-        with brownie.reverts():
-            strategy.setKeep(0, 10_001, gov, {"from": gov})
-    else:
-        with brownie.reverts():
-            strategy.setKeepCRV(10_001, {"from": gov})
 
     # try a health check with zero address as health check
     strategy.setHealthCheck(zero, {"from": gov})
@@ -115,4 +98,4 @@ def test_setters(
     chain.sleep(86400)
 
     # do this last so it doesn't mess with our harvests
-    strategy.setUniFees(0, 0, {"from": gov})
+    strategy.setUniFees(0, {"from": gov})

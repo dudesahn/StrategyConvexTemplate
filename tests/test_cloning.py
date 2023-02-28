@@ -29,7 +29,6 @@ def test_cloning(
     has_rewards,
     rewards_token,
     is_clonable,
-    proxy,
 ):
 
     # skip this test if we don't clone

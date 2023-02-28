@@ -14,7 +14,6 @@ def test_migration(
     whale,
     strategy,
     chain,
-    proxy,
     strategist_ms,
     healthCheck,
     pid,

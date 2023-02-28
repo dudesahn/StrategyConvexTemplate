@@ -15,8 +15,6 @@ def test_update_to_zero_then_back(
     rewards,
     chain,
     contract_name,
-    voter,
-    proxy,
     pid,
     amount,
     pool,
@@ -31,7 +29,6 @@ def test_update_to_zero_then_back(
     no_profit,
     is_slippery,
     rewards_template,
-    sushi_router,
     rewards_amount,
     rewards_whale,
 ):
@@ -234,8 +231,6 @@ def test_update_from_zero_to_off(
     rewards,
     chain,
     contract_name,
-    voter,
-    proxy,
     pid,
     amount,
     pool,
@@ -250,7 +245,6 @@ def test_update_from_zero_to_off(
     no_profit,
     is_slippery,
     rewards_template,
-    sushi_router,
 ):
     # skip this test if we don't use rewards in this template
     if not rewards_template:
@@ -447,8 +441,6 @@ def test_change_rewards(
     rewards,
     chain,
     contract_name,
-    voter,
-    proxy,
     pid,
     amount,
     pool,
@@ -545,8 +537,6 @@ def test_check_rewards(
     rewards,
     chain,
     contract_name,
-    voter,
-    proxy,
     pid,
     amount,
     pool,
@@ -627,65 +617,6 @@ def test_check_rewards(
 
 
 # this one tests if we don't have any CRV to send to voter or any left over after sending
-def test_weird_amounts(
-    gov,
-    token,
-    vault,
-    strategist,
-    whale,
-    strategy,
-    chain,
-    strategist_ms,
-    voter,
-    amount,
-    is_convex,
-    sleep_time,
-):
-
-    ## deposit to the vault after approving
-    token.approve(vault, 2**256 - 1, {"from": whale})
-    vault.deposit(amount, {"from": whale})
-    strategy.harvest({"from": gov})
-
-    # set our optimal to agEUR
-    strategy.setOptimal(0, {"from": gov})
-
-    # sleep to get some profit
-    chain.sleep(sleep_time)
-    chain.mine(1)
-
-    # take 100% of our CRV to the voter
-    if is_convex:
-        strategy.setKeep(10000, 0, gov, {"from": gov})
-    else:
-        strategy.setKeepCRV(10000, {"from": gov})
-    chain.sleep(1)
-    chain.mine(1)
-    strategy.harvest({"from": gov})
-
-    # sleep to get some profit
-    chain.sleep(sleep_time)
-    chain.mine(1)
-
-    # switch to EUROC
-    strategy.setOptimal(1, {"from": gov})
-    strategy.harvest({"from": gov})
-
-    # sleep to get some profit
-    chain.sleep(sleep_time)
-    chain.mine(1)
-
-    # take 0% of our CRV to the voter
-    if is_convex:
-        strategy.setKeep(0, 0, gov, {"from": gov})
-    else:
-        strategy.setKeepCRV(0, {"from": gov})
-    chain.sleep(1)
-    chain.mine(1)
-    strategy.harvest({"from": gov})
-
-
-# this one tests if we don't have any CRV to send to voter or any left over after sending
 def test_more_rewards_stuff(
     gov,
     token,
@@ -695,7 +626,6 @@ def test_more_rewards_stuff(
     strategy,
     chain,
     strategist_ms,
-    voter,
     amount,
     rewards_token,
     rewards,

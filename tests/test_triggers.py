@@ -75,46 +75,28 @@ def test_triggers(
     assert tx == True
     strategy.setMaxReportDelay(86400 * 21)
 
-    # only convex does this mess with earmarking
+    # only convex has claimable profit readouts
     if is_convex:
-        # turn on our check for earmark. Shouldn't block anything. Turn off earmark check after.
-        strategy.setHarvestTriggerParams(90000e6, 150000e6, True, {"from": gov})
+        strategy.setHarvestTriggerParams(90000e6, 150000e6, {"from": gov})
         tx = strategy.harvestTrigger(0, {"from": gov})
-        if strategy.needsEarmarkReward():
-            print("\nShould we harvest? Should be no since we need to earmark.", tx)
-            assert tx == False
-        else:
-            print(
-                "\nShould we harvest? Should be false since it was already false and we don't need to earmark.",
-                tx,
-            )
-            assert tx == False
-        strategy.setHarvestTriggerParams(90000e6, 150000e6, False, {"from": gov})
+        assert tx == False
 
         if not (is_slippery and no_profit):
             # update our minProfit so our harvest triggers true
-            strategy.setHarvestTriggerParams(1, 1000000e6, False, {"from": gov})
+            strategy.setHarvestTriggerParams(1, 1000000e6, {"from": gov})
             tx = strategy.harvestTrigger(0, {"from": gov})
             print("\nShould we harvest? Should be true.", tx)
             assert tx == True
 
             # update our maxProfit so harvest triggers true
-            strategy.setHarvestTriggerParams(1000000e6, 1, False, {"from": gov})
+            strategy.setHarvestTriggerParams(1000000e6, 1, {"from": gov})
             tx = strategy.harvestTrigger(0, {"from": gov})
             print("\nShould we harvest? Should be true.", tx)
             assert tx == True
 
-        # earmark should be false now (it's been too long), turn it off after
-        chain.sleep(86400 * 21)
-        strategy.setHarvestTriggerParams(90000e6, 150000e6, True, {"from": gov})
-        assert strategy.needsEarmarkReward() == True
-        tx = strategy.harvestTrigger(0, {"from": gov})
-        print(
-            "\nShould we harvest? Should be false, even though it was true before because of earmark.",
-            tx,
-        )
-        assert tx == False
-        strategy.setHarvestTriggerParams(90000e6, 150000e6, False, {"from": gov})
+        # return back to normal
+        strategy.setHarvestTriggerParams(90000e6, 150000e6, {"from": gov})
+
     else:  # curve uses minDelay as well
         strategy.setMinReportDelay(sleep_time - 1)
         tx = strategy.harvestTrigger(0, {"from": gov})
