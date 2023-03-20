@@ -1,8 +1,9 @@
 import brownie
-from brownie import Wei, accounts, Contract, config, ZERO_ADDRESS
-import math
+from brownie import chain
+import pytest
+from utils import harvest_strategy
 
-# test cloning our strategy, make sure the cloned strategy still works just fine by sending funds to it
+# make sure cloned strategy works just like normal
 def test_cloning(
     gov,
     token,
@@ -10,253 +11,166 @@ def test_cloning(
     strategist,
     whale,
     strategy,
-    keeper,
     rewards,
-    chain,
-    contract_name,
-    rewardsContract,
-    pid,
+    keeper,
     amount,
-    pool,
-    gauge,
-    strategy_name,
     sleep_time,
-    tests_using_tenderly,
     is_slippery,
     no_profit,
-    is_convex,
-    vault_address,
-    has_rewards,
-    rewards_token,
+    contract_name,
     is_clonable,
+    tests_using_tenderly,
+    strategy_name,
+    profit_whale,
+    profit_amount,
+    destination_strategy,
+    use_yswaps,
+    destination_vault,
 ):
 
     # skip this test if we don't clone
     if not is_clonable:
-        print("Doesn't have a clone function, skipping")
         return
 
+    ## deposit to the vault after approving like normal
+    starting_whale = token.balanceOf(whale)
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    vault.deposit(amount, {"from": whale})
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        destination_strategy,
+    )
+    before_pps = vault.pricePerShare()
+
+    # clone our strategy
+    tx = strategy.cloneRouterStrategy(
+        vault,
+        strategist,
+        rewards,
+        keeper,
+        destination_vault,
+        strategy_name,
+    )
+    new_strategy = contract_name.at(tx.return_value)
+
     # tenderly doesn't work for "with brownie.reverts"
-    if tests_using_tenderly:
-        if is_convex:
-            ## clone our strategy
-            tx = strategy.cloneConvexUsdcPairs(
+    if tests_using_tenderly == False:
+        # Shouldn't be able to call initialize again
+        with brownie.reverts():
+            strategy.initialize(
                 vault,
                 strategist,
                 rewards,
                 keeper,
-                pid,
-                pool,
+                destination_vault,
                 strategy_name,
                 {"from": gov},
             )
-            newStrategy = contract_name.at(tx.return_value)
-        else:
-            ## clone our strategy
-            tx = strategy.cloneCurveEURS(
-                vault,
-                strategist,
-                rewards,
-                keeper,
-                gauge,
-                pool,
-                strategy_name,
-                {"from": gov},
-            )
-            newStrategy = contract_name.at(tx.return_value)
-    else:
-        if is_convex:
-            # Shouldn't be able to call initialize again
-            with brownie.reverts():
-                strategy.initialize(
-                    vault,
-                    strategist,
-                    rewards,
-                    keeper,
-                    pid,
-                    pool,
-                    strategy_name,
-                    {"from": gov},
-                )
 
-            ## clone our strategy
-            tx = strategy.cloneConvexUsdcPairs(
+        # Shouldn't be able to call initialize again
+        with brownie.reverts():
+            new_strategy.initialize(
                 vault,
                 strategist,
                 rewards,
                 keeper,
-                pid,
-                pool,
+                destination_vault,
                 strategy_name,
                 {"from": gov},
             )
-            newStrategy = contract_name.at(tx.return_value)
-
-            # Shouldn't be able to call initialize again
-            with brownie.reverts():
-                newStrategy.initialize(
-                    vault,
-                    strategist,
-                    rewards,
-                    keeper,
-                    pid,
-                    pool,
-                    strategy_name,
-                    {"from": gov},
-                )
 
             ## shouldn't be able to clone a clone
-            with brownie.reverts():
-                newStrategy.cloneConvexUsdcPairs(
-                    vault,
-                    strategist,
-                    rewards,
-                    keeper,
-                    pid,
-                    pool,
-                    strategy_name,
-                    {"from": gov},
-                )
-
-        else:
-            # Shouldn't be able to call initialize again
-            with brownie.reverts():
-                strategy.initialize(
-                    vault,
-                    strategist,
-                    rewards,
-                    keeper,
-                    gauge,
-                    pool,
-                    strategy_name,
-                    {"from": gov},
-                )
-
-            ## clone our strategy
-            tx = strategy.cloneCurveEURS(
+        with brownie.reverts():
+            new_strategy.cloneRouterStrategy(
                 vault,
                 strategist,
                 rewards,
                 keeper,
-                gauge,
-                pool,
+                destination_vault,
                 strategy_name,
                 {"from": gov},
             )
-            newStrategy = contract_name.at(tx.return_value)
 
-            # Shouldn't be able to call initialize again
-            with brownie.reverts():
-                newStrategy.initialize(
-                    vault,
-                    strategist,
-                    rewards,
-                    keeper,
-                    gauge,
-                    pool,
-                    strategy_name,
-                    {"from": gov},
-                )
-
-            ## shouldn't be able to clone a clone
-            with brownie.reverts():
-                newStrategy.cloneCurveEURS(
-                    vault,
-                    strategist,
-                    rewards,
-                    keeper,
-                    gauge,
-                    pool,
-                    strategy_name,
-                    {"from": gov},
-                )
-
-    # revoke and get funds back into vault
-    currentDebt = vault.strategies(strategy)["debtRatio"]
+    # revoke, get funds back into vault, remove old strat from queue
     vault.revokeStrategy(strategy, {"from": gov})
-    chain.sleep(1)
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        destination_strategy,
+    )
+    vault.removeStrategyFromQueue(strategy.address, {"from": gov})
 
-    # attach our new strategy
-    vault.addStrategy(newStrategy, currentDebt, 0, 2**256 - 1, 1_000, {"from": gov})
-
-    if vault_address == ZERO_ADDRESS:
-        assert vault.withdrawalQueue(1) == newStrategy
-    else:
-        if (
-            vault.withdrawalQueue(2) == ZERO_ADDRESS
-        ):  # only has convex, since we just added our clone to position index 1
-            assert vault.withdrawalQueue(1) == newStrategy
-        else:
-            assert vault.withdrawalQueue(2) == newStrategy
-    assert vault.strategies(newStrategy)["debtRatio"] == currentDebt
+    # attach our new strategy, ensure it's the only one
+    vault.addStrategy(
+        new_strategy.address, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov}
+    )
+    assert vault.withdrawalQueue(0) == new_strategy.address
+    assert vault.strategies(new_strategy)["debtRatio"] == 10_000
     assert vault.strategies(strategy)["debtRatio"] == 0
 
-    # add rewards token if needed
-    if has_rewards:
-        if is_convex:
-            newStrategy.updateRewards(True, 0, {"from": gov})
-        else:
-            newStrategy.updateRewards(True, rewards_token, {"from": gov})
-
-    ## deposit to the vault after approving; this is basically just our simple_harvest test
-    before_pps = vault.pricePerShare()
-    startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
-    vault.deposit(amount, {"from": whale})
-
     # harvest, store asset amount
-    if not is_convex:  # make sure to update our proxy if a curve strategy
-        proxy.approveStrategy(strategy.gauge(), newStrategy, {"from": gov})
-    newStrategy.harvest({"from": gov})
-    chain.sleep(1)
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        new_strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        destination_strategy,
+    )
     old_assets = vault.totalAssets()
     assert old_assets > 0
-    assert token.balanceOf(newStrategy) == 0
-    assert newStrategy.estimatedTotalAssets() > 0
-    print("\nStarting Assets: ", old_assets / 1e18)
-
-    # try and include custom logic here to check that funds are in the staking contract (if needed)
-    if is_convex:
-        assert rewardsContract.balanceOf(newStrategy) > 0
-        print("\nAssets Staked: ", rewardsContract.balanceOf(newStrategy) / 1e18)
-    else:
-        assert newStrategy.stakedBalance() > 0
-        print("\nAssets Staked: ", newStrategy.stakedBalance() / 1e18)
+    assert token.balanceOf(new_strategy) == 0
+    assert new_strategy.estimatedTotalAssets() > 0
 
     # simulate some earnings
     chain.sleep(sleep_time)
-    chain.mine(1)
 
     # harvest after a day, store new asset amount
-    newStrategy.harvest({"from": gov})
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        new_strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        destination_strategy,
+    )
     new_assets = vault.totalAssets()
 
     # we can't use strategyEstimated Assets because the profits are sent to the vault
     assert new_assets >= old_assets
-    print("\nAssets after 2 days: ", new_assets / 1e18)
 
     # Display estimated APR based on the two days before the pay out
     print(
         "\nEstimated APR: ",
         "{:.2%}".format(
             ((new_assets - old_assets) * (365 * (86400 / sleep_time)))
-            / (newStrategy.estimatedTotalAssets())
+            / (new_strategy.estimatedTotalAssets())
         ),
     )
 
-    # simulate a day of waiting for share price to bump back up
-    chain.sleep(86400)
+    # simulate five days of waiting for share price to bump back up
+    chain.sleep(86400 * 5)
     chain.mine(1)
 
-    # withdraw and confirm we made money, or at least that we have about the same
+    # withdraw and confirm we made money, or at least that we have about the same (profit whale has to be different from normal whale)
     vault.withdraw({"from": whale})
     if is_slippery and no_profit:
         assert (
-            math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
-            or token.balanceOf(whale) >= startingWhale
+            pytest.approx(token.balanceOf(whale), rel=RELATIVE_APPROX) == starting_whale
         )
     else:
-        assert token.balanceOf(whale) >= startingWhale
+        assert token.balanceOf(whale) >= starting_whale
+
+    # make sure our PPS went us as well
     assert vault.pricePerShare() >= before_pps

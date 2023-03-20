@@ -61,7 +61,7 @@ def test_update_to_zero_then_back(
 
     # attach our new strategy and approve it on the proxy
     vault.addStrategy(
-        newStrategy, startingDebtRatio, 0, 2**256 - 1, 1_000, {"from": gov}
+        newStrategy, startingDebtRatio, 0, 2 ** 256 - 1, 1_000, {"from": gov}
     )
 
     # if a curve strat, whitelist on our strategy proxy
@@ -85,7 +85,7 @@ def test_update_to_zero_then_back(
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
@@ -275,7 +275,7 @@ def test_update_from_zero_to_off(
 
     # attach our new strategy and approve it on the proxy
     vault.addStrategy(
-        newStrategy, startingDebtRatio, 0, 2**256 - 1, 1_000, {"from": gov}
+        newStrategy, startingDebtRatio, 0, 2 ** 256 - 1, 1_000, {"from": gov}
     )
 
     # if a curve strat, whitelist on our strategy proxy
@@ -299,7 +299,7 @@ def test_update_from_zero_to_off(
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
@@ -480,7 +480,7 @@ def test_change_rewards(
 
     # attach our new strategy and approve it on the proxy
     vault.addStrategy(
-        newStrategy, startingDebtRatio, 0, 2**256 - 1, 1_000, {"from": gov}
+        newStrategy, startingDebtRatio, 0, 2 ** 256 - 1, 1_000, {"from": gov}
     )
 
     # if a curve strat, whitelist on our strategy proxy
@@ -496,7 +496,7 @@ def test_change_rewards(
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest, store asset amount
@@ -567,7 +567,7 @@ def test_check_rewards(
 
     if test_donation:
         ## deposit to the vault after approving
-        token.approve(vault, 2**256 - 1, {"from": whale})
+        token.approve(vault, 2 ** 256 - 1, {"from": whale})
         vault.deposit(amount, {"from": whale})
         strategy.harvest({"from": gov})
 
@@ -642,7 +642,7 @@ def test_more_rewards_stuff(
         return
 
     ## deposit to the vault after approving
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     strategy.harvest({"from": gov})
 

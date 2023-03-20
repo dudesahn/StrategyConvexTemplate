@@ -1,7 +1,7 @@
 import brownie
-from brownie import Contract
-from brownie import config
-import math
+from brownie import chain, Contract, ZERO_ADDRESS, accounts
+import pytest
+from utils import harvest_strategy, trade_handler_action
 
 # test our harvest triggers
 def test_triggers(
@@ -13,61 +13,92 @@ def test_triggers(
     strategy,
     chain,
     amount,
-    gasOracle,
-    strategist_ms,
+    sleep_time,
     is_slippery,
     no_profit,
-    is_convex,
-    sleep_time,
-    rewardsContract,
+    profit_whale,
+    profit_amount,
+    destination_strategy,
+    base_fee_oracle,
+    use_yswaps,
 ):
-
-    # convex inactive strategy (0 DR and 0 assets) shouldn't be touched by keepers
-    gasOracle.setMaxAcceptableBaseFee(10000 * 1e9, {"from": strategist_ms})
+    # inactive strategy (0 DR and 0 assets) shouldn't be touched by keepers
     currentDebtRatio = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
-    if is_convex:
-        strategy.harvest({"from": gov})
-        tx = strategy.harvestTrigger(0, {"from": gov})
-        print("\nShould we harvest? Should be false.", tx)
-        assert tx == False
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        destination_strategy,
+    )
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be false.", tx)
+    assert tx == False
     vault.updateStrategyDebtRatio(strategy, currentDebtRatio, {"from": gov})
 
-    ## deposit to the vault after approving
-    startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    ## deposit to the vault after approving, no harvest yet
+    starting_whale = token.balanceOf(whale)
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
     starting_assets = vault.totalAssets()
 
-    if is_convex:
-        # update our min credit so harvest triggers true
-        strategy.setCreditThreshold(1, {"from": gov})
-        tx = strategy.harvestTrigger(0, {"from": gov})
-        print("\nShould we harvest? Should be true.", tx)
-        assert tx == True
-        strategy.setCreditThreshold(1e24, {"from": gov})
+    # update our min credit so harvest triggers true
+    strategy.setCreditThreshold(1, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be true.", tx)
+    assert tx == True
+    strategy.setCreditThreshold(1e24, {"from": gov})
 
-        # harvest the credit
-        chain.sleep(1)
-        strategy.harvest({"from": gov})
-        chain.sleep(1)
-        chain.mine(1)
+    # test our manual harvest trigger
+    strategy.setForceHarvestTriggerOnce(True, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be true.", tx)
+    assert tx == True
 
-        # should trigger false, nothing is ready yet
-        tx = strategy.harvestTrigger(0, {"from": gov})
-        print("\nShould we harvest? Should be false.", tx)
-        assert tx == False
-    else:
-        # harvest the credit
-        chain.sleep(1)
-        strategy.harvest({"from": gov})
-        chain.sleep(1)
-        chain.mine(1)
+    # harvest the credit
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        destination_strategy,
+    )
+
+    # should trigger false, nothing is ready yet, just harvested
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be false.", tx)
+    assert tx == False
 
     # simulate earnings
     chain.sleep(sleep_time)
-    chain.mine(1)
+
+    ################# GENERATE CLAIMABLE PROFIT HERE AS NEEDED #################
+    # take profit in our destination vault
+    trade_handler_action(destination_strategy, token, gov, profit_whale, profit_amount)
+
+    # check that we have claimable profit, need this for min and max profit checks below
+    claimable_profit = strategy.claimableProfitInUsdc()
+    assert claimable_profit > 0
+
+    if not (is_slippery and no_profit):
+        # update our minProfit so our harvest triggers true
+        strategy.setHarvestTriggerParams(1, 1000000e6, {"from": gov})
+        tx = strategy.harvestTrigger(0, {"from": gov})
+        print("\nShould we harvest? Should be true.", tx)
+        assert tx == True
+
+        # update our maxProfit so harvest triggers true
+        strategy.setHarvestTriggerParams(1000000e6, 1, {"from": gov})
+        tx = strategy.harvestTrigger(0, {"from": gov})
+        print("\nShould we harvest? Should be true.", tx)
+        assert tx == True
+        strategy.setHarvestTriggerParams(90000e6, 150000e6, {"from": gov})
 
     # set our max delay to 1 day so we trigger true, then set it back to 21 days
     strategy.setMaxReportDelay(sleep_time - 1)
@@ -76,54 +107,35 @@ def test_triggers(
     assert tx == True
     strategy.setMaxReportDelay(86400 * 21)
 
-    # only convex has claimable profit readouts
-    if is_convex:
-        strategy.setHarvestTriggerParams(90000e6, 150000e6, {"from": gov})
-        tx = strategy.harvestTrigger(0, {"from": gov})
-        assert tx == False
-
-        if not (is_slippery and no_profit):
-            # update our minProfit so our harvest triggers true, also need to checkpoint
-            rewardsContract.user_checkpoint(strategy.address, {"from": gov})
-            strategy.setHarvestTriggerParams(1, 1000000e6, {"from": gov})
-            tx = strategy.harvestTrigger(0, {"from": gov})
-            print("\nShould we harvest? Should be true.", tx)
-            assert tx == True
-
-            # update our maxProfit so harvest triggers true
-            strategy.setHarvestTriggerParams(1000000e6, 1, {"from": gov})
-            tx = strategy.harvestTrigger(0, {"from": gov})
-            print("\nShould we harvest? Should be true.", tx)
-            assert tx == True
-
-        # return back to normal
-        strategy.setHarvestTriggerParams(90000e6, 150000e6, {"from": gov})
-
-    else:  # curve uses minDelay as well
-        strategy.setMinReportDelay(sleep_time - 1)
-        tx = strategy.harvestTrigger(0, {"from": gov})
-        print("\nShould we harvest? Should be True.", tx)
-        assert tx == True
-
     # harvest, wait
-    chain.sleep(1)
-    tx = strategy.harvest({"from": gov})
-    print("Harvest info:", tx.events["Harvested"])
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        destination_strategy,
+    )
+    print("Profit:", profit, "Loss:", loss)
     chain.sleep(sleep_time)
-    chain.mine(1)
 
-    # harvest should trigger false due to high gas price
-    gasOracle.setMaxAcceptableBaseFee(1 * 1e9, {"from": strategist_ms})
+    # harvest should trigger false because of oracle
+    base_fee_oracle.setManualBaseFeeBool(False, {"from": gov})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be false.", tx)
     assert tx == False
+    base_fee_oracle.setManualBaseFeeBool(True, {"from": gov})
+
+    # simulate five days of waiting for share price to bump back up
+    chain.sleep(86400 * 5)
+    chain.mine(1)
 
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
     if is_slippery and no_profit:
         assert (
-            math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
-            or token.balanceOf(whale) >= startingWhale
+            pytest.approx(token.balanceOf(whale), rel=RELATIVE_APPROX) == starting_whale
         )
     else:
-        assert token.balanceOf(whale) >= startingWhale
+        assert token.balanceOf(whale) >= starting_whale

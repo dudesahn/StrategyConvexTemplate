@@ -1,649 +1,520 @@
 import brownie
-from brownie import Contract
-from brownie import config
-import math
+from brownie import Contract, chain, ZERO_ADDRESS
+import pytest
+from utils import harvest_strategy, check_status
 
-
-def test_odds_and_ends(
+# this module includes other tests we may need to generate, for instance to get best possible coverage on prepareReturn or liquidatePosition
+# do any extra testing here to hit all parts of liquidatePosition
+# generally this involves sending away all assets and then withdrawing before another harvest
+def test_liquidatePosition(
     gov,
     token,
     vault,
-    strategist,
     whale,
     strategy,
-    chain,
-    strategist_ms,
-    gauge,
-    contract_name,
-    rewardsContract,
-    pid,
-    crv,
-    convexToken,
     amount,
-    pool,
-    strategy_name,
-    rewards_token,
-    is_convex,
-    has_rewards,
-    sleep_time,
-    gauge_is_not_tokenized,
+    profit_whale,
+    profit_amount,
+    destination_strategy,
+    use_yswaps,
+    destination_vault,
+    is_slippery,
+    RELATIVE_APPROX,
+    vault_address,
 ):
-
-    ## deposit to the vault after approving. turn off health check before each harvest since we're doing weird shit
-    strategy.setDoHealthCheck(False, {"from": gov})
-    startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
-    vault.deposit(amount, {"from": whale})
-    chain.sleep(1)
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
-
-    # send away all funds, will need to alter this based on strategy
-    if is_convex:
-        # set claim rewards to true and send away CRV and CVX
-        rewardsContract.withdrawAll(True, {"from": strategy})
-        to_send = token.balanceOf(strategy)
-        token.transfer(gov, to_send, {"from": strategy})
-        assert strategy.estimatedTotalAssets() == 0
-
-        to_send = crv.balanceOf(strategy)
-        crv.transfer(gov, to_send, {"from": strategy})
-        to_send = convexToken.balanceOf(strategy)
-        convexToken.transfer(gov, to_send, {"from": strategy})
-        if has_rewards:
-            to_send = rewards_token.balanceOf(strategy)
-            rewards_token.transfer(gov, to_send, {"from": strategy})
-        assert strategy.estimatedTotalAssets() == 0
-    else:
-        if gauge_is_not_tokenized:
-            return
-        # send all funds out of the gauge
-        to_send = gauge.balanceOf(voter)
-        print("Gauge Balance of Vault", to_send / 1e18)
-        gauge.transfer(gov, to_send, {"from": voter})
-        to_send = crv.balanceOf(strategy)
-        crv.transfer(gov, to_send, {"from": strategy})
-        if has_rewards:
-            to_send = rewards_token.balanceOf(strategy)
-            rewards_token.transfer(gov, to_send, {"from": strategy})
-        assert strategy.estimatedTotalAssets() == 0
-
-    # our whale donates 1 wei to the vault so we don't divide by zero (0.3.5 vault errors in vault._reportLoss)
-    token.transfer(strategy, 1, {"from": whale})
-
-    chain.sleep(sleep_time)
-    chain.mine(1)
-    strategy.setDoHealthCheck(False, {"from": gov})
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
-
-    # we can also withdraw from an empty vault as well
-    vault.withdraw({"from": whale})
-
-    # we can try to migrate too, lol
-    # deploy our new strategy
-    if is_convex:
-        new_strategy = strategist.deploy(
-            contract_name,
-            vault,
-            pid,
-            pool,
-            strategy_name,
-        )
-    else:
-        new_strategy = strategist.deploy(
-            contract_name,
-            vault,
-            gauge,
-            pool,
-            strategy_name,
-        )
-
-    total_old = strategy.estimatedTotalAssets()
-
-    # migrate our old strategy
-    vault.migrateStrategy(strategy, new_strategy, {"from": gov})
-    if not is_convex:
-        proxy.approveStrategy(strategy.gauge(), new_strategy, {"from": gov})
-
-    # assert that our old strategy is empty
-    updated_total_old = strategy.estimatedTotalAssets()
-    assert updated_total_old == 0
-
-    # harvest to get funds back in strategy
-    new_strategy.harvest({"from": gov})
-    new_strat_balance = new_strategy.estimatedTotalAssets()
-    assert new_strat_balance >= updated_total_old
-
-    startingVault = vault.totalAssets()
-    print("\nVault starting assets with new strategy: ", startingVault)
-
-    # simulate one day of earnings
-    chain.sleep(86400)
-    chain.mine(1)
-
-    # Test out our migrated strategy, confirm we're making a profit
-    new_strategy.harvest({"from": gov})
-    vaultAssets_2 = vault.totalAssets()
-    assert vaultAssets_2 >= startingVault
-    print("\nAssets after 1 day harvest: ", vaultAssets_2)
-
-    # check our oracle
-    one_eth_in_want = strategy.ethToWant(1000000000000000000)
-    print("This is how much want one ETH buys:", one_eth_in_want)
-    zero_eth_in_want = strategy.ethToWant(0)
-
-    # check our views
-    strategy.apiVersion()
-    strategy.isActive()
-
-    # tend stuff
-    chain.sleep(1)
-    strategy.tend({"from": gov})
-    chain.sleep(1)
-    strategy.tendTrigger(0, {"from": gov})
-
-
-def test_odds_and_ends_2(
-    gov,
-    token,
-    vault,
-    strategist,
-    whale,
-    strategy,
-    chain,
-    strategist_ms,
-    gauge,
-    amount,
-    is_convex,
-    gauge_is_not_tokenized,
-    rewardsContract,
-):
-
-    ## deposit to the vault after approving. turn off health check since we're doing weird shit
-    strategy.setDoHealthCheck(False, {"from": gov})
-    startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
-    vault.deposit(amount, {"from": whale})
-    chain.sleep(1)
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
-
-    # send away all funds, will need to alter this based on strategy
-    if is_convex:
-        rewardsContract.withdrawAll(False, {"from": strategy})
-        to_send = token.balanceOf(strategy)
-        token.transfer(gov, to_send, {"from": strategy})
-        assert strategy.estimatedTotalAssets() == 0
-    else:
-        if gauge_is_not_tokenized:
-            return
-        # send all funds out of the gauge
-        to_send = gauge.balanceOf(voter)
-        print("Gauge Balance of Vault", to_send / 1e18)
-        gauge.transfer(gov, to_send, {"from": voter})
-        assert strategy.estimatedTotalAssets() == 0
-
-    strategy.setEmergencyExit({"from": gov})
-
-    # our whale donates 1 wei to the vault so we don't divide by zero (0.3.5 vault errors in vault._reportLoss)
-    token.transfer(strategy, 1, {"from": whale})
-
-    chain.sleep(1)
-    strategy.setDoHealthCheck(False, {"from": gov})
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
-
-    # we can also withdraw from an empty vault as well
-    vault.withdraw({"from": whale})
-
-
-def test_odds_and_ends_migration(
-    contract_name,
-    gov,
-    token,
-    vault,
-    guardian,
-    strategist,
-    whale,
-    strategy,
-    chain,
-    strategist_ms,
-    pid,
-    amount,
-    gauge,
-    pool,
-    strategy_name,
-    is_convex,
-    sleep_time,
-):
-
     ## deposit to the vault after approving
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    starting_whale = token.balanceOf(whale)
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
-    chain.sleep(1)
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        destination_strategy,
+    )
 
-    # deploy our new strategy
-    if is_convex:
-        new_strategy = strategist.deploy(
-            contract_name,
-            vault,
-            pid,
-            pool,
-            strategy_name,
+    # check our current status
+    print("\nAfter first harvest")
+    strategy_params = check_status(strategy, vault)
+
+    # evaluate our current total assets
+    old_assets = vault.totalAssets()
+    initial_debt = strategy_params["totalDebt"]
+    starting_share_price = vault.pricePerShare()
+    initial_strategy_assets = strategy.estimatedTotalAssets()
+
+    ################# SEND ALL FUNDS AWAY. ADJUST AS NEEDED PER STRATEGY. #################
+    to_send = destination_vault.balanceOf(strategy)
+    destination_vault.transfer(gov, to_send, {"from": strategy})
+
+    # check our current status
+    print("\nAfter fund transfer, before withdrawal")
+    strategy_params = check_status(strategy, vault)
+
+    # we shouldn't have taken any actual losses yet, and debt/DR/share price should all still be the same
+    assert strategy_params["debtRatio"] == 10_000
+    assert strategy_params["totalLoss"] == 0
+    assert strategy_params["totalDebt"] == initial_debt == old_assets
+    assert vault.pricePerShare() == starting_share_price
+
+    # if slippery, then assets may differ slightly from debt
+    if is_slippery:
+        assert (
+            pytest.approx(initial_debt, rel=RELATIVE_APPROX) == initial_strategy_assets
         )
     else:
-        new_strategy = strategist.deploy(
-            contract_name,
-            vault,
-            gauge,
-            pool,
-            strategy_name,
-        )
-    total_old = strategy.estimatedTotalAssets()
+        assert initial_debt == initial_strategy_assets
 
-    # can we harvest an unactivated strategy? should be no, but only for convex
-    if is_convex:
-        tx = new_strategy.harvestTrigger(0, {"from": gov})
-        print("\nShould we harvest? Should be False.", tx)
-        assert tx == False
+    # confirm we emptied the strategy
+    assert strategy.estimatedTotalAssets() == 0
 
-    # sleep
-    chain.sleep(sleep_time)
+    # calculate how much of our vault tokens our whale holds
+    whale_holdings = vault.balanceOf(whale) / vault.totalSupply() * 10_000
+    print("Whale Holdings:", whale_holdings)
 
-    # migrate our old strategy
-    vault.migrateStrategy(strategy, new_strategy, {"from": gov})
-    if not is_convex:
-        proxy.approveStrategy(strategy.gauge(), new_strategy, {"from": gov})
+    # withdraw and see how down bad we are, confirm we can withdraw from an empty vault
+    # it's important to do this before harvesting, also allow max loss
+    vault.withdraw(vault.balanceOf(whale), whale, 10_000, {"from": whale})
 
-    # assert that our old strategy is empty
-    updated_total_old = strategy.estimatedTotalAssets()
-    assert updated_total_old == 0
+    # check our current status
+    print("\nAfter withdrawal")
+    strategy_params = check_status(strategy, vault)
 
-    # harvest to get funds back in strategy
-    chain.sleep(1)
-    new_strategy.harvest({"from": gov})
-    new_strat_balance = new_strategy.estimatedTotalAssets()
+    # this is where we branch. if we have an existing vault we assume there are other holders. if not, we assumed 100% loss on withdrawal.
+    if vault_address == ZERO_ADDRESS:
+        # because we only withdrew, and didn't harvest, only the withdrawn portion of assets will be known as a loss
+        # however, if we own all of the vault, this is a moot point
+        assert strategy_params["totalGain"] == 0
 
-    # confirm we made money, or at least that we have about the same
-    assert new_strat_balance >= total_old or math.isclose(
-        new_strat_balance, total_old, abs_tol=5
-    )
+        # if we burn all vault shares, then price per share is 1.0
+        assert vault.pricePerShare() == 10 ** token.decimals()
 
-    startingVault = vault.totalAssets()
-    print("\nVault starting assets with new strategy: ", startingVault)
+        # everything is gone, except for our debtOutstanding 😅
+        assert strategy_params["debtRatio"] == 0
+        assert strategy_params["totalLoss"] == initial_debt == old_assets
+        assert strategy_params["totalDebt"] == 0
 
-    # simulate one day of earnings
-    chain.sleep(86400)
-    chain.mine(1)
+        # if total debt is equal to zero, then debt outsanding is also zero
+        assert vault.debtOutstanding(strategy) == 0
 
-    # simulate a day of waiting for share price to bump back up
-    chain.sleep(86400)
-    chain.mine(1)
+        if is_slippery:
+            # remaining debt, plus whale's deposits, should be approximately our old assets
+            assert (
+                pytest.approx(
+                    strategy_params["totalDebt"] + amount, rel=RELATIVE_APPROX
+                )
+                == old_assets
+            )
+            # DR scales proportionally with the holdings of our whale (ie, x% of vault that was lost)
+            assert (
+                pytest.approx(strategy_params["debtRatio"], rel=RELATIVE_APPROX)
+                == whale_holdings
+            )
+            # vault assets will still be the same minus the "withdrawn" assets
+            assert (
+                pytest.approx(vault.totalAssets() + amount, rel=RELATIVE_APPROX)
+                == old_assets
+            )
+            # debt outstanding is the portion of debt that needs to be paid back (DR is still greater than zero)
+            assert (
+                pytest.approx(
+                    vault.totalAssets()
+                    * (10_000 - strategy_params["debtRatio"])
+                    / 10_000,
+                    rel=RELATIVE_APPROX,
+                )
+                == vault.debtOutstanding(strategy)
+            )
+        else:
+            assert strategy_params["totalDebt"] + amount == old_assets
+            assert strategy_params["debtRatio"] == whale_holdings
+            assert vault.totalAssets() + amount == old_assets
+            assert vault.totalAssets() * (
+                10_000 - strategy_params["debtRatio"]
+            ) / 10_000 == vault.debtOutstanding(strategy)
 
-    # Test out our migrated strategy, confirm we're making a profit
-    new_strategy.harvest({"from": gov})
-    vaultAssets_2 = vault.totalAssets()
-    # confirm we made money, or at least that we have about the same
-    assert vaultAssets_2 >= startingVault or math.isclose(
-        vaultAssets_2, startingVault, abs_tol=5
-    )
-    print("\nAssets after 1 day harvest: ", vaultAssets_2)
+    else:
+        # because we only withdrew, and didn't harvest, only the withdrawn portion of assets will be known as a loss
+        # this means total loss isn't all of our debt, and share price won't be zero yet
+        assert strategy_params["totalLoss"] > 0
+        assert strategy_params["totalGain"] == 0
+
+        # share price isn't affected since shares are burned proportionally with losses
+        assert vault.pricePerShare() == starting_share_price
+
+        if is_slippery:
+            # remaining debt, plus whale's deposits, should be approximately our old assets
+            assert (
+                pytest.approx(
+                    strategy_params["totalDebt"] + amount, rel=RELATIVE_APPROX
+                )
+                == old_assets
+            )
+            # DR scales proportionally with the holdings of our whale (ie, x% of vault that was lost)
+            assert (
+                pytest.approx(strategy_params["debtRatio"], rel=RELATIVE_APPROX)
+                == whale_holdings
+            )
+            # vault assets will still be the same minus the "withdrawn" assets
+            assert (
+                pytest.approx(vault.totalAssets() + amount, rel=RELATIVE_APPROX)
+                == old_assets
+            )
+            # debt outstanding is the portion of debt that needs to be paid back (DR is still greater than zero)
+            assert (
+                pytest.approx(
+                    vault.totalAssets()
+                    * (10_000 - strategy_params["debtRatio"])
+                    / 10_000,
+                    rel=RELATIVE_APPROX,
+                )
+                == vault.debtOutstanding(strategy)
+            )
+        else:
+            assert strategy_params["totalDebt"] + amount == old_assets
+            assert strategy_params["debtRatio"] == whale_holdings
+            assert vault.totalAssets() + amount == old_assets
+            assert vault.totalAssets() * (
+                10_000 - strategy_params["debtRatio"]
+            ) / 10_000 == vault.debtOutstanding(strategy)
+
+    # confirm that the strategy has no funds
+    assert strategy.estimatedTotalAssets() == 0
 
 
-def test_odds_and_ends_liquidatePosition(
+# there also may be situations where the destination protocol is exploited or funds are locked but you still hold the same number of wrapper tokens
+# though liquity doesn't have this as an option, it's important to test if it is to make sure debt is maintained properly in the case future assets free up
+def test_locked_funds(
     gov,
     token,
     vault,
-    strategist,
     whale,
     strategy,
-    chain,
-    strategist_ms,
-    gauge,
-    rewardsContract,
     amount,
     is_slippery,
     no_profit,
-    is_convex,
     sleep_time,
+    profit_whale,
+    profit_amount,
+    destination_strategy,
+    use_yswaps,
+    old_vault,
+    destination_vault,
+):
+    # should update this one for Router
+    print("No way to test this for current strategy")
+
+
+# here we take a loss intentionally without entering emergencyExit
+def test_rekt(
+    gov,
+    token,
+    vault,
+    whale,
+    strategy,
+    amount,
+    profit_whale,
+    profit_amount,
+    destination_strategy,
+    use_yswaps,
+    old_vault,
+    destination_vault,
 ):
     ## deposit to the vault after approving
-    startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    starting_whale = token.balanceOf(whale)
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
-    newWhale = token.balanceOf(whale)
-
-    # this is part of our check into the staking contract balance
-    if is_convex:
-        stakingBeforeHarvest = rewardsContract.balanceOf(strategy)
-    else:
-        stakingBeforeHarvest = strategy.stakedBalance()
-
-    # harvest, store asset amount
-    chain.sleep(1)
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
-    old_assets = vault.totalAssets()
-    assert old_assets > 0
-    assert token.balanceOf(strategy) == 0
-    assert strategy.estimatedTotalAssets() > 0
-    print("\nStarting Assets: ", old_assets / 1e18)
-
-    # try and include custom logic here to check that funds are in the staking contract (if needed)
-    if is_convex:
-        stakingBeforeHarvest < rewardsContract.balanceOf(strategy)
-    else:
-        stakingBeforeHarvest < strategy.stakedBalance()
-
-    # simulate time for earnings
-    chain.sleep(sleep_time)
-    chain.mine(1)
-
-    # harvest, store new asset amount
-    chain.sleep(1)
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
-    new_assets = vault.totalAssets()
-
-    # confirm we made money, or at least that we have about the same
-    assert new_assets >= old_assets or math.isclose(new_assets, old_assets, abs_tol=5)
-    print("\nAssets after 7 days: ", new_assets / 1e18)
-
-    # Display estimated APR
-    print(
-        "\nEstimated APR: ",
-        "{:.2%}".format(
-            ((new_assets - old_assets) * (365 * 86400 / sleep_time))
-            / (strategy.estimatedTotalAssets())
-        ),
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        destination_strategy,
     )
-    # simulate a day of waiting for share price to bump back up
-    chain.sleep(86400)
-    chain.mine(1)
 
-    # transfer funds to our strategy so we have enough for our withdrawal
-    token.transfer(strategy, amount, {"from": whale})
+    # check our current status
+    print("\nAfter first harvest")
+    strategy_params = check_status(strategy, vault)
 
-    # withdraw and confirm we made money, or at least that we have about the same
-    vault.withdraw({"from": whale})
-    if is_slippery and no_profit:
-        assert (
-            math.isclose(token.balanceOf(whale) + amount, startingWhale, abs_tol=10)
-            or token.balanceOf(whale) + amount >= startingWhale
-        )
-    else:
-        assert token.balanceOf(whale) + amount >= startingWhale
+    # evaluate our current total assets
+    old_assets = vault.totalAssets()
+    initial_strategy_assets = strategy.estimatedTotalAssets()
+    initial_debt = strategy_params["totalDebt"]
+    starting_share_price = vault.pricePerShare()
 
+    ################# SEND ALL FUNDS AWAY. ADJUST AS NEEDED PER STRATEGY. #################
+    to_send = destination_vault.balanceOf(strategy)
+    destination_vault.transfer(gov, to_send, {"from": strategy})
 
-def test_odds_and_ends_rekt(
-    gov,
-    token,
-    vault,
-    strategist,
-    whale,
-    strategy,
-    chain,
-    strategist_ms,
-    rewardsContract,
-    crv,
-    convexToken,
-    amount,
-    is_convex,
-    gauge,
-    has_rewards,
-    rewards_token,
-    gauge_is_not_tokenized,
-):
-    ## deposit to the vault after approving. turn off health check since we're doing weird shit
-    strategy.setDoHealthCheck(False, {"from": gov})
-    startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
-    vault.deposit(amount, {"from": whale})
-    chain.sleep(1)
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
+    # confirm we emptied the strategy
+    assert strategy.estimatedTotalAssets() == 0
 
-    # send away all funds, will need to alter this based on strategy
-    if is_convex:
-        # set claim rewards to true and send away CRV and CVX
-        rewardsContract.withdrawAll(True, {"from": strategy})
-        to_send = token.balanceOf(strategy)
-        token.transfer(gov, to_send, {"from": strategy})
-        assert strategy.estimatedTotalAssets() == 0
-        to_send = crv.balanceOf(strategy)
-        crv.transfer(gov, to_send, {"from": strategy})
-        to_send = convexToken.balanceOf(strategy)
-        convexToken.transfer(gov, to_send, {"from": strategy})
-        if has_rewards:
-            to_send = rewards_token.balanceOf(strategy)
-            rewards_token.transfer(gov, to_send, {"from": strategy})
-        assert strategy.estimatedTotalAssets() == 0
-    else:
-        if gauge_is_not_tokenized:
-            return
-        # send all funds out of the gauge
-        to_send = gauge.balanceOf(voter)
-        print("Gauge Balance of Vault", to_send / 1e18)
-        gauge.transfer(gov, to_send, {"from": voter})
-        to_send = crv.balanceOf(strategy)
-        crv.transfer(gov, to_send, {"from": strategy})
-        if has_rewards:
-            to_send = rewards_token.balanceOf(strategy)
-            rewards_token.transfer(gov, to_send, {"from": strategy})
-        assert strategy.estimatedTotalAssets() == 0
+    # our whale donates 5 wei to the vault so we don't divide by zero (needed for older vaults)
+    if old_vault:
+        token.transfer(strategy, 5, {"from": whale})
 
-    # our whale donates 1 wei to the vault so we don't divide by zero (0.3.5 vault errors in vault._reportLoss)
-    token.transfer(strategy, 1, {"from": whale})
-
+    # set debtRatio to zero so we try and pull everything that we can out. turn off health check because of massive losses
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
-
     strategy.setDoHealthCheck(False, {"from": gov})
-    chain.sleep(1)
-    chain.mine(1)
-    tx = strategy.harvest({"from": gov})
-    chain.sleep(1)
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        destination_strategy,
+    )
+    # assert strategy.estimatedTotalAssets() == 0
 
-    # we can also withdraw from an empty vault as well
+    if old_vault:
+        assert vault.totalAssets() == 5
+    else:
+        assert vault.totalAssets() == 0
+
+    # simulate 5 days of waiting for share price to bump back up
+    chain.sleep(86400 * 5)
+    chain.mine(1)
+
+    # withdraw and see how down bad we are, confirm we can withdraw from an empty vault
     vault.withdraw({"from": whale})
 
-
-# goal of this one is to hit a withdraw when we don't have any staked assets
-def test_odds_and_ends_liquidate_rekt(
-    gov,
-    token,
-    vault,
-    strategist,
-    whale,
-    strategy,
-    chain,
-    strategist_ms,
-    amount,
-    gauge,
-    is_convex,
-    gauge_is_not_tokenized,
-    rewardsContract,
-):
-    ## deposit to the vault after approving. turn off health check since we're doing weird shit
-    strategy.setDoHealthCheck(False, {"from": gov})
-    startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
-    vault.deposit(amount, {"from": whale})
-    chain.sleep(1)
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
-
-    # send away all funds, will need to alter this based on strategy
-    if is_convex:
-        rewardsContract.withdrawAll(False, {"from": strategy})
-        to_send = token.balanceOf(strategy)
-        token.transfer(gov, to_send, {"from": strategy})
-        assert strategy.estimatedTotalAssets() == 0
-    else:
-        if gauge_is_not_tokenized:
-            return
-        # send all funds out of the gauge
-        to_send = gauge.balanceOf(voter)
-        print("Gauge Balance of Vault", to_send / 1e18)
-        gauge.transfer(gov, to_send, {"from": voter})
-        assert strategy.estimatedTotalAssets() == 0
-
-    # we can also withdraw from an empty vault as well, but make sure we're okay with losing 100%
-    to_withdraw = 2**256 - 1  # withdraw our full amount
-    vault.withdraw(to_withdraw, whale, 10000, {"from": whale})
+    print(
+        "Raw loss:",
+        (starting_whale - token.balanceOf(whale)) / 1e18,
+        "Percentage:",
+        (starting_whale - token.balanceOf(whale)) / starting_whale,
+    )
+    print("Share price:", vault.pricePerShare() / 1e18)
 
 
 def test_weird_reverts(
     gov,
     token,
     vault,
-    strategist,
     whale,
     strategy,
-    chain,
-    strategist_ms,
-    other_vault_strategy,
-    amount,
+    destination_strategy,
 ):
 
     # only vault can call this
     with brownie.reverts():
-        strategy.migrate(strategist_ms, {"from": gov})
+        strategy.migrate(whale, {"from": gov})
 
     # can't migrate to a different vault
     with brownie.reverts():
-        vault.migrateStrategy(strategy, other_vault_strategy, {"from": gov})
+        vault.migrateStrategy(strategy, destination_strategy, {"from": gov})
 
     # can't withdraw from a non-vault address
     with brownie.reverts():
         strategy.withdraw(1e18, {"from": gov})
 
-    # can't do health check with a non-health check contract
-    with brownie.reverts():
-        strategy.withdraw(1e18, {"from": gov})
 
-
-# this test makes sure we can still harvest without any assets but with a profit
-def test_odds_and_ends_empty_strat(
+# this test makes sure we can still harvest without any assets but still get our profits
+# can also test here whether we claim rewards from an empty strategy, some protocols will revert
+def test_empty_strat(
     gov,
     token,
     vault,
-    strategist,
     whale,
     strategy,
-    chain,
-    strategist_ms,
     amount,
-    sleep_time,
+    profit_whale,
+    profit_amount,
+    destination_strategy,
+    use_yswaps,
+    destination_vault,
+    old_vault,
     is_slippery,
-    no_profit,
-    is_convex,
-    gauge,
-    gauge_is_not_tokenized,
-    rewardsContract,
+    RELATIVE_APPROX,
+    vault_address,
 ):
     ## deposit to the vault after approving
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    starting_whale = token.balanceOf(whale)
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
-    chain.sleep(1)
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        destination_strategy,
+    )
 
-    ## move our funds out of the strategy
-    startingDebtRatio = vault.strategies(strategy)["debtRatio"]
-    vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
-    chain.sleep(sleep_time)
-    strategy.harvest({"from": gov})
+    # check our current status
+    print("\nAfter first harvest")
+    strategy_params = check_status(strategy, vault)
 
-    ## move our funds back into the strategy
-    vault.updateStrategyDebtRatio(strategy, startingDebtRatio, {"from": gov})
-    chain.sleep(1)
-    strategy.harvest({"from": gov})
+    # evaluate our current total assets
+    old_assets = vault.totalAssets()
+    initial_strategy_assets = strategy.estimatedTotalAssets()
+    initial_debt = strategy_params["totalDebt"]
+    starting_share_price = vault.pricePerShare()
 
-    # sleep to generate some profit
-    chain.sleep(sleep_time)
+    ################# SEND ALL FUNDS AWAY. ADJUST AS NEEDED PER STRATEGY. #################
+    to_send = destination_vault.balanceOf(strategy)
+    destination_vault.transfer(gov, to_send, {"from": strategy})
 
-    # send away all funds, will need to alter this based on strategy
-    if is_convex:
-        # send away all funds so we have profit but no assets. make sure to turn off claimRewards first
-        rewardsContract.withdrawAll(False, {"from": strategy})
-        to_send = token.balanceOf(strategy)
-        token.transfer(gov, to_send, {"from": strategy})
-        assert strategy.estimatedTotalAssets() == 0
-        if not no_profit:
-            assert strategy.claimableBalance()[0] > 0
+    # confirm we emptied the strategy
+    assert strategy.estimatedTotalAssets() == 0
+
+    # check that our losses are approximately the whole strategy
+    print("\nBefore dust transfer, after main fund transfer")
+    strategy_params = check_status(strategy, vault)
+
+    # we shouldn't have taken any actual losses yet, and debt/DR/share price should all still be the same
+    assert strategy_params["debtRatio"] == 10_000
+    assert strategy_params["totalLoss"] == 0
+    assert strategy_params["totalDebt"] == initial_debt == old_assets
+    assert vault.pricePerShare() == starting_share_price
+
+    # if slippery, then assets may differ slightly from debt
+    if is_slippery:
+        assert (
+            pytest.approx(initial_debt, rel=RELATIVE_APPROX) == initial_strategy_assets
+        )
     else:
-        if gauge_is_not_tokenized:
-            return
-        # send all funds out of the gauge, then send back 1 wei so we can claim rewards
-        to_send = gauge.balanceOf(voter)
-        print("Gauge Balance of Vault", to_send / 1e18)
-        gauge.transfer(gov, to_send, {"from": voter})
-        gauge.transfer(voter, 1, {"from": gov})
-        assert strategy.estimatedTotalAssets() == 1
+        assert initial_debt == initial_strategy_assets
 
-    # our whale donates 1 wei to the vault so we don't divide by zero (0.3.5 vault, errors in vault._reportLoss)
-    token.transfer(strategy, 1, {"from": whale})
+    # confirm we emptied the strategy
+    assert strategy.estimatedTotalAssets() == 0
 
-    # harvest to check that it works okay, turn off health check since we'll have profit without any (or most) assets lol
-    chain.sleep(1)
+    # our whale donates 5 wei to the vault so we don't divide by zero (needed for older vaults)
+    # old vaults also don't have the totalIdle var
+    if old_vault:
+        dust_donation = 5
+        token.transfer(strategy, dust_donation, {"from": whale})
+        assert strategy.estimatedTotalAssets() == dust_donation
+    else:
+        total_idle = vault.totalIdle()
+        assert total_idle == 0
+
+    # check our current status
+    print("\nBefore harvest, after funds transfer out + dust transfer in")
+    strategy_params = check_status(strategy, vault)
+
+    # we shouldn't have taken any actual losses yet, and debt/DR/share price should all still be the same
+    assert strategy_params["debtRatio"] == 10_000
+    assert strategy_params["totalLoss"] == 0
+    assert strategy_params["totalDebt"] == initial_debt == old_assets
+    assert vault.pricePerShare() == starting_share_price
+    assert vault.debtOutstanding(strategy) == 0
+
+    # accept our losses, sad day 🥲
     strategy.setDoHealthCheck(False, {"from": gov})
-    tx = strategy.harvest({"from": gov})
-    print("Harvest Profit with no assets:", tx.events["Harvested"]["profit"] / 1e18)
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        destination_strategy,
+    )
+    assert loss > 0
+
+    # check our status
+    print("\nAfter our big time loss")
+    strategy_params = check_status(strategy, vault)
+
+    # DR goes to zero, loss is > 0, gain and debt should be near zero (zero for new vaults), share price also nearr zero (bye-bye assets 💀)
+    assert strategy_params["debtRatio"] == 0
+    assert strategy_params["totalLoss"] > 0
+    assert strategy_params["totalGain"] == 0
+    assert vault.pricePerShare() == 0
+
+    # vault should also have no assets, except old ones will have 5 wei
+    if old_vault:
+        assert strategy_params["totalDebt"] == dust_donation == vault.totalAssets()
+        assert strategy.estimatedTotalAssets() <= dust_donation
+    else:
+        assert strategy_params["totalDebt"] == 0 == vault.totalAssets()
+        total_idle = vault.totalIdle()
+        assert total_idle == 0
+        assert strategy.estimatedTotalAssets() == 0
+
+    # some profits fall from the heavens
+    # this should be used to pay down debt vs taking profits
+    token.transfer(strategy, profit_amount, {"from": profit_whale})
+    strategy.setDoHealthCheck(False, {"from": gov})
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        destination_strategy,
+    )
+    assert profit > 0
+    share_price = vault.pricePerShare()
+    assert share_price > 0
+    print("Share price:", share_price)
 
 
 # this test makes sure we can still harvest without any profit and not revert
-def test_odds_and_ends_no_profit(
+# for some strategies it may be impossible to harvest without generating profit, especially if not using yswaps
+def test_no_profit(
     gov,
     token,
     vault,
-    strategist,
     whale,
     strategy,
-    chain,
-    strategist_ms,
     amount,
+    profit_whale,
+    profit_amount,
+    destination_strategy,
+    use_yswaps,
     sleep_time,
-    is_slippery,
-    no_profit,
-    is_convex,
 ):
     ## deposit to the vault after approving
-    startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2**256 - 1, {"from": whale})
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
-    chain.sleep(1)
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        destination_strategy,
+    )
 
-    # sleep two weeks into the future so we need to earmark, harvest to clear our profit
-    strategy.setDoHealthCheck(False, {"from": gov})
-    chain.sleep(86400 * 14)
-    tx = strategy.harvest({"from": gov})
-    profit = tx.events["Harvested"]["profit"]
-    print("Harvest profit:", profit)
-    if not (is_slippery and no_profit):
-        assert profit > 0
-    chain.mine(1)
-    chain.sleep(1)
+    # check our current status
+    print("\nAfter first harvest")
+    strategy_params = check_status(strategy, vault)
 
-    # sleep to try and generate profit, but it shouldn't (if convex). we should still be able to harvest though.
-    chain.sleep(1)
-    if is_convex:
-        assert strategy.claimableBalance()[0] == 0
-    tx = strategy.harvest({"from": gov})
-    profit = tx.events["Harvested"]["profit"]
-    if is_convex:
-        assert profit == 0
+    # evaluate our current total assets
+    old_assets = vault.totalAssets()
+    initial_strategy_assets = strategy.estimatedTotalAssets()
+    initial_debt = strategy_params["totalDebt"]
+    starting_share_price = vault.pricePerShare()
 
-    # withdraw and confirm we made money, or at least that we have about the same
-    vault.withdraw({"from": whale})
-    if is_slippery and no_profit:
-        assert (
-            math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
-            or token.balanceOf(whale) >= startingWhale
-        )
-    else:
-        assert token.balanceOf(whale) >= startingWhale
+    # sleep
+    chain.sleep(sleep_time)
+
+    # if are using yswaps and we don't want profit, don't use yswaps (False for first argument).
+    # Or just don't harvest our destination strategy, can pass 0 for profit_amount and use if statement in utils
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        0,
+        destination_strategy,
+    )
+
+    # check our current status
+    print("\nAfter harvest")
+    strategy_params = check_status(strategy, vault)
+
+    assert profit == 0
+    assert vault.pricePerShare() == starting_share_price
