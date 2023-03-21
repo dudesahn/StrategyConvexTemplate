@@ -19,8 +19,10 @@ def test_migration(
     use_yswaps,
     is_slippery,
     no_profit,
-    destination_vault,
     strategy_name,
+    to_sweep,
+    pid,
+    pool,
 ):
 
     ## deposit to the vault after approving
@@ -43,7 +45,13 @@ def test_migration(
     chain.sleep(sleep_time)
 
     ######### THIS WILL NEED TO BE UPDATED BASED ON STRATEGY CONSTRUCTOR #########
-    new_strategy = gov.deploy(contract_name, vault, destination_vault, strategy_name)
+    new_strategy = gov.deploy(
+        contract_name,
+        vault,
+        pid,
+        pool,
+        strategy_name,
+    )
 
     # can we harvest an unactivated strategy? should be no
     tx = new_strategy.harvestTrigger(0, {"from": gov})
@@ -51,14 +59,17 @@ def test_migration(
     assert tx == False
 
     ######### ADD LOGIC TO TEST CLAIMING OF ASSETS FOR TRANSFER TO NEW STRATEGY AS NEEDED #########
-    # none needed for router strategy since we just hold the vault token
 
     # migrate our old strategy
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})
 
     ####### ADD LOGIC TO MAKE SURE ASSET TRANSFER WENT AS EXPECTED #######
-    assert destination_vault.balanceOf(strategy) == 0
-    assert destination_vault.balanceOf(new_strategy) > 0
+    assert token.balanceOf(strategy) == 0
+    assert token.balanceOf(new_strategy) > 0
+
+    # to_sweep is CRV here
+    assert to_sweep.balanceOf(new_strategy) >= 0
+    assert to_sweep.balanceOf(strategy) == 0
 
     # assert that our old strategy is empty
     updated_total_old = strategy.estimatedTotalAssets()
@@ -91,7 +102,7 @@ def test_migration(
 
     # Test out our migrated strategy, confirm we're making a profit
     (profit, loss) = harvest_strategy(
-        True,
+        use_yswaps,
         new_strategy,
         token,
         gov,
@@ -125,10 +136,11 @@ def test_empty_migration(
     destination_strategy,
     trade_factory,
     use_yswaps,
-    destination_vault,
     strategy_name,
     is_slippery,
     RELATIVE_APPROX,
+    pid,
+    pool,
 ):
 
     ## deposit to the vault after approving
@@ -151,7 +163,13 @@ def test_empty_migration(
     chain.sleep(sleep_time)
 
     ######### THIS WILL NEED TO BE UPDATED BASED ON STRATEGY CONSTRUCTOR #########
-    new_strategy = gov.deploy(contract_name, vault, destination_vault, strategy_name)
+    new_strategy = gov.deploy(
+        contract_name,
+        vault,
+        pid,
+        pool,
+        strategy_name,
+    )
 
     # set our debtRatio to zero so our harvest sends all funds back to vault
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})

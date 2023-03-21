@@ -1,6 +1,6 @@
 import pytest
 import brownie
-from brownie import interface, chain, accounts
+from brownie import interface, chain, accounts, Contract
 
 # returns (profit, loss) of a harvest
 def harvest_strategy(
@@ -22,7 +22,14 @@ def harvest_strategy(
 
     ####### ADD LOGIC AS NEEDED FOR CLAIMING/SENDING REWARDS TO STRATEGY #######
     # usually this is automatic, but it may need to be externally triggered
-    # 3Crypto doesn't use ySwaps
+    # 3Crypto doesn't use ySwaps, but we need to trigger the checkpoint on arbitrum
+    # use the profit_amount check so we can turn off profits as needed
+    rewardsContract = Contract(strategy.rewardsContract())
+    if strategy.stakedBalance() > 0 and profit_amount > 0:
+        rewardsContract.user_checkpoint(strategy.address, {"from": gov})
+        chain.sleep(86400)
+        rewardsContract.user_checkpoint(strategy.address, {"from": gov})
+        chain.sleep(86400)
 
     # we can use the tx for debugging if needed
     tx = strategy.harvest({"from": gov})
@@ -31,6 +38,9 @@ def harvest_strategy(
 
     # assert there are no loose funds in strategy after a harvest
     assert strategy.balanceOfWant() == 0
+
+    if strategy.stakedBalance() > 0 and profit_amount > 0:
+        rewardsContract.user_checkpoint(strategy.address, {"from": gov})
 
     # reset everything with a sleep and mine
     chain.sleep(1)

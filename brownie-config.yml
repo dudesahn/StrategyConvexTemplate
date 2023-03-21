@@ -21,5 +21,9 @@ compiler:
 
 reports:
   exclude_contracts:
-    - SafeERC20
     - Math
+    - Vault
+    - Ownable
+    - Address
+    - BaseStrategy
+    - SafeERC20

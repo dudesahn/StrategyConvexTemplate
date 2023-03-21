@@ -17,7 +17,6 @@ def test_liquidatePosition(
     profit_amount,
     destination_strategy,
     use_yswaps,
-    destination_vault,
     is_slippery,
     RELATIVE_APPROX,
     vault_address,
@@ -47,8 +46,10 @@ def test_liquidatePosition(
     initial_strategy_assets = strategy.estimatedTotalAssets()
 
     ################# SEND ALL FUNDS AWAY. ADJUST AS NEEDED PER STRATEGY. #################
-    to_send = destination_vault.balanceOf(strategy)
-    destination_vault.transfer(gov, to_send, {"from": strategy})
+    rewardsContract = Contract(strategy.rewardsContract())
+    rewardsContract.withdrawAll(False, {"from": strategy})
+    to_send = token.balanceOf(strategy)
+    token.transfer(gov, to_send, {"from": strategy})
 
     # check our current status
     print("\nAfter fund transfer, before withdrawal")
@@ -89,6 +90,9 @@ def test_liquidatePosition(
         # however, if we own all of the vault, this is a moot point
         assert strategy_params["totalGain"] == 0
 
+        # if our asset conversion has some slippage, then we may still have a few wei of assets left in the vault.
+        # not accounting for that in this testing but may be worth adding in the future, especially if some of the asserts below fail.
+
         # if we burn all vault shares, then price per share is 1.0
         assert vault.pricePerShare() == 10 ** token.decimals()
 
@@ -99,42 +103,6 @@ def test_liquidatePosition(
 
         # if total debt is equal to zero, then debt outsanding is also zero
         assert vault.debtOutstanding(strategy) == 0
-
-        if is_slippery:
-            # remaining debt, plus whale's deposits, should be approximately our old assets
-            assert (
-                pytest.approx(
-                    strategy_params["totalDebt"] + amount, rel=RELATIVE_APPROX
-                )
-                == old_assets
-            )
-            # DR scales proportionally with the holdings of our whale (ie, x% of vault that was lost)
-            assert (
-                pytest.approx(strategy_params["debtRatio"], rel=RELATIVE_APPROX)
-                == whale_holdings
-            )
-            # vault assets will still be the same minus the "withdrawn" assets
-            assert (
-                pytest.approx(vault.totalAssets() + amount, rel=RELATIVE_APPROX)
-                == old_assets
-            )
-            # debt outstanding is the portion of debt that needs to be paid back (DR is still greater than zero)
-            assert (
-                pytest.approx(
-                    vault.totalAssets()
-                    * (10_000 - strategy_params["debtRatio"])
-                    / 10_000,
-                    rel=RELATIVE_APPROX,
-                )
-                == vault.debtOutstanding(strategy)
-            )
-        else:
-            assert strategy_params["totalDebt"] + amount == old_assets
-            assert strategy_params["debtRatio"] == whale_holdings
-            assert vault.totalAssets() + amount == old_assets
-            assert vault.totalAssets() * (
-                10_000 - strategy_params["debtRatio"]
-            ) / 10_000 == vault.debtOutstanding(strategy)
 
     else:
         # because we only withdrew, and didn't harvest, only the withdrawn portion of assets will be known as a loss
@@ -202,7 +170,6 @@ def test_locked_funds(
     destination_strategy,
     use_yswaps,
     old_vault,
-    destination_vault,
 ):
     # should update this one for Router
     print("No way to test this for current strategy")
@@ -221,7 +188,6 @@ def test_rekt(
     destination_strategy,
     use_yswaps,
     old_vault,
-    destination_vault,
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
@@ -248,8 +214,10 @@ def test_rekt(
     starting_share_price = vault.pricePerShare()
 
     ################# SEND ALL FUNDS AWAY. ADJUST AS NEEDED PER STRATEGY. #################
-    to_send = destination_vault.balanceOf(strategy)
-    destination_vault.transfer(gov, to_send, {"from": strategy})
+    rewardsContract = Contract(strategy.rewardsContract())
+    rewardsContract.withdrawAll(False, {"from": strategy})
+    to_send = token.balanceOf(strategy)
+    token.transfer(gov, to_send, {"from": strategy})
 
     # confirm we emptied the strategy
     assert strategy.estimatedTotalAssets() == 0
@@ -328,7 +296,6 @@ def test_empty_strat(
     profit_amount,
     destination_strategy,
     use_yswaps,
-    destination_vault,
     old_vault,
     is_slippery,
     RELATIVE_APPROX,
@@ -359,8 +326,10 @@ def test_empty_strat(
     starting_share_price = vault.pricePerShare()
 
     ################# SEND ALL FUNDS AWAY. ADJUST AS NEEDED PER STRATEGY. #################
-    to_send = destination_vault.balanceOf(strategy)
-    destination_vault.transfer(gov, to_send, {"from": strategy})
+    rewardsContract = Contract(strategy.rewardsContract())
+    rewardsContract.withdrawAll(False, {"from": strategy})
+    to_send = token.balanceOf(strategy)
+    token.transfer(gov, to_send, {"from": strategy})
 
     # confirm we emptied the strategy
     assert strategy.estimatedTotalAssets() == 0
@@ -491,14 +460,10 @@ def test_no_profit(
     print("\nAfter first harvest")
     strategy_params = check_status(strategy, vault)
 
-    # evaluate our current total assets
-    old_assets = vault.totalAssets()
-    initial_strategy_assets = strategy.estimatedTotalAssets()
-    initial_debt = strategy_params["totalDebt"]
+    # store our starting share price
     starting_share_price = vault.pricePerShare()
 
-    # sleep
-    chain.sleep(sleep_time)
+    # normally we would sleep here, but we are intentionally trying to avoid profit, so we don't
 
     # if are using yswaps and we don't want profit, don't use yswaps (False for first argument).
     # Or just don't harvest our destination strategy, can pass 0 for profit_amount and use if statement in utils

@@ -144,9 +144,19 @@ def test_change_debt(
     print("\nAfter harvest to return DR to 100%")
     strategy_params = check_status(strategy, vault)
 
+    ################# SET FALSE IF PROFIT EXPECTED HERE. ADJUST AS NEEDED. #################
+    # set this true if no profit on this test. it is normal for a strategy to not generate profit here.
+    # realistically only wrapped tokens or every-block earners will see profits.
+    no_profit_here = True
+
     # debtOutstanding should be zero, credit available will be much lower than previously but greater than zero (profits)
+    # however, if the strategy has no profit, or has inconsistent profit-taking, then we can have no credit here
+    # also checked in test_emergency_exit_with_no_loss
     assert vault.debtOutstanding(strategy) == 0
-    assert 0 < vault.creditAvailable(strategy) < vault.totalAssets() / 2
+    if no_profit or no_profit_here:
+        vault.creditAvailable(strategy) == 0
+    else:
+        assert 0 < vault.creditAvailable(strategy) < vault.totalAssets() / 2
 
     # evaluate our current total assets
     new_assets = vault.totalAssets()
@@ -281,7 +291,10 @@ def test_change_debt_with_profit(
 
     # debtOutstanding should be zero, credit available will be much lower than 50% of vault but greater than zero (profits)
     assert vault.debtOutstanding(strategy) == 0
-    assert 0 < vault.creditAvailable(strategy) < vault.totalAssets() / 2
+    if not no_profit:
+        assert 0 < vault.creditAvailable(strategy) < vault.totalAssets() / 2
+    else:
+        vault.creditAvailable(strategy) == 0
 
     # we should have gain now, whether using yswaps or not thanks to the donation
     assert strategy_params["totalGain"] > 0

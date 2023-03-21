@@ -25,7 +25,6 @@ def test_cloning(
     profit_amount,
     destination_strategy,
     use_yswaps,
-    destination_vault,
 ):
 
     # skip this test if we don't clone

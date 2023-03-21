@@ -67,8 +67,8 @@ def amount(token):
 def profit_whale(profit_amount, token):
     # ideally not the same whale as the main whale, or else they will lose money
     profit_whale = accounts.at(
-        "0x36fDb65D2d484b036AdE6A2a418B05Da0c848f1B", force=True
-    )  # 0x36fDb65D2d484b036AdE6A2a418B05Da0c848f1B, 3Crypto 139 tokens
+        "0xF403C135812408BFbE8713b5A23a04b3D48AAE31", force=True
+    )  # 0xF403C135812408BFbE8713b5A23a04b3D48AAE31, 3Crypto 139 tokens
     if token.balanceOf(profit_whale) < 5 * profit_amount:
         raise ValueError(
             "Our profit whale needs more funds. Find another whale or reduce your profit_amount variable."
@@ -209,9 +209,9 @@ if chain_used == 1:  # mainnet
     def keeper(management):
         yield management
 
+    # token we can sweep out of strategy (use CRV)
     @pytest.fixture(scope="session")
     def to_sweep():
-        # token we can sweep out of strategy (use CRV)
         yield interface.IERC20("0xD533a949740bb3306d119CC777fa900bA034cd52")
 
     @pytest.fixture(scope="session")
@@ -259,10 +259,20 @@ if chain_used == 42161:  # arbitrum
     def keeper(management):
         yield management
 
+    # token we can sweep out of strategy (use CRV)
     @pytest.fixture(scope="session")
     def to_sweep():
-        # token we can sweep out of strategy (use CRV)
         yield interface.IERC20("0x11cDb42B0EB46D95f990BeDD4695A6e3fA034978")
+
+    # not actually arbitrum, just left as placeholderr
+    @pytest.fixture(scope="session")
+    def trade_factory():
+        yield "0xcADBA199F3AC26F67f660C89d43eB1820b7f7a3b"
+
+    # not actually arbitrum, just left as placeholderr
+    @pytest.fixture(scope="session")
+    def keeper_wrapper():
+        yield "0x0D26E894C2371AB6D20d99A65E991775e3b5CAd7"
 
 
 @pytest.fixture(scope="module")
@@ -346,15 +356,8 @@ def strategy(
 # put our pool's convex pid here
 @pytest.fixture(scope="session")
 def pid():
-    pid = 3  # 3 = 3crypto
+    pid = 8  # 8 = new 3crypto
     yield pid
-
-
-@pytest.fixture(scope="session")
-def destination_vault(interface):
-    # destination vault of the route
-    yield "0x5b2384D566D2E4a0b29B8eccB642C63199cd393c"
-    # yield interface.IVaultFactory045("0x5b2384D566D2E4a0b29B8eccB642C63199cd393c")
 
 
 @pytest.fixture(scope="session")

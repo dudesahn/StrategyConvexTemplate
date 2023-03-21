@@ -177,10 +177,8 @@ def test_setters(
     strategy.setStrategist(gov, {"from": gov})
 
     ######### BELOW WILL NEED TO BE UPDATED BASED SETTERS OUR STRATEGY HAS #########
-    strategy.setMaxLoss(1, {"from": gov})
-
-    with brownie.reverts():
-        strategy.setMaxLoss(7, {"from": whale})
+    strategy.setUniFees(100, {"from": gov})
+    strategy.setHarvestTriggerParams(100, 100, {"from": gov})
 
 
 # test sweeping out tokens

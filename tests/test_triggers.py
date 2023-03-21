@@ -79,8 +79,6 @@ def test_triggers(
     chain.sleep(sleep_time)
 
     ################# GENERATE CLAIMABLE PROFIT HERE AS NEEDED #################
-    # take profit in our destination vault
-    trade_handler_action(destination_strategy, token, gov, profit_whale, profit_amount)
 
     # check that we have claimable profit, need this for min and max profit checks below
     claimable_profit = strategy.claimableProfitInUsdc()
