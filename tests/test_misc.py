@@ -179,6 +179,7 @@ def test_setters(
     ######### BELOW WILL NEED TO BE UPDATED BASED SETTERS OUR STRATEGY HAS #########
     strategy.setUniFees(100, {"from": gov})
     strategy.setHarvestTriggerParams(100, 100, {"from": gov})
+    strategy.setClaimRewards(True, {"from": gov})
 
 
 # test sweeping out tokens

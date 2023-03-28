@@ -32,7 +32,7 @@ interface IConvexRewards {
     // strategy's staked balance in the synthetix staking contract
     function balanceOf(address account) external view returns (uint256);
 
-    // read how much claimable CRV and CVX a strategy has
+    // read how much claimable CRV a strategy has
     function claimable_reward(address asset, address account)
         external
         view
@@ -81,8 +81,6 @@ abstract contract StrategyConvexBase is BaseStrategy {
     // tokens used in this strategy, internal constants to save gas
     IERC20 internal constant crv =
         IERC20(0x11cDb42B0EB46D95f990BeDD4695A6e3fA034978);
-    IERC20 internal constant convexToken =
-        IERC20(0xb952A807345991BD529FDded05009F5e80Fe8F45);
     IERC20 internal constant weth =
         IERC20(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1);
 
@@ -123,17 +121,9 @@ abstract contract StrategyConvexBase is BaseStrategy {
         return want.balanceOf(address(this));
     }
 
-    /// @notice How much (CRV, CVX) we can claim from the staking contract
-    function claimableBalance() public view returns (uint256, uint256) {
-        uint256 crvRewards =
-            rewardsContract.claimable_reward(address(crv), address(this));
-        uint256 cvxRewards =
-            rewardsContract.claimable_reward(
-                address(convexToken),
-                address(this)
-            );
-
-        return (crvRewards, cvxRewards);
+    /// @notice How much CRV we can claim from the staking contract
+    function claimableBalance() public view returns (uint256) {
+        return rewardsContract.claimable_reward(address(crv), address(this));
     }
 
     /// @notice Total assets the strategy holds, sum of loose and staked want.
@@ -276,15 +266,9 @@ contract StrategyConvex3CryptoArbitrum is StrategyConvexBase {
             uint256 _debtPayment
         )
     {
-        // this claims our CRV, CVX, and any extra tokens like SNX or ANKR
+        // this claims our CRV
         if (stakedBalance() > 0) {
             rewardsContract.getReward(address(this));
-        }
-
-        // transfer CVX to gov for now, as there is currrently no liquidity on arbitrum
-        uint256 cvxBalance = convexToken.balanceOf(address(this));
-        if (cvxBalance > 0) {
-            convexToken.safeTransfer(governance(), cvxBalance);
         }
 
         // sell our crv for more weth
@@ -335,17 +319,13 @@ contract StrategyConvex3CryptoArbitrum is StrategyConvexBase {
     }
 
     // migrate our want token to a new strategy if needed, make sure to check claimRewards first
-    // also send over any CRV or CVX that is claimed; for migrations we definitely want to claim
+    // also send over any CRV that is claimed; for migrations we definitely want to claim
     function prepareMigration(address _newStrategy) internal override {
         uint256 _stakedBal = stakedBalance();
         if (_stakedBal > 0) {
             rewardsContract.withdraw(_stakedBal, claimRewards);
         }
         crv.safeTransfer(_newStrategy, crv.balanceOf(address(this)));
-        convexToken.safeTransfer(
-            _newStrategy,
-            convexToken.balanceOf(address(this))
-        );
     }
 
     // Sells our CRV for WETH on UniV3
@@ -430,20 +410,17 @@ contract StrategyConvex3CryptoArbitrum is StrategyConvexBase {
 
     /// @notice Calculates the profit if all claimable assets were sold for USDC (6 decimals).
     /// @dev Uses yearn's lens oracle, if returned values are strange then troubleshoot there.
-    /// @return Total return in USDC from selling claimable CRV and CVX.
+    /// @return Total return in USDC from selling claimable CRV.
     function claimableProfitInUsdc() public view returns (uint256) {
         IOracle yearnOracle =
             IOracle(0x043518AB266485dC085a1DB095B8d9C2Fc78E9b9); // yearn lens oracle
         uint256 crvPrice = yearnOracle.getPriceUsdcRecommended(address(crv));
-        uint256 convexTokenPrice =
-            yearnOracle.getPriceUsdcRecommended(address(convexToken));
 
-        // check how much CRV and CVX we can claim from our deposit contract
-        (uint256 claimableCrv, uint256 claimableCvx) = claimableBalance();
+        // check how much CRV we can claim from our deposit contract
+        uint256 claimableCrv = claimableBalance();
 
         // Oracle returns prices as 6 decimals, so multiply by claimable amount and divide by token decimals (1e18)
-        return
-            (crvPrice * claimableCrv + convexTokenPrice * claimableCvx) / 1e18;
+        return (crvPrice * claimableCrv) / 1e18;
     }
 
     /// @notice Convert our keeper's eth cost into want
